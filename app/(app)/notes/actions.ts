@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { note } from "@/db/app-schema";
@@ -11,6 +11,16 @@ async function requireMember() {
   const session = await getSession();
   if (!session) throw new Error("Not authorized");
   return session;
+}
+
+// Broadcast a note change to every connected client via Postgres NOTIFY.
+// (LISTEN side lives in lib/note-events.ts → the SSE route.)
+async function notifyNotes() {
+  try {
+    await db.execute(sql`select pg_notify('note', '')`);
+  } catch {
+    // realtime is best-effort; the write already succeeded
+  }
 }
 
 export async function createNote(
@@ -31,6 +41,7 @@ export async function createNote(
     authorId: session.user.id,
     authorName: session.user.name || session.user.email || "Member",
   });
+  await notifyNotes();
   revalidatePath("/notes");
   revalidatePath("/");
   return { ok: true };
@@ -56,6 +67,7 @@ export async function deleteNote(formData: FormData) {
   }
 
   await db.delete(note).where(eq(note.id, id));
+  await notifyNotes();
   revalidatePath("/notes");
   revalidatePath("/");
 }

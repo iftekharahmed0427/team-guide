@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { note } from "@/db/app-schema";
 import { deleteNote } from "./actions";
 import NoteComposer from "./note-composer";
+import NotesLive from "./notes-live";
 
 const SHORT_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -48,6 +49,7 @@ export default async function NotesPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <NotesLive />
           <NoteComposer />
 
           {notes.length === 0 ? (
