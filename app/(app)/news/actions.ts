@@ -1,0 +1,93 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { newsPost } from "@/db/app-schema";
+
+async function requireAdmin() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || session.user.role !== "admin") {
+    throw new Error("Not authorized");
+  }
+  return session;
+}
+
+function slugify(title: string) {
+  const base = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return base || "post";
+}
+
+type CreateInput = {
+  title: string;
+  content: string;
+  excerpt: string;
+  tags: string[];
+};
+
+export async function createPost(
+  input: CreateInput,
+): Promise<{ slug: string } | { error: string }> {
+  let session;
+  try {
+    session = await requireAdmin();
+  } catch {
+    return { error: "You do not have permission to create posts." };
+  }
+
+  const title = input.title.trim();
+  if (!title) return { error: "Title is required." };
+  if (!input.content || input.content === "<p></p>") {
+    return { error: "Content is required." };
+  }
+
+  const tags = Array.from(
+    new Set(input.tags.map((t) => t.trim()).filter(Boolean)),
+  ).slice(0, 8);
+
+  const base = slugify(title);
+  let slug = base;
+  for (let i = 0; i < 50; i++) {
+    const existing = await db
+      .select({ id: newsPost.id })
+      .from(newsPost)
+      .where(eq(newsPost.slug, slug))
+      .limit(1);
+    if (existing.length === 0) break;
+    slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  await db.insert(newsPost).values({
+    id: randomUUID(),
+    slug,
+    title,
+    excerpt: input.excerpt.trim().slice(0, 200),
+    content: input.content,
+    tags,
+    authorId: session.user.id,
+    authorName: session.user.name || session.user.email || "Member",
+  });
+
+  revalidatePath("/news");
+  return { slug };
+}
+
+export async function deletePost(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Missing post");
+  await db.delete(newsPost).where(eq(newsPost.id, id));
+  revalidatePath("/news");
+  redirect("/news");
+}

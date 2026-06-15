@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    container_name: teamguide-app
+    restart: unless-stopped
+    # Reads BETTER_AUTH_*, DISCORD_*, AUTH_ALLOWED_*, and the Supabase DATABASE_URL.
+    env_file: .env
+    # Published on loopback only; your reverse proxy terminates TLS and forwards here.
+    ports:
+      - "127.0.0.1:3000:3000"

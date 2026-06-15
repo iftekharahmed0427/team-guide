@@ -1,26 +1,239 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --surface: #101012;
+  --surface-2: #161618;
+  --border: #232327;
+  --foreground: #ededed;
+  --muted: #8a8a92;
+  --accent: #e4e4e7;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius: 0px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Squared, minimal scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid var(--background);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #34343a;
+}
+
+/* Rich text content (TipTap editor + rendered articles) */
+.rich-text {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+.rich-text:focus {
+  outline: none;
+}
+.rich-text > :first-child {
+  margin-top: 0;
+}
+.rich-text h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.5rem 0 0.5rem;
+}
+.rich-text h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+.rich-text p {
+  margin: 0.75rem 0;
+}
+.rich-text ul,
+.rich-text ol {
+  margin: 0.75rem 0;
+  padding-left: 1.4rem;
+}
+.rich-text ul {
+  list-style: disc;
+}
+.rich-text ol {
+  list-style: decimal;
+}
+.rich-text li {
+  margin: 0.25rem 0;
+}
+.rich-text li p {
+  margin: 0;
+}
+.rich-text a {
+  color: #93c5fd;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rich-text blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--muted);
+}
+.rich-text strong {
+  font-weight: 600;
+}
+.rich-text code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.rich-text pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.rich-text pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.rich-text hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+.rich-text p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion: a small, dependency-free animation layer that matches the flat,
+   squared design. Entrance fades, a dropdown reveal, and a left-to-right
+   overlay wipe for buttons. All honor prefers-reduced-motion.
+   --------------------------------------------------------------------------- */
+
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fx-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fx-menu {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+/* Entrance: fade + rise. `both` keeps the start state before the delay. */
+.fx-rise {
+  animation: fx-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fx-fade {
+  animation: fx-fade 0.5s ease both;
+}
+
+/* Dropdown / popover reveal, anchored to the top edge. */
+.fx-menu {
+  transform-origin: top;
+  animation: fx-menu 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Left-to-right overlay wipe on hover/focus for squared buttons. The overlay
+   is a solid color (not a gradient) that slides in from the left and sits
+   behind the button's own label. Set --wipe to change the fill color. */
+.btn-wipe {
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+.btn-wipe::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--wipe, var(--surface-2));
+  transform: translateX(-101%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+.btn-wipe:hover::before,
+.btn-wipe:focus-visible::before {
+  transform: translateX(0);
+}
+
+/* High-contrast variant for primary (light-filled) buttons: a black panel
+   sweeps across and the label inverts to white — a clean white-to-black wipe. */
+.btn-wipe-dark {
+  --wipe: var(--background);
+  transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-wipe-dark:hover,
+.btn-wipe-dark:focus-visible {
+  color: var(--foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-rise,
+  .fx-fade,
+  .fx-menu {
+    animation: none;
+  }
+  .btn-wipe::before {
+    transition: none;
+  }
+  .btn-wipe-dark {
+    transition: none;
+  }
 }
