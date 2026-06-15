@@ -1,16 +1,25 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, and, asc, count, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { boardTask } from "@/db/app-schema";
-import { isStatus, type Task } from "./columns";
+import { boardTask, boardTaskComment, boardTaskAssignee } from "@/db/app-schema";
+import { user } from "@/db/auth-schema";
+import { isStatus, displayName, type Task, type Comment } from "./columns";
 
 // The board is shared, so any signed-in member can edit it.
 async function requireMember() {
   const session = await getSession();
   if (!session) throw new Error("Not authorized");
+  return session;
+}
+
+// Assigning members is admin-only.
+async function requireAdmin() {
+  const session = await requireMember();
+  if (session.user.role !== "admin") throw new Error("Admins only");
   return session;
 }
 
@@ -27,12 +36,41 @@ async function notifyBoard() {
 export async function listTasks(): Promise<Task[]> {
   await requireMember();
   const rows = await db.select().from(boardTask).orderBy(asc(boardTask.position));
+
+  // Assignees (with live display name) and comment counts, grouped by task.
+  const assigneeRows = await db
+    .select({
+      taskId: boardTaskAssignee.taskId,
+      userId: boardTaskAssignee.userId,
+      name: user.name,
+      email: user.email,
+    })
+    .from(boardTaskAssignee)
+    .innerJoin(user, eq(boardTaskAssignee.userId, user.id))
+    .orderBy(asc(boardTaskAssignee.createdAt));
+
+  const countRows = await db
+    .select({ taskId: boardTaskComment.taskId, n: count() })
+    .from(boardTaskComment)
+    .groupBy(boardTaskComment.taskId);
+
+  const assigneesByTask = new Map<string, { id: string; name: string }[]>();
+  for (const a of assigneeRows) {
+    const list = assigneesByTask.get(a.taskId) ?? [];
+    list.push({ id: a.userId, name: displayName(a.name, a.email) });
+    assigneesByTask.set(a.taskId, list);
+  }
+  const countByTask = new Map<string, number>();
+  for (const c of countRows) countByTask.set(c.taskId, Number(c.n));
+
   return rows.map((t) => ({
     id: t.id,
     title: t.title,
     note: t.note,
     status: t.status,
     position: t.position,
+    assignees: assigneesByTask.get(t.id) ?? [],
+    commentCount: countByTask.get(t.id) ?? 0,
   }));
 }
 
@@ -83,7 +121,122 @@ export async function moveTask(input: {
 export async function deleteTask(id: string): Promise<void> {
   await requireMember();
   if (!id) return;
+  // FK cascade removes the card's comments and assignees.
   await db.delete(boardTask).where(eq(boardTask.id, id));
   revalidatePath("/board");
   await notifyBoard();
+}
+
+// ── Comments ────────────────────────────────────────────────────────────────
+
+export async function listComments(taskId: string): Promise<Comment[]> {
+  await requireMember();
+  if (!taskId) return [];
+  const rows = await db
+    .select()
+    .from(boardTaskComment)
+    .where(eq(boardTaskComment.taskId, taskId))
+    .orderBy(asc(boardTaskComment.createdAt));
+  return rows.map((c) => ({
+    id: c.id,
+    taskId: c.taskId,
+    body: c.body,
+    authorId: c.authorId,
+    authorName: c.authorName,
+    createdAt: c.createdAt.toISOString(),
+  }));
+}
+
+// The client generates the id so it can render the comment optimistically.
+export async function addComment(input: {
+  id: string;
+  taskId: string;
+  body: string;
+}): Promise<{ ok: true } | { error: string }> {
+  let session;
+  try {
+    session = await requireMember();
+  } catch {
+    return { error: "You must be signed in to comment." };
+  }
+  const body = input.body.trim().slice(0, 2000);
+  if (!input.id || !input.taskId || !body) return { error: "Write something first." };
+
+  await db.insert(boardTaskComment).values({
+    id: input.id,
+    taskId: input.taskId,
+    body,
+    authorId: session.user.id,
+    authorName: displayName(session.user.name, session.user.email),
+  });
+  revalidatePath("/board");
+  await notifyBoard();
+  return { ok: true };
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  const session = await requireMember();
+  if (!id) return;
+  const rows = await db
+    .select({ authorId: boardTaskComment.authorId })
+    .from(boardTaskComment)
+    .where(eq(boardTaskComment.id, id))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return;
+
+  const isOwner = row.authorId === session.user.id;
+  const isAdmin = session.user.role === "admin";
+  if (!isOwner && !isAdmin) {
+    throw new Error("You can only delete your own comments.");
+  }
+  await db.delete(boardTaskComment).where(eq(boardTaskComment.id, id));
+  revalidatePath("/board");
+  await notifyBoard();
+}
+
+// ── Assignment (admin only) ──────────────────────────────────────────────────
+
+export async function assignMember(input: {
+  taskId: string;
+  userId: string;
+}): Promise<{ ok: true } | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "Only admins can assign members." };
+  }
+  if (!input.taskId || !input.userId) return { error: "Missing task or member." };
+
+  await db
+    .insert(boardTaskAssignee)
+    .values({ id: randomUUID(), taskId: input.taskId, userId: input.userId })
+    .onConflictDoNothing();
+  revalidatePath("/board");
+  await notifyBoard();
+  return { ok: true };
+}
+
+export async function unassignMember(input: {
+  taskId: string;
+  userId: string;
+}): Promise<{ ok: true } | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "Only admins can assign members." };
+  }
+  if (!input.taskId || !input.userId) return { error: "Missing task or member." };
+
+  await db
+    .delete(boardTaskAssignee)
+    .where(
+      and(
+        eq(boardTaskAssignee.taskId, input.taskId),
+        eq(boardTaskAssignee.userId, input.userId),
+      ),
+    );
+  revalidatePath("/board");
+  await notifyBoard();
+  return { ok: true };
 }

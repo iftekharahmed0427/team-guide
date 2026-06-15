@@ -1,20 +1,25 @@
 import { asc } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { boardTask } from "@/db/app-schema";
+import { user as userTable } from "@/db/auth-schema";
 import KanbanBoard from "./kanban-board";
-import { type Task } from "./columns";
+import { listTasks } from "./actions";
+import { displayName, type Member } from "./columns";
 
 export default async function BoardPage() {
-  await getSession();
+  const session = await getSession();
+  const isAdmin = session?.user.role === "admin";
+  const currentUserId = session?.user.id ?? null;
 
-  const rows = await db.select().from(boardTask).orderBy(asc(boardTask.position));
-  const tasks: Task[] = rows.map((t) => ({
-    id: t.id,
-    title: t.title,
-    note: t.note,
-    status: t.status,
-    position: t.position,
+  const tasks = await listTasks();
+
+  const memberRows = await db
+    .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+    .from(userTable)
+    .orderBy(asc(userTable.createdAt));
+  const members: Member[] = memberRows.map((m) => ({
+    id: m.id,
+    name: displayName(m.name, m.email),
   }));
 
   return (
@@ -27,7 +32,12 @@ export default async function BoardPage() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">
-        <KanbanBoard initialTasks={tasks} />
+        <KanbanBoard
+          initialTasks={tasks}
+          members={members}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+        />
       </main>
     </>
   );

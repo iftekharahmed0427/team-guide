@@ -57,6 +57,13 @@
       "when": 1781524919438,
       "tag": "0007_peaceful_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781526666038,
+      "tag": "0008_material_captain_universe",
+      "breakpoints": true
     }
   ]
 }

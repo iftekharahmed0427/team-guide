@@ -71,6 +71,37 @@ export const boardTask = pgTable("board_task", {
     .notNull(),
 });
 
+// A comment on a board card. Any signed-in member can post; deletable by the
+// author or an admin (mirrors `note`). Author is denormalized for display.
+export const boardTaskComment = pgTable("board_task_comment", {
+  id: text("id").primaryKey(),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => boardTask.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  authorId: text("author_id"),
+  authorName: text("author_name").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Which members are assigned to a card. Admin-managed. A card can have several
+// assignees and a member several cards, so this is a join table (unique pair).
+// The display name is read live by joining the user table.
+export const boardTaskAssignee = pgTable(
+  "board_task_assignee",
+  {
+    id: text("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => boardTask.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("board_task_assignee_unique").on(t.taskId, t.userId)],
+);
+
 // Free-form team notes. Anyone signed in can post; everyone sees them with the
 // author's name. Deletable by the author or an admin.
 export const note = pgTable("note", {
