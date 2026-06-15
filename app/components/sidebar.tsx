@@ -7,12 +7,8 @@ import {
   LayoutDashboard,
   Newspaper,
   Users,
-  FolderKanban,
   SquareKanban,
   BookOpen,
-  BarChart3,
-  Calendar,
-  MessageSquare,
   Settings,
   LifeBuoy,
   LogOut,
@@ -42,10 +38,6 @@ const primaryNav: NavItem[] = [
   { label: "Guides", icon: BookOpen, href: "/guides" },
   { label: "Board", icon: SquareKanban, href: "/board" },
   { label: "Team", icon: Users, href: "/team" },
-  { label: "Projects", icon: FolderKanban, badge: "8" },
-  { label: "Analytics", icon: BarChart3 },
-  { label: "Calendar", icon: Calendar },
-  { label: "Messages", icon: MessageSquare, badge: "3" },
 ];
 
 const secondaryNav: NavItem[] = [
