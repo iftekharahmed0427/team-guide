@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import Sidebar from "@/app/components/sidebar";
+import LiveRefresh from "@/app/components/live-refresh";
 
 export default async function AppLayout({
   children,
@@ -15,6 +16,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+      <LiveRefresh />
       <Sidebar
         user={{
           name: session.user.name,

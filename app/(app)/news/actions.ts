@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -80,6 +81,7 @@ export async function createPost(
   });
 
   revalidatePath("/news");
+  await notifyChange();
   return { slug };
 }
 
@@ -89,5 +91,6 @@ export async function deletePost(formData: FormData) {
   if (!id) throw new Error("Missing post");
   await db.delete(newsPost).where(eq(newsPost.id, id));
   revalidatePath("/news");
+  await notifyChange();
   redirect("/news");
 }

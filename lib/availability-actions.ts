@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { unavailability } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
 
 // Any signed-in member can toggle their OWN unavailability for a given day.
 export async function toggleUnavailability(date: string) {
@@ -36,4 +37,5 @@ export async function toggleUnavailability(date: string) {
   }
 
   revalidatePath("/");
+  await notifyChange();
 }

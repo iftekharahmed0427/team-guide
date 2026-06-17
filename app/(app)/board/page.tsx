@@ -10,16 +10,23 @@ export default async function BoardPage() {
   const session = await getSession();
   const isAdmin = session?.user.role === "admin";
   const currentUserId = session?.user.id ?? null;
+  const currentUserImage = session?.user.image ?? null;
 
   const tasks = await listTasks();
 
   const memberRows = await db
-    .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+    .select({
+      id: userTable.id,
+      name: userTable.name,
+      email: userTable.email,
+      image: userTable.image,
+    })
     .from(userTable)
     .orderBy(asc(userTable.createdAt));
   const members: Member[] = memberRows.map((m) => ({
     id: m.id,
     name: displayName(m.name, m.email),
+    image: m.image,
   }));
 
   return (
@@ -37,6 +44,7 @@ export default async function BoardPage() {
           members={members}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
+          currentUserImage={currentUserImage}
         />
       </main>
     </>

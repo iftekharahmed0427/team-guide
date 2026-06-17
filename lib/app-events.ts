@@ -1,27 +1,27 @@
 import { Client } from "pg";
 
-// Server-only pub/sub for note changes, backed by Postgres LISTEN/NOTIFY so it
-// works across every server instance (notifications fan out through the DB).
-// Mutations call pg_notify('note'); this module keeps one dedicated listener
+// App-wide server-only pub/sub, backed by Postgres LISTEN/NOTIFY so it works
+// across every server instance (notifications fan out through the DB). Every
+// mutating server action calls notifyChange() (lib/notify.ts) → pg_notify on the
+// single 'app_event' channel; this module keeps one dedicated listener
 // connection and forwards each notification to subscribed SSE streams.
-// Mirrors lib/board-events.ts.
 
 type Listener = () => void;
 
-type NoteEventState = {
+type AppEventState = {
   listeners: Set<Listener>;
   client: Client | null;
   connecting: Promise<void> | null;
 };
 
 // Survive dev HMR (and avoid stacking listener connections) via a global.
-const globalForNote = globalThis as unknown as {
-  __noteEvents?: NoteEventState;
+const globalForApp = globalThis as unknown as {
+  __appEvents?: AppEventState;
 };
 
-const state: NoteEventState =
-  globalForNote.__noteEvents ??
-  (globalForNote.__noteEvents = {
+const state: AppEventState =
+  globalForApp.__appEvents ??
+  (globalForApp.__appEvents = {
     listeners: new Set(),
     client: null,
     connecting: null,
@@ -52,7 +52,7 @@ async function ensureListening(): Promise<void> {
         state.client = null;
       });
       await client.connect();
-      await client.query("LISTEN note");
+      await client.query("LISTEN app_event");
       state.client = client;
     })();
   }
@@ -65,7 +65,7 @@ async function ensureListening(): Promise<void> {
   }
 }
 
-export function subscribeNotes(listener: Listener): () => void {
+export function subscribeApp(listener: Listener): () => void {
   state.listeners.add(listener);
   void ensureListening();
   return () => {

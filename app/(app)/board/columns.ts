@@ -17,6 +17,7 @@ export function isStatus(value: string): value is Status {
 export type Member = {
   id: string;
   name: string;
+  image: string | null;
 };
 
 export type Task = {
@@ -37,19 +38,11 @@ export type Comment = {
   body: string;
   authorId: string | null;
   authorName: string;
+  authorImage: string | null;
   createdAt: string;
 };
 
 // Display name for an assignment/comment author (name, else email, else fallback).
 export function displayName(name?: string | null, email?: string | null): string {
   return (name ?? "").trim() || (email ?? "").trim() || "Member";
-}
-
-// Two-letter initials for an avatar chip.
-export function initials(source?: string | null): string {
-  const s = (source ?? "").trim();
-  if (!s) return "?";
-  const parts = s.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return s.slice(0, 2).toUpperCase();
 }

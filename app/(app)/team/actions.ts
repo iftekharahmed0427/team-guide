@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { invite as inviteTable } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -35,6 +36,7 @@ export async function inviteMember(formData: FormData) {
     .values({ id: randomUUID(), email, role, invitedBy: session.user.email })
     .onConflictDoUpdate({ target: inviteTable.email, set: { role } });
   revalidatePath("/team");
+  await notifyChange();
 }
 
 export async function setMemberRole(formData: FormData) {
@@ -57,6 +59,7 @@ export async function setMemberRole(formData: FormData) {
       .where(eq(inviteTable.email, rows[0].email.toLowerCase()));
   }
   revalidatePath("/team");
+  await notifyChange();
 }
 
 export async function removeMember(formData: FormData) {
@@ -81,6 +84,7 @@ export async function removeMember(formData: FormData) {
       .where(eq(inviteTable.email, rows[0].email.toLowerCase()));
   }
   revalidatePath("/team");
+  await notifyChange();
 }
 
 export async function revokeInvite(formData: FormData) {
@@ -89,4 +93,5 @@ export async function revokeInvite(formData: FormData) {
   if (!id) throw new Error("Missing invite");
   await db.delete(inviteTable).where(eq(inviteTable.id, id));
   revalidatePath("/team");
+  await notifyChange();
 }

@@ -40,13 +40,7 @@ import {
   Send,
   Loader2,
 } from "lucide-react";
-import {
-  COLUMNS,
-  initials,
-  type Task,
-  type Member,
-  type Comment,
-} from "./columns";
+import { COLUMNS, type Task, type Member, type Comment } from "./columns";
 import {
   createTask,
   moveTask,
@@ -58,6 +52,7 @@ import {
   assignMember,
   unassignMember,
 } from "./actions";
+import Avatar from "@/app/components/avatar";
 
 type Columns = Record<string, Task[]>;
 
@@ -96,20 +91,6 @@ function groupTasks(tasks: Task[]): Columns {
 function findContainer(cols: Columns, id: string): string | undefined {
   if (id in cols) return id;
   return Object.keys(cols).find((k) => cols[k].some((t) => t.id === id));
-}
-
-// ── Avatar ────────────────────────────────────────────────────────────────
-
-function Avatar({ name, size = 20 }: { name: string; size?: number }) {
-  return (
-    <span
-      title={name}
-      style={{ height: size, width: size }}
-      className="flex shrink-0 items-center justify-center border border-border bg-surface-2 text-[10px] font-semibold leading-none"
-    >
-      {initials(name)}
-    </span>
-  );
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────
@@ -166,12 +147,18 @@ function CardShell({
         {hasMeta ? (
           <span className="flex items-center gap-2.5 text-muted">
             {assignees.length > 0 ? (
-              <span className="flex items-center -space-x-1">
+              <span className="flex items-center -space-x-1.5">
                 {assignees.slice(0, 3).map((a) => (
-                  <Avatar key={a.id} name={a.name} size={18} />
+                  <Avatar
+                    key={a.id}
+                    name={a.name}
+                    image={a.image}
+                    size={18}
+                    className="ring-1 ring-surface"
+                  />
                 ))}
                 {assignees.length > 3 ? (
-                  <span className="flex h-[18px] items-center justify-center border border-border bg-surface-2 px-1 text-[10px] font-semibold leading-none">
+                  <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-border bg-surface-2 px-1 text-[10px] font-semibold leading-none ring-1 ring-surface">
                     +{assignees.length - 3}
                   </span>
                 ) : null}
@@ -338,7 +325,7 @@ function CommentRow({
     <div className="border border-border bg-surface-2/40 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Avatar name={comment.authorName} size={22} />
+          <Avatar name={comment.authorName} image={comment.authorImage} size={22} />
           <div className="leading-tight">
             <p className="text-xs font-medium text-foreground">
               {comment.authorName || "Member"}
@@ -370,6 +357,7 @@ function CardModal({
   members,
   isAdmin,
   currentUserId,
+  currentUserImage,
   refreshKey,
   onClose,
   onToggleAssignee,
@@ -379,6 +367,7 @@ function CardModal({
   members: Member[];
   isAdmin: boolean;
   currentUserId: string | null;
+  currentUserImage: string | null;
   refreshKey: number;
   onClose: () => void;
   onToggleAssignee: (member: Member, assign: boolean) => void;
@@ -429,6 +418,7 @@ function CardModal({
       body: text,
       authorId: currentUserId,
       authorName: "You",
+      authorImage: currentUserImage,
       createdAt: new Date().toISOString(),
     };
     setComments((prev) => [...prev, optimistic]);
@@ -508,7 +498,7 @@ function CardModal({
                               }`}
                             >
                               <span className="flex items-center gap-2 truncate">
-                                <Avatar name={m.name} size={20} />
+                                <Avatar name={m.name} image={m.image} size={20} />
                                 <span className="truncate">{m.name}</span>
                               </span>
                               {assigned ? (
@@ -535,7 +525,7 @@ function CardModal({
                     key={a.id}
                     className="flex items-center gap-1.5 border border-border bg-surface-2/40 py-1 pl-1.5 pr-2 text-xs"
                   >
-                    <Avatar name={a.name} size={18} />
+                    <Avatar name={a.name} image={a.image} size={18} />
                     <span className="text-foreground">{a.name}</span>
                     {isAdmin ? (
                       <button
@@ -630,11 +620,13 @@ export default function KanbanBoard({
   members,
   isAdmin,
   currentUserId,
+  currentUserImage,
 }: {
   initialTasks: Task[];
   members: Member[];
   isAdmin: boolean;
   currentUserId: string | null;
+  currentUserImage: string | null;
 }) {
   // Optimistic state is authoritative for this session; seeded once from props.
   const [columns, setColumns] = useState<Columns>(() => groupTasks(initialTasks));
@@ -668,9 +660,10 @@ export default function KanbanBoard({
     }
   }, []);
 
-  // Subscribe to the live board stream; refetch + reconcile on each change.
+  // Subscribe to the app-wide realtime stream; refetch + reconcile on each
+  // change. (Board data only shows here, but the stream is shared app-wide.)
   useEffect(() => {
-    const source = new EventSource("/api/board/stream");
+    const source = new EventSource("/api/realtime");
     source.onmessage = () => {
       setRefreshKey((k) => k + 1);
       void reconcile();
@@ -887,6 +880,7 @@ export default function KanbanBoard({
           members={members}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
+          currentUserImage={currentUserImage}
           refreshKey={refreshKey}
           onClose={() => setModalId(null)}
           onToggleAssignee={(member, assign) =>

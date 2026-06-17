@@ -1,11 +1,12 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Trash2 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { note } from "@/db/app-schema";
+import { user } from "@/db/auth-schema";
 import { deleteNote } from "./actions";
 import NoteComposer from "./note-composer";
-import NotesLive from "./notes-live";
+import Avatar from "@/app/components/avatar";
 
 const SHORT_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -21,20 +22,23 @@ function formatWhen(d: Date | string) {
   return `${SHORT_MONTHS[x.getMonth()]} ${x.getDate()} · ${h}:${String(m).padStart(2, "0")} ${ap}`;
 }
 
-function getInitials(name?: string | null) {
-  const source = (name ?? "").trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return source.slice(0, 2).toUpperCase();
-}
-
 export default async function NotesPage() {
   const session = await getSession();
   const currentUserId = session?.user.id;
   const isAdmin = session?.user.role === "admin";
 
-  const notes = await db.select().from(note).orderBy(desc(note.createdAt));
+  const notes = await db
+    .select({
+      id: note.id,
+      body: note.body,
+      authorId: note.authorId,
+      authorName: note.authorName,
+      authorImage: user.image,
+      createdAt: note.createdAt,
+    })
+    .from(note)
+    .leftJoin(user, eq(note.authorId, user.id))
+    .orderBy(desc(note.createdAt));
 
   return (
     <>
@@ -49,7 +53,6 @@ export default async function NotesPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-4">
-          <NotesLive />
           <NoteComposer />
 
           {notes.length === 0 ? (
@@ -64,9 +67,7 @@ export default async function NotesPage() {
                   <div key={n.id} className="border border-border bg-surface p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-surface-2 text-xs font-semibold">
-                          {getInitials(n.authorName)}
-                        </div>
+                        <Avatar name={n.authorName} image={n.authorImage} size={32} />
                         <div className="leading-tight">
                           <p className="text-sm font-medium text-foreground">
                             {n.authorName || "Member"}

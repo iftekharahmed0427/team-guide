@@ -7,6 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { shift } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
 
 // Toggle the current member's shift: check in if off, check out if on.
 export async function toggleShift() {
@@ -29,4 +30,5 @@ export async function toggleShift() {
   }
 
   revalidatePath("/");
+  await notifyChange();
 }

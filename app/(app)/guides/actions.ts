@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { guide } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
 import { isGame } from "./games";
 
 async function requireAdmin() {
@@ -83,6 +84,7 @@ export async function createGuide(
   });
 
   revalidatePath("/guides");
+  await notifyChange();
   return { slug };
 }
 
@@ -92,5 +94,6 @@ export async function deleteGuide(formData: FormData) {
   if (!id) throw new Error("Missing guide");
   await db.delete(guide).where(eq(guide.id, id));
   revalidatePath("/guides");
+  await notifyChange();
   redirect("/guides");
 }

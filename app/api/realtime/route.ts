@@ -1,11 +1,12 @@
-import { subscribeNotes } from "@/lib/note-events";
+import { subscribeApp } from "@/lib/app-events";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Server-Sent Events stream. Emits a "changed" message whenever any client
-// posts or deletes a note (via Postgres NOTIFY → lib/note-events). The client
-// then refreshes the route to pull the latest notes.
+// App-wide Server-Sent Events stream. Emits a "changed" message whenever any
+// client mutates any data (via Postgres NOTIFY → lib/app-events). Clients then
+// refresh: most pages via <LiveRefresh> (router.refresh), the board via its own
+// reconcile.
 export async function GET(request: Request) {
   const encoder = new TextEncoder();
   let unsubscribe = () => {};
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       };
 
       send(": connected\n\n");
-      unsubscribe = subscribeNotes(() => send("data: changed\n\n"));
+      unsubscribe = subscribeApp(() => send("data: changed\n\n"));
       // Keep proxies from closing an idle connection.
       heartbeat = setInterval(() => send(": ping\n\n"), 25000);
 

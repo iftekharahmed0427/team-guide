@@ -2,11 +2,12 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq, and, asc, count, sql } from "drizzle-orm";
+import { eq, and, asc, count } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { boardTask, boardTaskComment, boardTaskAssignee } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
+import { notifyChange } from "@/lib/notify";
 import { isStatus, displayName, type Task, type Comment } from "./columns";
 
 // The board is shared, so any signed-in member can edit it.
@@ -23,16 +24,6 @@ async function requireAdmin() {
   return session;
 }
 
-// Broadcast a board change to every connected client via Postgres NOTIFY.
-// (LISTEN side lives in lib/board-events.ts → the SSE route.)
-async function notifyBoard() {
-  try {
-    await db.execute(sql`select pg_notify('board_task', '')`);
-  } catch {
-    // realtime is best-effort; the write already succeeded
-  }
-}
-
 export async function listTasks(): Promise<Task[]> {
   await requireMember();
   const rows = await db.select().from(boardTask).orderBy(asc(boardTask.position));
@@ -44,6 +35,7 @@ export async function listTasks(): Promise<Task[]> {
       userId: boardTaskAssignee.userId,
       name: user.name,
       email: user.email,
+      image: user.image,
     })
     .from(boardTaskAssignee)
     .innerJoin(user, eq(boardTaskAssignee.userId, user.id))
@@ -54,10 +46,13 @@ export async function listTasks(): Promise<Task[]> {
     .from(boardTaskComment)
     .groupBy(boardTaskComment.taskId);
 
-  const assigneesByTask = new Map<string, { id: string; name: string }[]>();
+  const assigneesByTask = new Map<
+    string,
+    { id: string; name: string; image: string | null }[]
+  >();
   for (const a of assigneeRows) {
     const list = assigneesByTask.get(a.taskId) ?? [];
-    list.push({ id: a.userId, name: displayName(a.name, a.email) });
+    list.push({ id: a.userId, name: displayName(a.name, a.email), image: a.image });
     assigneesByTask.set(a.taskId, list);
   }
   const countByTask = new Map<string, number>();
@@ -97,7 +92,7 @@ export async function createTask(input: {
     position: Date.now(),
   });
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
   return { ok: true };
 }
 
@@ -115,7 +110,7 @@ export async function moveTask(input: {
     .set({ status, position: input.position })
     .where(eq(boardTask.id, input.id));
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
 }
 
 export async function deleteTask(id: string): Promise<void> {
@@ -124,7 +119,7 @@ export async function deleteTask(id: string): Promise<void> {
   // FK cascade removes the card's comments and assignees.
   await db.delete(boardTask).where(eq(boardTask.id, id));
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
 }
 
 // ── Comments ────────────────────────────────────────────────────────────────
@@ -133,8 +128,17 @@ export async function listComments(taskId: string): Promise<Comment[]> {
   await requireMember();
   if (!taskId) return [];
   const rows = await db
-    .select()
+    .select({
+      id: boardTaskComment.id,
+      taskId: boardTaskComment.taskId,
+      body: boardTaskComment.body,
+      authorId: boardTaskComment.authorId,
+      authorName: boardTaskComment.authorName,
+      authorImage: user.image,
+      createdAt: boardTaskComment.createdAt,
+    })
     .from(boardTaskComment)
+    .leftJoin(user, eq(boardTaskComment.authorId, user.id))
     .where(eq(boardTaskComment.taskId, taskId))
     .orderBy(asc(boardTaskComment.createdAt));
   return rows.map((c) => ({
@@ -143,6 +147,7 @@ export async function listComments(taskId: string): Promise<Comment[]> {
     body: c.body,
     authorId: c.authorId,
     authorName: c.authorName,
+    authorImage: c.authorImage,
     createdAt: c.createdAt.toISOString(),
   }));
 }
@@ -170,7 +175,7 @@ export async function addComment(input: {
     authorName: displayName(session.user.name, session.user.email),
   });
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
   return { ok: true };
 }
 
@@ -192,7 +197,7 @@ export async function deleteComment(id: string): Promise<void> {
   }
   await db.delete(boardTaskComment).where(eq(boardTaskComment.id, id));
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
 }
 
 // ── Assignment (admin only) ──────────────────────────────────────────────────
@@ -213,7 +218,7 @@ export async function assignMember(input: {
     .values({ id: randomUUID(), taskId: input.taskId, userId: input.userId })
     .onConflictDoNothing();
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
   return { ok: true };
 }
 
@@ -237,6 +242,6 @@ export async function unassignMember(input: {
       ),
     );
   revalidatePath("/board");
-  await notifyBoard();
+  await notifyChange();
   return { ok: true };
 }

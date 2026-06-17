@@ -5,14 +5,7 @@ import { user as userTable } from "@/db/auth-schema";
 import { invite as inviteTable } from "@/db/app-schema";
 import { inviteMember, setMemberRole, removeMember, revokeInvite } from "./actions";
 import CustomSelect from "@/app/components/custom-select";
-
-function getInitials(name?: string | null, email?: string | null) {
-  const source = (name ?? "").trim() || (email ?? "").trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return source.slice(0, 2).toUpperCase();
-}
+import Avatar from "@/app/components/avatar";
 
 function RoleBadge({ role }: { role: string | null }) {
   const isAdmin = role === "admin";
@@ -38,6 +31,7 @@ export default async function TeamPage() {
       id: userTable.id,
       name: userTable.name,
       email: userTable.email,
+      image: userTable.image,
       role: userTable.role,
       createdAt: userTable.createdAt,
     })
@@ -116,9 +110,7 @@ export default async function TeamPage() {
                     <tr key={m.id} className="border-b border-border last:border-0">
                       <td className="py-3 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center border border-border bg-surface-2 text-xs font-semibold">
-                            {getInitials(m.name, m.email)}
-                          </div>
+                          <Avatar name={m.name || m.email} image={m.image} size={32} />
                           <div className="leading-tight">
                             <p className="font-medium">
                               {m.name || "Member"}

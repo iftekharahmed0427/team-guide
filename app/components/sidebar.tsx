@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import Avatar from "@/app/components/avatar";
 
 type SidebarUser = {
   name?: string | null;
@@ -44,16 +45,6 @@ const secondaryNav: NavItem[] = [
   { label: "Settings", icon: Settings },
   { label: "Support", icon: LifeBuoy },
 ];
-
-function getInitials(name?: string | null, email?: string | null) {
-  const source = (name ?? "").trim() || (email ?? "").trim();
-  if (!source) return "?";
-  const parts = source.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return source.slice(0, 2).toUpperCase();
-}
 
 function NavRow({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
@@ -108,7 +99,6 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
     router.refresh();
   }
 
-  const initials = getInitials(user.name, user.email);
   const isAdmin = user.role === "admin";
 
   return (
@@ -141,9 +131,7 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
 
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-3 border border-border bg-surface-2 px-3 py-2.5">
-          <div className="flex h-8 w-8 items-center justify-center border border-border bg-background text-xs font-semibold">
-            {initials}
-          </div>
+          <Avatar name={user.name} image={user.image} size={32} />
           <div className="min-w-0 flex-1 leading-tight">
             <div className="flex items-center gap-1.5">
               <p className="truncate text-sm font-medium">{user.name || "Member"}</p>
