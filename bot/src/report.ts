@@ -64,6 +64,6 @@ function buildEmbed(count: number, range: string): EmbedBuilder {
       { name: "Tickets", value: `**${count}**`, inline: true },
       { name: "Period", value: range, inline: true },
     )
-    .setFooter({ text: "Team Guide · counts screenshot posts" })
+    .setFooter({ text: "Team Guide" })
     .setTimestamp(new Date());
 }

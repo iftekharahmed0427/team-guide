@@ -67,11 +67,13 @@ export default function ReportChannelForm({ members }: { members: Member[] }) {
           disabled={pending || !channelId.trim()}
           className="btn-wipe btn-wipe-dark flex h-9 shrink-0 items-center justify-center gap-2 border border-border bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
         >
-          {pending ? (
-            <Loader2 size={15} strokeWidth={2} className="animate-spin" />
-          ) : (
-            <Plus size={15} strokeWidth={2} />
-          )}
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {pending ? (
+              <Loader2 size={15} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Plus size={15} strokeWidth={2} />
+            )}
+          </span>
           Add
         </button>
       </div>
