@@ -18,10 +18,8 @@ export default async function ReportsPage() {
   const rows = await db
     .select({
       id: reportChannel.id,
-      discordId: reportChannel.userId,
       channelName: reportChannel.name,
       current: reportChannel.currentCount,
-      previous: reportChannel.previousCount,
       userId: userTable.id,
       userName: userTable.name,
       image: userTable.image,
@@ -39,8 +37,6 @@ export default async function ReportsPage() {
     name: r.userName || r.channelName || "Member",
     image: r.image ?? null,
     count: r.current ?? 0,
-    previous: r.previous ?? 0,
-    countsEveryone: !r.discordId,
     isYou: !!r.userId && r.userId === currentUserId,
   }));
 
@@ -51,7 +47,7 @@ export default async function ReportsPage() {
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
         <div>
           <h1 className="text-base font-semibold tracking-tight">Reports</h1>
-          <p className="text-xs text-muted">Live screenshot counts for the current period</p>
+          <p className="text-xs text-muted">Live ticket counts for the current period</p>
         </div>
         <div className="hidden text-right leading-tight sm:block">
           <p className="text-xs text-muted">Team total</p>
@@ -61,6 +57,9 @@ export default async function ReportsPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise">
+          <h1 className="mb-6 text-center text-4xl font-semibold tracking-tight">
+            Live ticket count
+          </h1>
           <ReportGrid entries={entries} />
         </div>
       </main>

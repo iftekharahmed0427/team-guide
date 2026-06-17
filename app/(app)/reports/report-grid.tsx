@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Camera } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 
 export type ReportEntry = {
@@ -9,8 +8,6 @@ export type ReportEntry = {
   name: string;
   image: string | null;
   count: number;
-  previous: number;
-  countsEveryone: boolean;
   isYou: boolean;
 };
 
@@ -53,38 +50,24 @@ function Card({ entry }: { entry: ReportEntry }) {
   const noun = entry.count === 1 ? "ticket" : "tickets";
   return (
     <div
-      className={`relative flex flex-col gap-4 border bg-surface p-5 ${
+      className={`relative flex w-62 flex-col items-center gap-2 border bg-surface p-5 ${
         entry.isYou ? "border-foreground" : "border-border"
       }`}
     >
       {entry.isYou ? (
-        <span className="absolute right-3 top-3 border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+        <span className="absolute right-2 top-2 border border-border px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted">
           You
         </span>
       ) : null}
 
-      <div className="flex items-center gap-3">
-        <Avatar name={entry.name} image={entry.image} size={40} />
-        <div className="min-w-0 leading-tight">
-          <p className="truncate text-sm font-medium text-foreground">{entry.name}</p>
-          <p className="flex items-center gap-1 text-xs text-muted">
-            <Camera size={12} strokeWidth={1.75} />
-            {entry.countsEveryone ? "counts everyone" : "screenshots logged"}
-          </p>
-        </div>
-      </div>
+      <Avatar name={entry.name} image={entry.image} size={40} />
+      <p className="max-w-full truncate text-sm font-medium text-foreground">{entry.name}</p>
 
-      <div className="flex items-end justify-between">
-        <span className="text-5xl font-semibold tracking-tight tabular-nums">
-          <Odometer value={entry.count} />
-        </span>
-        <span className="pb-1 text-xs text-muted">
-          {noun} this period
-          {entry.previous > 0 ? (
-            <span className="block text-right text-[11px]">prev {entry.previous}</span>
-          ) : null}
-        </span>
-      </div>
+      <span className="text-4xl font-semibold tracking-tight tabular-nums">
+        <Odometer value={entry.count} />
+      </span>
+
+      <span className="text-xs text-muted">{noun} this period</span>
     </div>
   );
 }
@@ -99,7 +82,7 @@ export default function ReportGrid({ entries }: { entries: ReportEntry[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="flex flex-wrap justify-center gap-4">
       {entries.map((entry) => (
         <Card key={entry.id} entry={entry} />
       ))}
