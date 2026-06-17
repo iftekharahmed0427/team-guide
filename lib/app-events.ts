@@ -32,8 +32,8 @@ async function ensureListening(): Promise<void> {
   if (!state.connecting) {
     state.connecting = (async () => {
       const useSsl = process.env.DATABASE_SSL !== "disable";
-      // LISTEN requires a dedicated, non-pooled session — the Supabase
-      // transaction pooler does not support it — so use the direct connection.
+      // LISTEN requires a dedicated, non-pooled session (the Supabase
+      // transaction pooler does not support it), so use the direct connection.
       const client = new Client({
         connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
         ssl: useSsl ? { rejectUnauthorized: false } : undefined,

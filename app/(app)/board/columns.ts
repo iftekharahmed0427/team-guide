@@ -28,7 +28,7 @@ export type Task = {
   position: number;
   // Members assigned to this card (admin-managed). Kept fresh by reconcile.
   assignees: Member[];
-  // How many comments the card has — shown as a badge on the card face.
+  // How many comments the card has, shown as a badge on the card face.
   commentCount: number;
 };
 

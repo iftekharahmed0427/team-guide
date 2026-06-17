@@ -214,7 +214,7 @@ body {
 }
 
 /* High-contrast variant for primary (light-filled) buttons: a black panel
-   sweeps across and the label inverts to white — a clean white-to-black wipe. */
+   sweeps across and the label inverts to white, a clean white-to-black wipe. */
 .btn-wipe-dark {
   --wipe: var(--background);
   transition: color 0.4s cubic-bezier(0.4, 0, 0.2, 1);

@@ -825,7 +825,7 @@ export default function KanbanBoard({
     void deleteTask(id);
   }
 
-  // Admin assign/unassign — optimistic, then persisted; reconcile corrects.
+  // Admin assign/unassign, optimistic then persisted; reconcile corrects.
   function handleToggleAssignee(taskId: string, member: Member, assign: boolean) {
     updateTask(taskId, (t) => ({
       ...t,

@@ -99,7 +99,7 @@ const DEV_SESSION = {
 
 // Canonical session accessor for read-only server components. Falls back to a
 // stub admin session in development so pages render without logging in. Mutating
-// server actions intentionally keep calling auth.api.getSession directly — they
+// server actions intentionally keep calling auth.api.getSession directly, since they
 // must operate on a real user row.
 export async function getSession(): Promise<Session> {
   const session = await auth.api.getSession({ headers: await headers() });
