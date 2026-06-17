@@ -40,5 +40,6 @@ $DC up -d --build
 echo "==> Removing dangling images"
 docker image prune -f >/dev/null 2>&1 || true
 
-echo "==> Done. Recent logs (Ctrl+C to stop following):"
-$DC logs --tail=20 -f bot
+echo "==> Done. Recent logs:"
+$DC logs --tail=20 bot
+echo "==> Follow live logs with: $DC logs -f bot"
