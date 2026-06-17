@@ -206,6 +206,35 @@ export const botSetting = pgTable("bot_setting", {
     .notNull(),
 });
 
+// A commission a team member submits for admin review. The member fills in the
+// ticket name + customer email; an admin later sets the renewal date, product
+// price ($) and commission rate (%), then approves or denies it. The payout
+// (price * rate / 100) is computed on read, not stored. The submitter sees only
+// their own commissions and, once decided, whether it was approved/denied and
+// the amount they will receive. Admins see all and can edit any later.
+export const commission = pgTable("commission", {
+  id: text("id").primaryKey(),
+  ticketName: text("ticket_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | denied
+  // Admin review fields (null / default until reviewed):
+  renewalDate: date("renewal_date", { mode: "string" }),
+  productPrice: doublePrecision("product_price"), // US dollars
+  commissionRate: doublePrecision("commission_rate").notNull().default(15), // percent
+  reviewNote: text("review_note").notNull().default(""), // admin note shown to the submitter (e.g. a denial reason)
+  // Submitter, denormalized like the other content tables (no FK).
+  submittedById: text("submitted_by_id"),
+  submittedByName: text("submitted_by_name").notNull().default(""),
+  // Reviewer (admin) for visibility.
+  reviewedByName: text("reviewed_by_name").notNull().default(""),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
 // Single-row health/state written by the bot, read by the website. The bot
 // refreshes `lastHeartbeatAt` on a timer; the website shows online when it is
 // recent. Errors and last report time are surfaced for visibility.

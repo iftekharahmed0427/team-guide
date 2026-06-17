@@ -1,0 +1,1 @@
+ALTER TABLE "commission" ADD COLUMN "review_note" text DEFAULT '' NOT NULL;
