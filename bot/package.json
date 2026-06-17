@@ -1,0 +1,22 @@
+{
+  "name": "team-guide-reports-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord bot that counts screenshot tickets in each member's report channel and posts a biweekly summary embed.",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "now": "bun run src/index.ts --now",
+    "dry": "bun run src/index.ts --now --dry-run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2"
+  }
+}

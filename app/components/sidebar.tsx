@@ -31,6 +31,7 @@ type NavItem = {
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   href?: string;
   badge?: string;
+  adminOnly?: boolean;
 };
 
 const primaryNav: NavItem[] = [
@@ -42,7 +43,7 @@ const primaryNav: NavItem[] = [
 ];
 
 const secondaryNav: NavItem[] = [
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, href: "/settings", adminOnly: true },
   { label: "Support", icon: LifeBuoy },
 ];
 
@@ -117,16 +118,20 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
         <p className="px-5 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted">
           Menu
         </p>
-        {primaryNav.map((item) => (
-          <NavRow key={item.label} item={item} active={isActive(item)} />
-        ))}
+        {primaryNav
+          .filter((item) => !item.adminOnly || isAdmin)
+          .map((item) => (
+            <NavRow key={item.label} item={item} active={isActive(item)} />
+          ))}
 
         <p className="px-5 pb-2 pt-6 text-[11px] font-medium uppercase tracking-wider text-muted">
           General
         </p>
-        {secondaryNav.map((item) => (
-          <NavRow key={item.label} item={item} active={isActive(item)} />
-        ))}
+        {secondaryNav
+          .filter((item) => !item.adminOnly || isAdmin)
+          .map((item) => (
+            <NavRow key={item.label} item={item} active={isActive(item)} />
+          ))}
       </nav>
 
       <div className="border-t border-border p-3">

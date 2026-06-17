@@ -4,6 +4,8 @@ import {
   timestamp,
   date,
   unique,
+  integer,
+  boolean,
   doublePrecision,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
@@ -134,4 +136,61 @@ export const shift = pgTable("shift", {
     .references(() => user.id, { onDelete: "cascade" }),
   checkedInAt: timestamp("checked_in_at").defaultNow().notNull(),
   checkedOutAt: timestamp("checked_out_at"),
+});
+
+// ── Reports bot config (edited from the website, read by the Discord bot) ─────
+
+// One member's report channel. `userId`/`name` are the member's Discord
+// snowflake and display name; `userId` null means count everyone's uploads in
+// the channel. The bot reads these rows to know which channels to count + post.
+export const reportChannel = pgTable(
+  "report_channel",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    userId: text("user_id"), // Discord snowflake; null = count all uploads
+    name: text("name").notNull().default(""),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("report_channel_channel_unique").on(t.channelId)],
+);
+
+// Single-row (`id` = "singleton") bot config, edited from the website Settings →
+// Discord bot page and read by the bot. All times are UTC. `periodAnchor` is a
+// Friday a 14-day period ends on. `token` is the Discord bot token (set-only via
+// the UI, never sent back to the browser). Presence fields drive the bot's
+// Discord status. `runRequestedAt` is bumped by the "Run now" button.
+export const botSetting = pgTable("bot_setting", {
+  id: text("id").primaryKey().default("singleton"),
+  token: text("token"),
+  enabled: boolean("enabled").notNull().default(true),
+  periodAnchor: text("period_anchor").notNull().default("2026-06-26"),
+  periodDays: integer("period_days").notNull().default(14),
+  postHour: integer("post_hour").notNull().default(17),
+  postMinute: integer("post_minute").notNull().default(0),
+  presenceStatus: text("presence_status").notNull().default("online"), // online|idle|dnd|invisible
+  presenceActivityType: text("presence_activity_type").notNull().default("none"), // none|Playing|Watching|Listening|Competing|Custom
+  presenceActivityText: text("presence_activity_text").notNull().default(""),
+  runRequestedAt: timestamp("run_requested_at"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// Single-row health/state written by the bot, read by the website. The bot
+// refreshes `lastHeartbeatAt` on a timer; the website shows online when it is
+// recent. Errors and last report time are surfaced for visibility.
+export const botStatus = pgTable("bot_status", {
+  id: text("id").primaryKey().default("singleton"),
+  state: text("state").notNull().default("offline"), // offline|online|error|no_token
+  botTag: text("bot_tag"),
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at"),
+  lastHeartbeatAt: timestamp("last_heartbeat_at"),
+  lastReportAt: timestamp("last_report_at"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
 });

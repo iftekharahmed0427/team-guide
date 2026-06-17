@@ -1,0 +1,205 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+import { getSession } from "@/lib/auth";
+import { db } from "@/db";
+import { reportChannel, botSetting } from "@/db/app-schema";
+import { notifyChange } from "@/lib/notify";
+
+const PAGE = "/settings/discord-bot";
+const SNOWFLAKE = /^\d{5,25}$/;
+const PRESENCE_STATUS = new Set(["online", "idle", "dnd", "invisible"]);
+const ACTIVITY_TYPE = new Set([
+  "none",
+  "Playing",
+  "Watching",
+  "Listening",
+  "Competing",
+  "Custom",
+]);
+
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session || session.user.role !== "admin") {
+    throw new Error("Not authorized");
+  }
+  return session;
+}
+
+// Ensure the singleton settings row exists before updating individual fields.
+async function ensureSettingsRow() {
+  await db.insert(botSetting).values({ id: "singleton" }).onConflictDoNothing();
+}
+
+type Result = { ok: true } | { error: string };
+
+async function adminGuard(): Promise<Result | null> {
+  try {
+    await requireAdmin();
+    return null;
+  } catch {
+    return { error: "Only admins can edit bot settings." };
+  }
+}
+
+// ── Token (set-only; never read back to the browser) ─────────────────────────
+
+export async function setBotToken(token: string): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  const value = token.trim();
+  if (value.length < 20) {
+    return { error: "That doesn't look like a valid bot token." };
+  }
+  await ensureSettingsRow();
+  await db.update(botSetting).set({ token: value }).where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+export async function clearBotToken(): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  await ensureSettingsRow();
+  await db.update(botSetting).set({ token: null }).where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+// ── Presence (the bot's Discord status) ──────────────────────────────────────
+
+export async function updatePresence(input: {
+  presenceStatus: string;
+  presenceActivityType: string;
+  presenceActivityText: string;
+}): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  if (!PRESENCE_STATUS.has(input.presenceStatus)) {
+    return { error: "Invalid status." };
+  }
+  if (!ACTIVITY_TYPE.has(input.presenceActivityType)) {
+    return { error: "Invalid activity type." };
+  }
+  await ensureSettingsRow();
+  await db
+    .update(botSetting)
+    .set({
+      presenceStatus: input.presenceStatus,
+      presenceActivityType: input.presenceActivityType,
+      presenceActivityText: input.presenceActivityText.trim().slice(0, 128),
+    })
+    .where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+// ── Enable / run-now ─────────────────────────────────────────────────────────
+
+export async function setEnabled(enabled: boolean): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  await ensureSettingsRow();
+  await db.update(botSetting).set({ enabled }).where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+export async function requestRunNow(): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  await ensureSettingsRow();
+  await db
+    .update(botSetting)
+    .set({ runRequestedAt: new Date() })
+    .where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+// ── Schedule ─────────────────────────────────────────────────────────────────
+
+export async function updateBotSchedule(input: {
+  periodAnchor: string;
+  periodDays: number;
+  postHour: number;
+  postMinute: number;
+}): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+
+  const periodAnchor = input.periodAnchor.trim();
+  const anchorMs = Date.parse(`${periodAnchor}T00:00:00Z`);
+  if (Number.isNaN(anchorMs)) return { error: "Period anchor must be a valid date." };
+  if (new Date(anchorMs).getUTCDay() !== 5) {
+    return { error: "Period anchor must be a Friday. Periods end on Fridays." };
+  }
+  if (!Number.isInteger(input.periodDays) || input.periodDays < 1) {
+    return { error: "Period length must be a whole number of days (≥ 1)." };
+  }
+  if (!Number.isInteger(input.postHour) || input.postHour < 0 || input.postHour > 23) {
+    return { error: "Post hour must be 0–23 (UTC)." };
+  }
+  if (!Number.isInteger(input.postMinute) || input.postMinute < 0 || input.postMinute > 59) {
+    return { error: "Post minute must be 0–59." };
+  }
+
+  await ensureSettingsRow();
+  await db
+    .update(botSetting)
+    .set({
+      periodAnchor,
+      periodDays: input.periodDays,
+      postHour: input.postHour,
+      postMinute: input.postMinute,
+    })
+    .where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+// ── Report channels ──────────────────────────────────────────────────────────
+
+export async function addReportChannel(input: {
+  channelId: string;
+  userId: string | null;
+  name: string;
+}): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+
+  const channelId = input.channelId.trim();
+  if (!SNOWFLAKE.test(channelId)) {
+    return { error: "Channel ID must be a Discord ID (numbers only)." };
+  }
+  const userId = input.userId?.trim() || null;
+  if (userId && !SNOWFLAKE.test(userId)) {
+    return { error: "Member ID must be a Discord ID (numbers only)." };
+  }
+  const name = input.name.trim().slice(0, 80);
+
+  await db
+    .insert(reportChannel)
+    .values({ id: randomUUID(), channelId, userId, name })
+    .onConflictDoUpdate({ target: reportChannel.channelId, set: { userId, name } });
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+export async function deleteReportChannel(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await db.delete(reportChannel).where(eq(reportChannel.id, id));
+  revalidatePath(PAGE);
+  await notifyChange();
+}

@@ -1,0 +1,22 @@
+# Unique project name so this stack never collides with others on the VPS.
+name: team-guide-reports-bot
+
+services:
+  bot:
+    build: .
+    image: team-guide-reports-bot
+    container_name: team-guide-reports-bot
+    restart: unless-stopped
+    # Outbound-only: NO ports published, so nothing can conflict with other
+    # containers on the host. Compose creates an isolated network for this
+    # project automatically.
+    # All config (report channels + schedule) lives in the database and is
+    # edited from the website — nothing to mount here.
+    env_file:
+      - .env
+    # Keep logs from growing unbounded on the VPS.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

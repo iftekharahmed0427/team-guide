@@ -64,6 +64,20 @@
       "when": 1781526666038,
       "tag": "0008_material_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781679141646,
+      "tag": "0009_boring_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781679896012,
+      "tag": "0010_unknown_sprite",
+      "breakpoints": true
     }
   ]
 }
