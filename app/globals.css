@@ -224,6 +224,32 @@ body {
   color: var(--foreground);
 }
 
+/* Odometer: a rolling-digit counter (like a mechanical clock/odometer). Each
+   digit is a column clipping a vertical 0-9 strip; translating the strip rolls
+   the digit, and the CSS transition makes it spin up to the new value. Used by
+   the live ticket counts on the reports page. */
+.odo {
+  display: inline-flex;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.odo-digit {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+}
+.odo-strip {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.odo-cell {
+  display: flex;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fx-rise,
   .fx-fade,
@@ -234,6 +260,9 @@ body {
     transition: none;
   }
   .btn-wipe-dark {
+    transition: none;
+  }
+  .odo-strip {
     transition: none;
   }
 }

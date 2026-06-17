@@ -9,6 +9,7 @@ import {
   Users,
   SquareKanban,
   BookOpen,
+  Ticket,
   Settings,
   LifeBuoy,
   LogOut,
@@ -39,6 +40,7 @@ const primaryNav: NavItem[] = [
   { label: "News", icon: Newspaper, href: "/news" },
   { label: "Guides", icon: BookOpen, href: "/guides" },
   { label: "Board", icon: SquareKanban, href: "/board" },
+  { label: "Reports", icon: Ticket, href: "/reports" },
   { label: "Team", icon: Users, href: "/team" },
 ];
 

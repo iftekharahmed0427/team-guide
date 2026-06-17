@@ -1,5 +1,11 @@
 import pg from "pg";
 
+// `timestamp` (no tz) columns hold UTC wall-clock here (Supabase's session is UTC
+// and the website writes UTC). Parse them as UTC so epoch comparisons line up
+// regardless of the bot process's local timezone — matters when running locally;
+// the VPS container is already UTC. (OID 1114 = timestamp without time zone.)
+pg.types.setTypeParser(1114, (v) => new Date(v.replace(" ", "T") + "Z"));
+
 // Config lives in the same Supabase Postgres the website writes to, so admins
 // edit the bot (token, presence, schedule, channels, enable, run-now) from the
 // web UI and the bot reads it here at runtime. The bot writes its health/status
@@ -123,6 +129,94 @@ export async function getLastReportAt(): Promise<number> {
   );
   const v = rows[0]?.last_report_at;
   return v ? new Date(v).getTime() : 0;
+}
+
+// ── Live ticket counts (dashboard) ───────────────────────────────────────────
+
+export type LiveChannel = ReportEntry & {
+  lastSeenMessageId: string | null;
+  currentCount: number;
+};
+
+export async function getLiveChannels(): Promise<LiveChannel[]> {
+  const { rows } = await getPool().query(
+    `select channel_id, user_id, name, last_seen_message_id, current_count
+     from report_channel order by created_at asc`,
+  );
+  return rows.map((r) => ({
+    channelId: String(r.channel_id),
+    userId: r.user_id == null ? null : String(r.user_id),
+    name: r.name == null ? "" : String(r.name),
+    lastSeenMessageId:
+      r.last_seen_message_id == null ? null : String(r.last_seen_message_id),
+    currentCount: Number(r.current_count ?? 0),
+  }));
+}
+
+export async function getTicketPeriodStart(): Promise<number | null> {
+  const { rows } = await getPool().query(
+    "select period_start from ticket_count where id = 'singleton'",
+  );
+  const v = rows[0]?.period_start;
+  return v ? new Date(v).getTime() : null;
+}
+
+// New period: snapshot the in-progress totals into the previous-period fields,
+// reset the running counts, and record the new period start. One transaction so
+// the dashboard never reads a half-reset state. `at time zone 'UTC'` stores the
+// UTC wall-clock independent of the Postgres session timezone.
+export async function rolloverTicketCounts(periodStartMs: number): Promise<void> {
+  const client = await getPool().connect();
+  try {
+    await client.query("begin");
+    await client.query(
+      `update report_channel
+         set previous_count = current_count, current_count = 0,
+             last_seen_message_id = null, counted_at = now()`,
+    );
+    await client.query(
+      `insert into ticket_count (id, total, previous_total, period_start, updated_at)
+       values ('singleton', 0, 0, to_timestamp($1 / 1000.0) at time zone 'UTC', now())
+       on conflict (id) do update
+         set previous_total = ticket_count.total, total = 0,
+             period_start = excluded.period_start, updated_at = now()`,
+      [periodStartMs],
+    );
+    await client.query("commit");
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateChannelCount(
+  channelId: string,
+  currentCount: number,
+  lastSeenMessageId: string | null,
+): Promise<void> {
+  await getPool().query(
+    `update report_channel
+       set current_count = $2, last_seen_message_id = $3, counted_at = now()
+     where channel_id = $1`,
+    [channelId, currentCount, lastSeenMessageId],
+  );
+}
+
+export async function setTicketTotal(total: number): Promise<void> {
+  await getPool().query(
+    `insert into ticket_count (id, total, updated_at)
+     values ('singleton', $1, now())
+     on conflict (id) do update set total = $1, updated_at = now()`,
+    [total],
+  );
+}
+
+// Best-effort: tell the website to refresh via its app_event SSE bus (same
+// channel lib/notify.ts uses). NOTIFY works over the pooled connection.
+export async function notifyAppEvent(): Promise<void> {
+  await getPool().query("select pg_notify('app_event', '')");
 }
 
 export async function closeDb(): Promise<void> {

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { newsPost, unavailability, shift, note } from "@/db/app-schema";
+import { newsPost, unavailability, shift, note, ticketCount } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import AvailabilityCalendar from "@/app/components/availability-calendar";
 import ShiftCheckin from "@/app/components/shift-checkin";
@@ -71,38 +71,52 @@ export default async function Home() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
 
-  const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes] = await Promise.all([
-    db.select().from(newsPost).orderBy(desc(newsPost.createdAt)).limit(5),
-    db
-      .select({
-        date: unavailability.date,
-        userId: unavailability.userId,
-        userName: user.name,
-      })
-      .from(unavailability)
-      .innerJoin(user, eq(unavailability.userId, user.id)),
-    db
-      .select({
-        userId: shift.userId,
-        userName: user.name,
-        checkedInAt: shift.checkedInAt,
-      })
-      .from(shift)
-      .innerJoin(user, eq(shift.userId, user.id))
-      .where(isNull(shift.checkedOutAt))
-      .orderBy(shift.checkedInAt),
-    db.select({ value: count() }).from(user),
-    db.select().from(note).orderBy(desc(note.createdAt)).limit(5),
-  ]);
+  const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes, ticketRows] =
+    await Promise.all([
+      db.select().from(newsPost).orderBy(desc(newsPost.createdAt)).limit(5),
+      db
+        .select({
+          date: unavailability.date,
+          userId: unavailability.userId,
+          userName: user.name,
+        })
+        .from(unavailability)
+        .innerJoin(user, eq(unavailability.userId, user.id)),
+      db
+        .select({
+          userId: shift.userId,
+          userName: user.name,
+          checkedInAt: shift.checkedInAt,
+        })
+        .from(shift)
+        .innerJoin(user, eq(shift.userId, user.id))
+        .where(isNull(shift.checkedOutAt))
+        .orderBy(shift.checkedInAt),
+      db.select({ value: count() }).from(user),
+      db.select().from(note).orderBy(desc(note.createdAt)).limit(5),
+      db.select().from(ticketCount).where(eq(ticketCount.id, "singleton")).limit(1),
+    ]);
 
   const totalMembers = memberCount[0]?.value ?? 0;
+
+  // Live ticket total kept fresh by the bot (see bot/src/index.ts countTick). The
+  // "% vs last period" delta is only meaningful once a prior period exists.
+  const tickets = ticketRows[0]?.total ?? 0;
+  const previousTickets = ticketRows[0]?.previousTotal ?? 0;
+  let ticketDelta = "this period";
+  let ticketTrend: "up" | "down" | undefined;
+  if (previousTickets > 0) {
+    const pct = Math.round(((tickets - previousTickets) / previousTickets) * 100);
+    ticketTrend = pct >= 0 ? "up" : "down";
+    ticketDelta = `${pct >= 0 ? "+" : ""}${pct}% vs last period`;
+  }
 
   const stats: Stat[] = [
     {
       label: "Tickets solved",
-      value: "142",
-      delta: "+12% vs last period",
-      trend: "up",
+      value: tickets.toLocaleString(),
+      delta: ticketDelta,
+      trend: ticketTrend,
       icon: CheckCheck,
     },
     {

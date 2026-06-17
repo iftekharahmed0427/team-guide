@@ -143,6 +143,13 @@ export const shift = pgTable("shift", {
 // One member's report channel. `userId`/`name` are the member's Discord
 // snowflake and display name; `userId` null means count everyone's uploads in
 // the channel. The bot reads these rows to know which channels to count + post.
+//
+// The live counter fields are maintained by the bot for the dashboard: it counts
+// image attachments incrementally (only fetching messages newer than
+// `lastSeenMessageId`) so it can refresh every few seconds without re-walking
+// channel history and tripping Discord rate limits. `currentCount` is this
+// channel's tally for the in-progress period; `previousCount` is its final tally
+// for the period that just ended (kept so the dashboard delta survives a rollover).
 export const reportChannel = pgTable(
   "report_channel",
   {
@@ -150,10 +157,31 @@ export const reportChannel = pgTable(
     channelId: text("channel_id").notNull(),
     userId: text("user_id"), // Discord snowflake; null = count all uploads
     name: text("name").notNull().default(""),
+    lastSeenMessageId: text("last_seen_message_id"), // newest message already counted
+    currentCount: integer("current_count").notNull().default(0),
+    previousCount: integer("previous_count").notNull().default(0),
+    countedAt: timestamp("counted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [unique("report_channel_channel_unique").on(t.channelId)],
 );
+
+// Single-row (`id` = "singleton") live ticket totals the bot keeps fresh for the
+// dashboard "Tickets solved" card. `total` is the team-wide sum of image-attachment
+// tickets in the in-progress period; `previousTotal` is the prior period's final
+// sum (for the "% vs last period" delta). `periodStart` is the UTC start of the
+// period the counts cover; when the bot sees a new period start it snapshots the
+// totals into the `previous*` fields and resets, so the dashboard rolls over too.
+export const ticketCount = pgTable("ticket_count", {
+  id: text("id").primaryKey().default("singleton"),
+  total: integer("total").notNull().default(0),
+  previousTotal: integer("previous_total").notNull().default(0),
+  periodStart: timestamp("period_start"),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
 
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →
 // Discord bot page and read by the bot. All times are UTC. `periodAnchor` is a

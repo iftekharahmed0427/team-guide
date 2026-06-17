@@ -24,6 +24,18 @@ export function periodWindow(end: Date, cfg: Settings): { start: number; end: nu
   return { start: endMs - cfg.periodDays * DAY_MS, end: endMs };
 }
 
+// Start (UTC ms) of the in-progress period that contains `now` — the most recent
+// period boundary at or before now. Boundaries sit `periodDays` apart from the
+// anchor (itself a period-end Friday), so the live counter's window
+// (currentPeriodStart, now] is the in-progress version of the window the report
+// for the next boundary will post.
+export function currentPeriodStart(now: Date, cfg: Settings): number {
+  const anchor = Date.parse(`${cfg.periodAnchor}T00:00:00Z`);
+  const periodMs = cfg.periodDays * DAY_MS;
+  const periodsSinceAnchor = Math.floor((now.getTime() - anchor) / periodMs);
+  return anchor + periodsSinceAnchor * periodMs;
+}
+
 export function formatRange(startMs: number, endMs: number): string {
   const fmt = (ms: number) =>
     new Date(ms).toLocaleDateString("en-US", {
