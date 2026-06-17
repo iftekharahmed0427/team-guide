@@ -1,4 +1,5 @@
-import { headers } from "next/headers";
+import { cache } from "react";
+import { headers, cookies } from "next/headers";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
@@ -97,12 +98,37 @@ const DEV_SESSION = {
   },
 } as unknown as NonNullable<Session>;
 
-// Canonical session accessor for read-only server components. Falls back to a
-// stub admin session in development so pages render without logging in. Mutating
-// server actions intentionally keep calling auth.api.getSession directly, since they
-// must operate on a real user row.
-export async function getSession(): Promise<Session> {
+// Name of the cookie that turns on the admin "view as member" preview.
+export const VIEW_AS_COOKIE = "tg_view_as_member";
+
+// The real, un-downgraded session. Cached per request so repeated calls in one
+// render don't re-validate the session. Falls back to a stub admin session in
+// development so pages render without logging in. Use this only for the preview
+// toggle itself (so an admin can always turn the preview back off).
+export const getRealSession = cache(async (): Promise<Session> => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (session || IS_PRODUCTION) return session;
   return DEV_SESSION;
+});
+
+// True when a real admin has switched on the "view as member" preview.
+export async function isViewingAsMember(): Promise<boolean> {
+  const real = await getRealSession();
+  if (real?.user.role !== "admin") return false;
+  return (await cookies()).get(VIEW_AS_COOKIE)?.value === "1";
+}
+
+// Canonical session accessor for server components and mutating actions. When an
+// admin is previewing as a member, the role is downgraded to "member" so every
+// page, nav item, and admin-gated action behaves exactly as it would for a real
+// team member. This can only ever DOWNGRADE privileges, never grant them.
+export async function getSession(): Promise<Session> {
+  const session = await getRealSession();
+  if (session?.user.role === "admin") {
+    const previewing = (await cookies()).get(VIEW_AS_COOKIE)?.value === "1";
+    if (previewing) {
+      return { ...session, user: { ...session.user, role: "member" } } as NonNullable<Session>;
+    }
+  }
+  return session;
 }

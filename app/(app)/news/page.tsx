@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { desc } from "drizzle-orm";
 import { Plus, Calendar, User, ChevronRight, X } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
 
@@ -98,7 +97,7 @@ export default async function NewsPage({
   searchParams: Promise<{ tag?: string }>;
 }) {
   const { tag } = await searchParams;
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   const isAdmin = session?.user.role === "admin";
 
   const posts = await db.select().from(newsPost).orderBy(desc(newsPost.createdAt));

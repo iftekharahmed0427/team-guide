@@ -1,17 +1,16 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 
 async function requireAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   if (!session || session.user.role !== "admin") {
     throw new Error("Not authorized");
   }

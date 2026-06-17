@@ -1,12 +1,11 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import NewsEditor from "../news-editor";
 
 export default async function NewNewsPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   if (!session) redirect("/sign-in");
   if (session.user.role !== "admin") redirect("/news");
 

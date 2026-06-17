@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -10,15 +10,18 @@ import {
   SquareKanban,
   BookOpen,
   Ticket,
+  HandCoins,
   Settings,
   LifeBuoy,
   LogOut,
   Box,
   Shield,
+  Eye,
   Loader2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import Avatar from "@/app/components/avatar";
+import { setViewAsMember } from "@/app/components/view-as-actions";
 
 type SidebarUser = {
   name?: string | null;
@@ -41,6 +44,7 @@ const primaryNav: NavItem[] = [
   { label: "Guides", icon: BookOpen, href: "/guides" },
   { label: "Board", icon: SquareKanban, href: "/board" },
   { label: "Reports", icon: Ticket, href: "/reports" },
+  { label: "Commissions", icon: HandCoins, href: "/commissions" },
   { label: "Team", icon: Users, href: "/team" },
 ];
 
@@ -84,10 +88,24 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export default function Sidebar({ user }: { user: SidebarUser }) {
+export default function Sidebar({
+  user,
+  viewingAsMember,
+}: {
+  user: SidebarUser;
+  viewingAsMember: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [viewAsPending, startViewAs] = useTransition();
+
+  function toggleViewAs() {
+    startViewAs(async () => {
+      await setViewAsMember(!viewingAsMember);
+      router.refresh();
+    });
+  }
 
   const isActive = (item: NavItem) => {
     if (!item.href) return false;
@@ -102,7 +120,9 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
     router.refresh();
   }
 
-  const isAdmin = user.role === "admin";
+  const realAdmin = user.role === "admin";
+  // Effective role: while previewing as a member, hide admin-only nav + badge.
+  const isAdmin = realAdmin && !viewingAsMember;
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface">
@@ -137,6 +157,21 @@ export default function Sidebar({ user }: { user: SidebarUser }) {
       </nav>
 
       <div className="border-t border-border p-3">
+        {realAdmin ? (
+          <button
+            type="button"
+            onClick={toggleViewAs}
+            disabled={viewAsPending}
+            className="mb-2 flex w-full items-center gap-2 border border-border bg-surface-2 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground disabled:opacity-60"
+          >
+            {viewAsPending ? (
+              <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Eye size={14} strokeWidth={1.75} />
+            )}
+            {viewingAsMember ? "Exit member view" : "View as member"}
+          </button>
+        ) : null}
         <div className="flex items-center gap-3 border border-border bg-surface-2 px-3 py-2.5">
           <Avatar name={user.name} image={user.image} size={32} />
           <div className="min-w-0 flex-1 leading-tight">

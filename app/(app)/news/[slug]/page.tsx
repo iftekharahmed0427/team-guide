@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { ArrowLeft, Calendar, User, Trash2 } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
 import { deletePost } from "../actions";
@@ -31,7 +30,7 @@ export default async function NewsPostPage({
     notFound();
   }
 
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   const isAdmin = session?.user.role === "admin";
 
   return (
