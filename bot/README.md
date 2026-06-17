@@ -87,6 +87,21 @@ docker compose logs -f
 
 All other configuration is done in the website, with no container restart needed.
 
+### Updating after a push
+
+To pull the latest code and rebuild in one step, run the deploy script on the
+VPS after each push:
+
+```bash
+cd team-guide/bot
+chmod +x deploy.sh   # first time only
+./deploy.sh
+```
+
+It does a fast-forward `git pull`, rebuilds and restarts the container, prunes
+old images, and tails the logs. Your `.env` and the config in the database are
+left untouched.
+
 ## Files
 
 | File | Purpose |
