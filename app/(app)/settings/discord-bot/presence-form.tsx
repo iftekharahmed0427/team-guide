@@ -101,16 +101,17 @@ export default function PresenceForm({ presence }: { presence: Presence }) {
           type="button"
           onClick={submit}
           disabled={pending}
-          className="btn-wipe btn-wipe-dark flex h-9 shrink-0 items-center gap-2 border border-border bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
+          className="btn-wipe btn-wipe-dark relative flex h-9 shrink-0 items-center justify-center border border-border bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
         >
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-            {pending ? (
-              <Loader2 size={15} strokeWidth={2} className="animate-spin" />
-            ) : saved ? (
-              <Check size={15} strokeWidth={2} />
-            ) : null}
+          <span className={`flex items-center gap-2 ${pending ? "invisible" : ""}`}>
+            {saved ? <Check size={15} strokeWidth={2} /> : null}
+            {saved ? "Saved" : "Save presence"}
           </span>
-          {saved ? "Saved" : "Save presence"}
+          {pending ? (
+            <span className="absolute inset-0 flex items-center justify-center">
+              <Loader2 size={15} strokeWidth={2} className="animate-spin" />
+            </span>
+          ) : null}
         </button>
       </div>
     </div>

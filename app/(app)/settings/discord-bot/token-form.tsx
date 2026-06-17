@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, KeyRound, Check, Asterisk } from "lucide-react";
+import { Loader2, KeyRound, Asterisk } from "lucide-react";
 import { setBotToken, clearBotToken } from "./actions";
 
 export default function TokenForm({
@@ -103,16 +103,14 @@ export default function TokenForm({
               type="button"
               onClick={save}
               disabled={pending || !value.trim()}
-              className="btn-wipe btn-wipe-dark flex h-9 shrink-0 items-center justify-center gap-2 border border-border bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
+              className="btn-wipe btn-wipe-dark relative flex h-9 shrink-0 items-center justify-center border border-border bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50"
             >
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                {pending ? (
+              <span className={pending ? "invisible" : ""}>Save token</span>
+              {pending ? (
+                <span className="absolute inset-0 flex items-center justify-center">
                   <Loader2 size={15} strokeWidth={2} className="animate-spin" />
-                ) : saved ? (
-                  <Check size={15} strokeWidth={2} />
-                ) : null}
-              </span>
-              Save token
+                </span>
+              ) : null}
             </button>
           </div>
           {hasToken ? (
