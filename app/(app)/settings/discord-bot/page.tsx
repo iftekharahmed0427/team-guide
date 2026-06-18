@@ -10,6 +10,7 @@ import BotControls from "./bot-controls";
 import TokenForm from "./token-form";
 import PresenceForm from "./presence-form";
 import ScheduleForm from "./schedule-form";
+import AnnouncementForm from "./announcement-form";
 import ReportChannelForm from "./report-channel-form";
 
 export default async function DiscordBotSettingsPage() {
@@ -31,6 +32,14 @@ export default async function DiscordBotSettingsPage() {
     periodDays: settingRow?.periodDays ?? 14,
     postHour: settingRow?.postHour ?? 17,
     postMinute: settingRow?.postMinute ?? 0,
+  };
+  const announcement = {
+    announcementChannelId: settingRow?.announcementChannelId ?? "",
+    announcementEnabled: settingRow?.announcementEnabled ?? false,
+    announcementTitle: settingRow?.announcementTitle ?? "Ticket count for this period",
+    announcementColor: settingRow?.announcementColor ?? "#5865f2",
+    announcementIntro: settingRow?.announcementIntro ?? "",
+    announcementFooter: settingRow?.announcementFooter ?? "Team Guide",
   };
 
   const status = await getBotStatusPayload();
@@ -124,6 +133,19 @@ export default async function DiscordBotSettingsPage() {
         </div>
         <div className="p-5">
           <ScheduleForm settings={schedule} />
+        </div>
+      </section>
+
+      {/* Announcement */}
+      <section className={card}>
+        <div className={cardHead}>
+          <h3 className="text-sm font-semibold tracking-tight">Announcement</h3>
+          <p className="text-xs text-muted">
+            A period-end leaderboard embed posted to a channel of your choice.
+          </p>
+        </div>
+        <div className="p-5">
+          <AnnouncementForm announcement={announcement} />
         </div>
       </section>
 

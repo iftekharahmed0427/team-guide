@@ -22,6 +22,12 @@ export type Settings = {
   presenceActivityType: string; // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: string;
   runRequestedAt: number; // ms epoch, 0 if never
+  announcementChannelId: string | null;
+  announcementEnabled: boolean;
+  announcementTitle: string;
+  announcementColor: string; // hex, e.g. #5865f2
+  announcementIntro: string;
+  announcementFooter: string;
 };
 
 export type ReportEntry = {
@@ -41,6 +47,12 @@ const DEFAULT_SETTINGS: Settings = {
   presenceActivityType: "none",
   presenceActivityText: "",
   runRequestedAt: 0,
+  announcementChannelId: null,
+  announcementEnabled: false,
+  announcementTitle: "Ticket count for this period",
+  announcementColor: "#5865f2",
+  announcementIntro: "",
+  announcementFooter: "Team Guide",
 };
 
 let pool: pg.Pool | null = null;
@@ -61,11 +73,17 @@ function getPool(): pg.Pool {
 export async function getSettings(): Promise<Settings> {
   const { rows } = await getPool().query(
     `select token, enabled, period_anchor, period_days, post_hour, post_minute,
-            presence_status, presence_activity_type, presence_activity_text, run_requested_at
+            presence_status, presence_activity_type, presence_activity_text, run_requested_at,
+            announcement_channel_id, announcement_enabled, announcement_title,
+            announcement_color, announcement_intro, announcement_footer
      from bot_setting where id = 'singleton' limit 1`,
   );
   const r = rows[0];
   if (!r) return DEFAULT_SETTINGS;
+  const channelId =
+    r.announcement_channel_id == null || String(r.announcement_channel_id).trim() === ""
+      ? null
+      : String(r.announcement_channel_id);
   return {
     token: r.token == null || String(r.token).trim() === "" ? null : String(r.token),
     enabled: r.enabled !== false,
@@ -77,6 +95,12 @@ export async function getSettings(): Promise<Settings> {
     presenceActivityType: String(r.presence_activity_type ?? "none"),
     presenceActivityText: String(r.presence_activity_text ?? ""),
     runRequestedAt: r.run_requested_at ? new Date(r.run_requested_at).getTime() : 0,
+    announcementChannelId: channelId,
+    announcementEnabled: r.announcement_enabled === true,
+    announcementTitle: String(r.announcement_title ?? "Ticket count for this period"),
+    announcementColor: String(r.announcement_color ?? "#5865f2"),
+    announcementIntro: String(r.announcement_intro ?? ""),
+    announcementFooter: String(r.announcement_footer ?? "Team Guide"),
   };
 }
 

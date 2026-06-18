@@ -5,8 +5,9 @@ import { formatRange, periodWindow } from "./period.ts";
 
 type RunOptions = { dryRun?: boolean };
 
-// Count every configured channel for the period ending at `end`, then post (or,
-// in dry-run, log) a summary embed in each channel.
+// Count every configured channel for the period ending at `end`, post a summary
+// embed in each channel, then (if enabled) post a ranked leaderboard to the
+// announcement channel. In dry-run nothing is sent, only logged.
 export async function runReport(
   client: Client,
   settings: Settings,
@@ -21,6 +22,8 @@ export async function runReport(
       (opts.dryRun ? " [dry-run]" : ""),
   );
 
+  const ranking: { name: string; count: number }[] = [];
+
   for (const entry of channels) {
     const label = entry.name || entry.userId || entry.channelId;
     const result = await countChannelTickets(client, entry, start);
@@ -30,6 +33,7 @@ export async function runReport(
       continue;
     }
     console.log(`[report] ${label}: ${result.count} ticket(s)`);
+    ranking.push({ name: label, count: result.count });
 
     if (opts.dryRun) continue;
 
@@ -48,7 +52,11 @@ export async function runReport(
       console.error(`[report] ${label}: send failed:`, err);
     }
   }
+
+  await postLeaderboard(client, settings, ranking, opts);
 }
+
+// ── Per-channel summary ───────────────────────────────────────────────────────
 
 function buildEmbed(count: number, range: string): EmbedBuilder {
   const noun = count === 1 ? "ticket" : "tickets";
@@ -66,4 +74,62 @@ function buildEmbed(count: number, range: string): EmbedBuilder {
     )
     .setFooter({ text: "Team Guide" })
     .setTimestamp(new Date());
+}
+
+// ── Leaderboard announcement ──────────────────────────────────────────────────
+
+function parseColor(hex: string): number {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  return m && m[1] ? parseInt(m[1], 16) : 0x5865f2;
+}
+
+function buildLeaderboardEmbed(
+  ranking: { name: string; count: number }[],
+  settings: Settings,
+): EmbedBuilder {
+  const ranked = [...ranking].sort((a, b) => b.count - a.count);
+  const lines = ranked.map((r, i) => {
+    const noun = r.count === 1 ? "ticket" : "tickets";
+    return `**#${i + 1}** ${r.name} - ${r.count} ${noun}`;
+  });
+  const body = lines.length > 0 ? lines.join("\n") : "No tickets were logged this period.";
+  const intro = settings.announcementIntro.trim();
+  const embed = new EmbedBuilder()
+    .setTitle(settings.announcementTitle.trim() || "Ticket count for this period")
+    .setColor(parseColor(settings.announcementColor))
+    .setDescription(intro ? `${intro}\n\n${body}` : body)
+    .setTimestamp(new Date());
+  const footer = settings.announcementFooter.trim();
+  if (footer) embed.setFooter({ text: footer });
+  return embed;
+}
+
+async function postLeaderboard(
+  client: Client,
+  settings: Settings,
+  ranking: { name: string; count: number }[],
+  opts: RunOptions,
+): Promise<void> {
+  if (!settings.announcementEnabled || !settings.announcementChannelId) return;
+
+  const embed = buildLeaderboardEmbed(ranking, settings);
+
+  if (opts.dryRun) {
+    console.log(`[report] leaderboard (dry-run):\n${embed.data.description ?? ""}`);
+    return;
+  }
+
+  try {
+    const channel = (await client.channels.fetch(
+      settings.announcementChannelId,
+    )) as TextBasedChannel | null;
+    if (!channel || !channel.isSendable()) {
+      console.error("[report] announcement: cannot send (missing access / Send Messages?)");
+      return;
+    }
+    await channel.send({ embeds: [embed] });
+    console.log("[report] leaderboard posted");
+  } catch (err) {
+    console.error("[report] announcement send failed:", err);
+  }
 }

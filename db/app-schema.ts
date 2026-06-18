@@ -211,6 +211,15 @@ export const botSetting = pgTable("bot_setting", {
   presenceActivityType: text("presence_activity_type").notNull().default("none"), // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: text("presence_activity_text").notNull().default(""),
   runRequestedAt: timestamp("run_requested_at"),
+  // Period-end leaderboard announcement: posted to `announcementChannelId` when a
+  // report runs (if `announcementEnabled`). The ranked member list is generated;
+  // the title/color/intro/footer are the admin-customizable styling.
+  announcementChannelId: text("announcement_channel_id"),
+  announcementEnabled: boolean("announcement_enabled").notNull().default(false),
+  announcementTitle: text("announcement_title").notNull().default("Ticket count for this period"),
+  announcementColor: text("announcement_color").notNull().default("#5865f2"),
+  announcementIntro: text("announcement_intro").notNull().default(""),
+  announcementFooter: text("announcement_footer").notNull().default("Team Guide"),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())

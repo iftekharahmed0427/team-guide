@@ -166,6 +166,51 @@ export async function updateBotSchedule(input: {
   return { ok: true };
 }
 
+// ── Period-end leaderboard announcement ──────────────────────────────────────
+
+const HEX = /^#?[0-9a-fA-F]{6}$/;
+
+export async function updateAnnouncement(input: {
+  announcementChannelId: string;
+  announcementEnabled: boolean;
+  announcementTitle: string;
+  announcementColor: string;
+  announcementIntro: string;
+  announcementFooter: string;
+}): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+
+  const channelId = input.announcementChannelId.trim();
+  if (channelId && !SNOWFLAKE.test(channelId)) {
+    return { error: "Channel ID must be a Discord ID (numbers only)." };
+  }
+  if (input.announcementEnabled && !channelId) {
+    return { error: "Set an announcement channel before enabling it." };
+  }
+  const color = input.announcementColor.trim();
+  if (color && !HEX.test(color)) {
+    return { error: "Color must be a 6-digit hex, e.g. #5865f2." };
+  }
+
+  await ensureSettingsRow();
+  await db
+    .update(botSetting)
+    .set({
+      announcementChannelId: channelId || null,
+      announcementEnabled: input.announcementEnabled,
+      announcementTitle:
+        input.announcementTitle.trim().slice(0, 256) || "Ticket count for this period",
+      announcementColor: color ? (color.startsWith("#") ? color : `#${color}`) : "#5865f2",
+      announcementIntro: input.announcementIntro.trim().slice(0, 500),
+      announcementFooter: input.announcementFooter.trim().slice(0, 200),
+    })
+    .where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
 // ── Report channels ──────────────────────────────────────────────────────────
 
 export async function addReportChannel(input: {
