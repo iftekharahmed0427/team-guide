@@ -84,6 +84,51 @@ export async function createPost(
   return { slug };
 }
 
+export async function updatePost(
+  id: string,
+  input: CreateInput,
+): Promise<{ slug: string } | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "You do not have permission to edit posts." };
+  }
+
+  const title = input.title.trim();
+  if (!title) return { error: "Title is required." };
+  if (!input.content || input.content === "<p></p>") {
+    return { error: "Content is required." };
+  }
+
+  const rows = await db
+    .select({ slug: newsPost.slug })
+    .from(newsPost)
+    .where(eq(newsPost.id, id))
+    .limit(1);
+  const existing = rows[0];
+  if (!existing) return { error: "Post not found." };
+
+  const tags = Array.from(
+    new Set(input.tags.map((t) => t.trim()).filter(Boolean)),
+  ).slice(0, 8);
+
+  // The slug stays fixed so existing links keep working.
+  await db
+    .update(newsPost)
+    .set({
+      title,
+      excerpt: input.excerpt.trim().slice(0, 200),
+      content: input.content,
+      tags,
+    })
+    .where(eq(newsPost.id, id));
+
+  revalidatePath("/news");
+  revalidatePath(`/news/${existing.slug}`);
+  await notifyChange();
+  return { slug: existing.slug };
+}
+
 export async function deletePost(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");

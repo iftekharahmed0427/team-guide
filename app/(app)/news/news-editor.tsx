@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useState, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
 import {
   Bold,
   Italic,
@@ -16,13 +17,17 @@ import {
   Quote,
   Code,
   Link2,
+  ImagePlus,
   Undo2,
   Redo2,
   X,
   Loader2,
   Send,
 } from "lucide-react";
-import { createPost } from "./actions";
+import { createPost, updatePost } from "./actions";
+import { imageToDataUrl, imageEditorProps } from "@/app/components/editor-images";
+
+type NewsInitial = { id: string; title: string; content: string; tags: string[] };
 
 function ToolbarButton({
   onClick,
@@ -54,24 +59,44 @@ function ToolbarButton({
   );
 }
 
-export default function NewsEditor() {
+export default function NewsEditor({ initial }: { initial?: NewsInitial }) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+  const editing = initial != null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
+    content: initial?.content,
     extensions: [
       StarterKit.configure({ heading: { levels: [2, 3] } }),
       Placeholder.configure({ placeholder: "Write the announcement..." }),
+      Image.configure({ allowBase64: true }),
     ],
     editorProps: {
       attributes: { class: "rich-text min-h-[320px] px-4 py-3" },
+      handlePaste: imageEditorProps.handlePaste,
+      handleDrop: imageEditorProps.handleDrop,
     },
   });
+
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    files.forEach(async (file) => {
+      if (!file.type.startsWith("image/")) return;
+      try {
+        const src = await imageToDataUrl(file);
+        editor?.chain().focus().setImage({ src }).run();
+      } catch {
+        // skip an image that fails to decode
+      }
+    });
+  }
 
   function addTag(value: string) {
     const t = value.trim().replace(/,+$/, "").trim();
@@ -120,12 +145,15 @@ export default function NewsEditor() {
       return;
     }
     setSubmitting(true);
-    const res = await createPost({
+    const payload = {
       title,
       content: editor.getHTML(),
       excerpt: editor.getText().trim().slice(0, 200),
       tags,
-    });
+    };
+    const res = initial
+      ? await updatePost(initial.id, payload)
+      : await createPost(payload);
     if ("error" in res) {
       setError(res.error);
       setSubmitting(false);
@@ -139,6 +167,14 @@ export default function NewsEditor() {
 
   return (
     <div className="flex flex-col gap-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={onPickImage}
+      />
       <input
         type="text"
         value={title}
@@ -209,6 +245,9 @@ export default function NewsEditor() {
           <ToolbarButton label="Link" disabled={!ready} active={editor?.isActive("link")} onClick={toggleLink}>
             <Link2 size={15} strokeWidth={2} />
           </ToolbarButton>
+          <ToolbarButton label="Insert image" disabled={!ready} onClick={() => fileInputRef.current?.click()}>
+            <ImagePlus size={15} strokeWidth={2} />
+          </ToolbarButton>
           <span className="mx-1 h-5 w-px bg-border" />
           <ToolbarButton label="Undo" disabled={!ready} onClick={() => editor?.chain().focus().undo().run()}>
             <Undo2 size={15} strokeWidth={2} />
@@ -236,7 +275,7 @@ export default function NewsEditor() {
           ) : (
             <Send size={16} strokeWidth={2} />
           )}
-          Publish
+          {editing ? "Save changes" : "Publish"}
         </button>
       </div>
     </div>

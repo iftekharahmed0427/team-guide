@@ -89,6 +89,54 @@ export async function createGuide(
   return { slug };
 }
 
+export async function updateGuide(
+  id: string,
+  input: CreateInput,
+): Promise<{ slug: string } | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "You do not have permission to edit guides." };
+  }
+
+  const title = input.title.trim();
+  if (!title) return { error: "Title is required." };
+  const games = await getGames();
+  if (!games.includes(input.game)) return { error: "Pick a game for this guide." };
+  if (!input.content || input.content === "<p></p>") {
+    return { error: "Content is required." };
+  }
+
+  const rows = await db
+    .select({ slug: guide.slug })
+    .from(guide)
+    .where(eq(guide.id, id))
+    .limit(1);
+  const existing = rows[0];
+  if (!existing) return { error: "Guide not found." };
+
+  const tags = Array.from(
+    new Set(input.tags.map((t) => t.trim()).filter(Boolean)),
+  ).slice(0, 8);
+
+  // The slug stays fixed so existing links keep working.
+  await db
+    .update(guide)
+    .set({
+      title,
+      game: input.game,
+      excerpt: input.excerpt.trim().slice(0, 200),
+      content: input.content,
+      tags,
+    })
+    .where(eq(guide.id, id));
+
+  revalidatePath("/guides");
+  revalidatePath(`/guides/${existing.slug}`);
+  await notifyChange();
+  return { slug: existing.slug };
+}
+
 // Add a new game to the admin-managed list (from the guide editor).
 export async function addGame(
   name: string,

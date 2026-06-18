@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, Calendar, User, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, User, Pencil, Trash2 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
@@ -44,16 +44,25 @@ export default async function NewsPostPage({
           Back to news
         </Link>
         {isAdmin ? (
-          <form action={deletePost}>
-            <input type="hidden" name="id" value={post.id} />
-            <button
-              type="submit"
-              className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:border-red-500/50 hover:text-red-400"
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/news/${post.slug}/edit`}
+              className="flex h-9 items-center gap-2 border border-border bg-surface-2 px-3 text-sm text-muted transition-colors hover:text-foreground"
             >
-              <Trash2 size={15} strokeWidth={1.75} />
-              Delete
-            </button>
-          </form>
+              <Pencil size={15} strokeWidth={1.75} />
+              Edit
+            </Link>
+            <form action={deletePost}>
+              <input type="hidden" name="id" value={post.id} />
+              <button
+                type="submit"
+                className="flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:border-red-500/50 hover:text-red-400"
+              >
+                <Trash2 size={15} strokeWidth={1.75} />
+                Delete
+              </button>
+            </form>
+          </div>
         ) : null}
       </header>
 
