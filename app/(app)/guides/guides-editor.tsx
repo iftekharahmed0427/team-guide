@@ -19,12 +19,12 @@ import {
   Undo2,
   Redo2,
   X,
+  Plus,
   Loader2,
   Send,
 } from "lucide-react";
 import CustomSelect from "@/app/components/custom-select";
-import { createGuide } from "./actions";
-import { GAMES, GAME_OPTIONS } from "./games";
+import { createGuide, addGame } from "./actions";
 
 function ToolbarButton({
   onClick,
@@ -56,14 +56,39 @@ function ToolbarButton({
   );
 }
 
-export default function GuidesEditor() {
+export default function GuidesEditor({
+  gameOptions,
+  initialGame,
+}: {
+  gameOptions: { value: string; label: string }[];
+  initialGame: string;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [game, setGame] = useState<string>(GAMES[0]);
+  const [game, setGame] = useState<string>(initialGame);
+  const [newGame, setNewGame] = useState("");
+  const [addingGame, setAddingGame] = useState(false);
+  const [gameError, setGameError] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleAddGame() {
+    const name = newGame.trim();
+    if (!name) return;
+    setGameError(null);
+    setAddingGame(true);
+    const res = await addGame(name);
+    setAddingGame(false);
+    if ("error" in res) {
+      setGameError(res.error);
+      return;
+    }
+    setNewGame("");
+    setGame(res.name); // select the new game (CustomSelect re-seeds on the key change)
+    router.refresh();
+  }
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -156,12 +181,42 @@ export default function GuidesEditor() {
           Game
         </label>
         <CustomSelect
+          key={gameOptions.map((o) => o.value).join("|")}
           name="game"
-          options={GAME_OPTIONS}
+          options={gameOptions}
           defaultValue={game}
           onChange={setGame}
           className="w-full sm:w-64"
         />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newGame}
+            onChange={(e) => setNewGame(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddGame();
+              }
+            }}
+            placeholder="Add a new game"
+            className="h-9 w-full border border-border bg-surface-2 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-muted sm:w-64"
+          />
+          <button
+            type="button"
+            onClick={handleAddGame}
+            disabled={addingGame || !newGame.trim()}
+            className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-2 disabled:opacity-50"
+          >
+            {addingGame ? (
+              <Loader2 size={15} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Plus size={15} strokeWidth={2} />
+            )}
+            Add
+          </button>
+        </div>
+        {gameError ? <p className="text-xs text-red-400">{gameError}</p> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border border-border bg-surface-2 px-2 py-2">

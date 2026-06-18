@@ -99,6 +99,13 @@
       "when": 1781693381861,
       "tag": "0013_zippy_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781754500409,
+      "tag": "0014_bitter_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

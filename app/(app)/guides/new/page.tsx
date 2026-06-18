@@ -3,11 +3,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import GuidesEditor from "../guides-editor";
+import { getGames, gameOptions } from "../games";
 
 export default async function NewGuidePage() {
   const session = await getSession();
   if (!session) redirect("/sign-in");
   if (session.user.role !== "admin") redirect("/guides");
+
+  const games = await getGames();
 
   return (
     <>
@@ -26,7 +29,7 @@ export default async function NewGuidePage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto w-full max-w-3xl">
-          <GuidesEditor />
+          <GuidesEditor gameOptions={gameOptions(games)} initialGame={games[0] ?? ""} />
         </div>
       </main>
     </>

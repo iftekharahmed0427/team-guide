@@ -57,6 +57,17 @@ export const guide = pgTable("guide", {
     .notNull(),
 });
 
+// The admin-managed list of games that guides can be filed under (the editor's
+// category picker and the order sections appear on the guides index). Seeded
+// with a default set the first time the list is read; admins add more from the
+// guide editor. `position` orders the list (append new games at the end).
+export const gameCategory = pgTable("game_category", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  position: doublePrecision("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // A shared team kanban board. Each task sits in one column (`status`) and is
 // ordered within it by `position` (fractional, so moving a card only updates
 // that single row instead of reindexing the whole column).

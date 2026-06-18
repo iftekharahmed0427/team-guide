@@ -6,9 +6,9 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { guide } from "@/db/app-schema";
+import { guide, gameCategory } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
-import { isGame } from "./games";
+import { getGames } from "./games";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -50,7 +50,8 @@ export async function createGuide(
 
   const title = input.title.trim();
   if (!title) return { error: "Title is required." };
-  if (!isGame(input.game)) return { error: "Pick a game for this guide." };
+  const games = await getGames();
+  if (!games.includes(input.game)) return { error: "Pick a game for this guide." };
   if (!input.content || input.content === "<p></p>") {
     return { error: "Content is required." };
   }
@@ -86,6 +87,33 @@ export async function createGuide(
   revalidatePath("/guides");
   await notifyChange();
   return { slug };
+}
+
+// Add a new game to the admin-managed list (from the guide editor).
+export async function addGame(
+  name: string,
+): Promise<{ ok: true; name: string } | { error: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "Only admins can add games." };
+  }
+  const trimmed = name.trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!trimmed) return { error: "Enter a game name." };
+
+  const games = await getGames(); // seeds defaults + returns current names
+  if (games.some((g) => g.toLowerCase() === trimmed.toLowerCase())) {
+    return { error: "That game is already in the list." };
+  }
+
+  await db
+    .insert(gameCategory)
+    .values({ id: randomUUID(), name: trimmed, position: games.length })
+    .onConflictDoNothing();
+  revalidatePath("/guides");
+  revalidatePath("/guides/new");
+  await notifyChange();
+  return { ok: true, name: trimmed };
 }
 
 export async function deleteGuide(formData: FormData) {

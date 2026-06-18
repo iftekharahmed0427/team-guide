@@ -4,7 +4,7 @@ import { Plus, Calendar, User, ChevronRight, X, Gamepad2 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { guide } from "@/db/app-schema";
-import { GAMES, isGame } from "./games";
+import { getGames } from "./games";
 
 type Guide = typeof guide.$inferSelect;
 
@@ -97,10 +97,11 @@ export default async function GuidesPage({
   const isAdmin = session?.user.role === "admin";
 
   const guides = await db.select().from(guide).orderBy(desc(guide.createdAt));
-  const activeGame = game && isGame(game) ? game : null;
+  const games = await getGames();
+  const activeGame = game && games.includes(game) ? game : null;
 
-  // Games that actually have guides, kept in the curated GAMES order.
-  const gamesWithGuides = GAMES.filter((g) => guides.some((x) => x.game === g));
+  // Games that actually have guides, kept in the managed list's order.
+  const gamesWithGuides = games.filter((g) => guides.some((x) => x.game === g));
   const visible = activeGame ? guides.filter((g) => g.game === activeGame) : guides;
 
   return (
