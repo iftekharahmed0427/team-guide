@@ -26,25 +26,24 @@ export type CountResult =
 // Count image-attachment "tickets" for `entry` in the active window, and return
 // the channel's newest message id.
 //
-// The window is (floor, now], where `floor` is the LATEST of:
-//   • `windowStart` — the period start, or a later manual-reset time, and
-//   • the most recent message from ANOTHER bot in the channel.
-// So counting always begins AFTER another bot's message: report channels get a
-// bot post (e.g. the ticket panel) that marks where a fresh count should start,
-// and screenshots above it are ignored. The reporting bot's OWN messages (the
-// per-channel summary embeds it posts) are skipped — otherwise posting a report
-// would zero the live count on the next tick. If no other bot has posted since
-// `windowStart`, the whole window is counted.
+// The window is (floor, now]. `floor` is `windowStart` (the period start, or a
+// later manual-reset time). When `stopAtBotMessage` is true the count also stops
+// at the most recent message from ANOTHER bot — i.e. counting begins after a bot
+// post (e.g. a ticket panel), screenshots above it ignored. This is the
+// auto-reset/period behavior. In MANUAL mode (auto-reset off) it is false, so bot
+// messages are ignored and the count is simply every screenshot since the last
+// manual reset — counts persist until an admin resets, instead of dropping every
+// time some bot posts in the channel.
 //
-// Walks history backward via REST and stops as soon as it reaches the floor or
-// another bot's message, so a channel with regular bot posts is cheap to count.
-// Because it recounts current state on every call, deleted screenshots fall out
-// of the tally on their own (no Message Content intent is needed for attachments
-// or for author.bot).
+// The reporting bot's OWN summary embeds are always skipped (never a floor),
+// regardless of `stopAtBotMessage`. Walks history backward via REST; recounts
+// current state each call, so deleted screenshots fall out of the tally (no
+// Message Content intent needed for attachments or author.bot).
 export async function countWindow(
   client: Client,
   entry: ReportEntry,
   windowStart: number,
+  stopAtBotMessage = true,
 ): Promise<CountResult> {
   try {
     const channel = await client.channels.fetch(entry.channelId);
@@ -79,7 +78,7 @@ export async function countWindow(
         // Our own summary embeds must not act as the floor (that would zero the
         // count right after we post) and carry no images anyway.
         if (m.author.id === selfId) continue;
-        if (m.author.bot) {
+        if (stopAtBotMessage && m.author.bot) {
           done = true; // reached another bot's message; stop counting
           break;
         }

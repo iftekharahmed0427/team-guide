@@ -29,7 +29,8 @@ export async function runReport(
     const label = entry.name || entry.userId || entry.channelId;
     // A manual reset only applies within the current period.
     const floor = entry.resetAt && entry.resetAt > start ? entry.resetAt : start;
-    const result = await countWindow(client, entry, floor);
+    // Match the live counter: manual mode (auto-reset off) ignores the bot floor.
+    const result = await countWindow(client, entry, floor, settings.autoReset);
 
     if (!result.ok) {
       console.error(`[report] ${label}: SKIPPED, ${result.error}`);

@@ -186,7 +186,9 @@ async function countTick(): Promise<void> {
     for (const ch of channels) {
       // A manual reset wins when it is newer than the period floor.
       const floor = ch.resetAt && ch.resetAt > periodFloor ? ch.resetAt : periodFloor;
-      const res = await countWindow(client, ch, floor);
+      // In manual mode (auto-reset off) ignore the bot-message floor, so counts
+      // persist until an admin resets instead of dropping when a bot posts.
+      const res = await countWindow(client, ch, floor, s.autoReset);
 
       if (!res.ok) {
         // Keep the last good tally for this channel; don't drop the team total.
