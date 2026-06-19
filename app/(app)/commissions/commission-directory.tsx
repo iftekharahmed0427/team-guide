@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, ChevronRight } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import CommissionReview from "./commission-review";
 import { deleteCommission } from "./actions";
@@ -65,16 +65,21 @@ function MemberCard({ member, onOpen }: { member: MemberData; onOpen: () => void
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full flex-col gap-3 border border-border bg-surface p-4 text-left transition-colors hover:border-foreground/40"
+      className="group flex w-full cursor-pointer flex-col gap-3 border border-border bg-surface p-4 text-left transition-colors hover:border-foreground/40 hover:bg-surface-2"
     >
       <div className="flex items-center gap-3">
         <Avatar name={member.name} image={member.image} size={36} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{member.name}</p>
           <p className="text-xs text-muted">
             {total} commission{total === 1 ? "" : "s"}
           </p>
         </div>
+        <ChevronRight
+          size={16}
+          strokeWidth={1.75}
+          className="shrink-0 text-muted transition-colors group-hover:text-foreground"
+        />
       </div>
       <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
         <Stat label="Active" value={member.approved} tone="text-emerald-400" />
