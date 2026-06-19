@@ -155,6 +155,13 @@
       "when": 1781878027360,
       "tag": "0021_empty_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781890538561,
+      "tag": "0022_secret_swarm",
+      "breakpoints": true
     }
   ]
 }

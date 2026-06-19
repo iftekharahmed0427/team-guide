@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { desc, inArray } from "drizzle-orm";
-import { ArrowLeft, History } from "lucide-react";
+import { ArrowLeft, History, RotateCcw } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportPeriod, reportPeriodEntry, review } from "@/db/app-schema";
+import { reportPeriod, reportPeriodEntry, resetLog, review } from "@/db/app-schema";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/datetime";
 import DeletePeriodButton from "./delete-period-button";
 
@@ -49,6 +49,13 @@ export default async function ReportHistoryPage() {
     reviewsByPeriod.set(r.periodId, c);
   }
 
+  // Audit trail of who reset counts and when (Reset all + per-channel resets).
+  const resets = await db
+    .select()
+    .from(resetLog)
+    .orderBy(desc(resetLog.createdAt))
+    .limit(50);
+
   const card = "border border-border bg-surface";
 
   return (
@@ -69,6 +76,39 @@ export default async function ReportHistoryPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-6">
+          {/* Reset log: who reset counts and when */}
+          <section className={card}>
+            <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+              <RotateCcw size={15} strokeWidth={1.75} className="text-muted" />
+              <h2 className="text-sm font-semibold tracking-tight">Reset log</h2>
+            </div>
+            {resets.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-muted">
+                No resets recorded yet.
+              </div>
+            ) : (
+              <ul>
+                {resets.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-4 border-b border-border px-5 py-3 text-sm last:border-0"
+                  >
+                    <span>
+                      <span className="font-medium">{r.actorName || "Admin"}</span>
+                      <span className="text-muted"> reset </span>
+                      <span className="font-medium">
+                        {r.scope === "all" ? "all channels" : r.channelName || "a channel"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs text-muted tabular-nums">
+                      {fmtDateTime(r.createdAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
           {periods.length === 0 ? (
             <div className={`${card} flex flex-col items-center gap-2 px-5 py-16 text-center`}>
               <History size={22} strokeWidth={1.5} className="text-muted" />

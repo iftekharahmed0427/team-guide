@@ -13,13 +13,8 @@ pg.types.setTypeParser(1114, (v) => new Date(v.replace(" ", "T") + "Z"));
 
 export type Settings = {
   token: string | null;
-  enabled: boolean;
-  autoReset: boolean; // reset the live counts automatically at each period boundary
   resetAfterRun: boolean; // a "Reset all" requested this report; post from the archived period
-  periodAnchor: string; // YYYY-MM-DD, a Friday a period ends on
-  periodDays: number;
-  postHour: number; // UTC
-  postMinute: number; // UTC
+  periodDays: number; // length used for the report range label + reports-page averages
   presenceStatus: string; // online|idle|dnd|invisible
   presenceActivityType: string; // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: string;
@@ -43,13 +38,8 @@ export type ReportEntry = {
 
 const DEFAULT_SETTINGS: Settings = {
   token: null,
-  enabled: true,
-  autoReset: true,
   resetAfterRun: false,
-  periodAnchor: "2026-06-26",
   periodDays: 14,
-  postHour: 17,
-  postMinute: 0,
   presenceStatus: "online",
   presenceActivityType: "none",
   presenceActivityText: "",
@@ -81,7 +71,7 @@ function getPool(): pg.Pool {
 
 export async function getSettings(): Promise<Settings> {
   const { rows } = await getPool().query(
-    `select token, enabled, auto_reset, reset_after_run, period_anchor, period_days, post_hour, post_minute,
+    `select token, reset_after_run, period_days,
             presence_status, presence_activity_type, presence_activity_text, run_requested_at,
             announcement_channel_id, announcement_enabled, announcement_title,
             announcement_color, announcement_intro, announcement_footer,
@@ -100,13 +90,8 @@ export async function getSettings(): Promise<Settings> {
       : String(r.announcement_role_id);
   return {
     token: r.token == null || String(r.token).trim() === "" ? null : String(r.token),
-    enabled: r.enabled !== false,
-    autoReset: r.auto_reset !== false,
     resetAfterRun: r.reset_after_run === true,
-    periodAnchor: String(r.period_anchor),
     periodDays: Number(r.period_days),
-    postHour: Number(r.post_hour),
-    postMinute: Number(r.post_minute),
     presenceStatus: String(r.presence_status ?? "online"),
     presenceActivityType: String(r.presence_activity_type ?? "none"),
     presenceActivityText: String(r.presence_activity_text ?? ""),
@@ -255,43 +240,6 @@ export async function getLiveChannels(): Promise<LiveChannel[]> {
     resetAt: r.count_reset_at ? new Date(r.count_reset_at).getTime() : null,
     currentCount: Number(r.current_count ?? 0),
   }));
-}
-
-export async function getTicketPeriodStart(): Promise<number | null> {
-  const { rows } = await getPool().query(
-    "select period_start from ticket_count where id = 'singleton'",
-  );
-  const v = rows[0]?.period_start;
-  return v ? new Date(v).getTime() : null;
-}
-
-// New period: snapshot the in-progress totals into the previous-period fields,
-// reset the running counts, and record the new period start. One transaction so
-// the dashboard never reads a half-reset state. `at time zone 'UTC'` stores the
-// UTC wall-clock independent of the Postgres session timezone.
-export async function rolloverTicketCounts(periodStartMs: number): Promise<void> {
-  const client = await getPool().connect();
-  try {
-    await client.query("begin");
-    await client.query(
-      `update report_channel
-         set previous_count = current_count, current_count = 0, counted_at = now()`,
-    );
-    await client.query(
-      `insert into ticket_count (id, total, previous_total, period_start, updated_at)
-       values ('singleton', 0, 0, to_timestamp($1 / 1000.0) at time zone 'UTC', now())
-       on conflict (id) do update
-         set previous_total = ticket_count.total, total = 0,
-             period_start = excluded.period_start, updated_at = now()`,
-      [periodStartMs],
-    );
-    await client.query("commit");
-  } catch (e) {
-    await client.query("rollback").catch(() => {});
-    throw e;
-  } finally {
-    client.release();
-  }
 }
 
 export async function updateChannelCount(

@@ -29,11 +29,10 @@ export default async function ReportsPage() {
   )[0];
   const periodDays = setting?.periodDays ?? 14;
 
-  // When did the current period start? Prefer the most recent "Reset all" (the
-  // end of the last archived period); otherwise fall back to the period start the
-  // bot tracks (set by its automatic rollover), so the label still reflects a
-  // reset even when no "Reset all" archive has been made. Only "no reset yet"
-  // when neither exists.
+  // When did the current period start? Use the most recent "Reset all" (the end
+  // of the last archived period); otherwise fall back to the period start stored
+  // in ticket_count (legacy, no longer advanced now that auto-reset is gone).
+  // Only "no reset yet" when neither exists.
   const [lastArchive, tc] = await Promise.all([
     db
       .select({ endedAt: reportPeriod.endedAt })

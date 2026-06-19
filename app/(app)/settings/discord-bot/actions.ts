@@ -11,6 +11,7 @@ import {
   ticketCount,
   reportPeriod,
   reportPeriodEntry,
+  resetLog,
   review,
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
@@ -106,27 +107,7 @@ export async function updatePresence(input: {
   return { ok: true };
 }
 
-// ── Enable / run-now ─────────────────────────────────────────────────────────
-
-export async function setEnabled(enabled: boolean): Promise<Result> {
-  const denied = await adminGuard();
-  if (denied) return denied;
-  await ensureSettingsRow();
-  await db.update(botSetting).set({ enabled }).where(eq(botSetting.id, "singleton"));
-  revalidatePath(PAGE);
-  await notifyChange();
-  return { ok: true };
-}
-
-export async function setAutoReset(autoReset: boolean): Promise<Result> {
-  const denied = await adminGuard();
-  if (denied) return denied;
-  await ensureSettingsRow();
-  await db.update(botSetting).set({ autoReset }).where(eq(botSetting.id, "singleton"));
-  revalidatePath(PAGE);
-  await notifyChange();
-  return { ok: true };
-}
+// ── Run-now ──────────────────────────────────────────────────────────────────
 
 export async function requestRunNow(): Promise<Result> {
   const denied = await adminGuard();
@@ -135,48 +116,6 @@ export async function requestRunNow(): Promise<Result> {
   await db
     .update(botSetting)
     .set({ runRequestedAt: new Date() })
-    .where(eq(botSetting.id, "singleton"));
-  revalidatePath(PAGE);
-  await notifyChange();
-  return { ok: true };
-}
-
-// ── Schedule ─────────────────────────────────────────────────────────────────
-
-export async function updateBotSchedule(input: {
-  periodAnchor: string;
-  periodDays: number;
-  postHour: number;
-  postMinute: number;
-}): Promise<Result> {
-  const denied = await adminGuard();
-  if (denied) return denied;
-
-  const periodAnchor = input.periodAnchor.trim();
-  const anchorMs = Date.parse(`${periodAnchor}T00:00:00Z`);
-  if (Number.isNaN(anchorMs)) return { error: "Period anchor must be a valid date." };
-  if (new Date(anchorMs).getUTCDay() !== 5) {
-    return { error: "Period anchor must be a Friday. Periods end on Fridays." };
-  }
-  if (!Number.isInteger(input.periodDays) || input.periodDays < 1) {
-    return { error: "Period length must be a whole number of days (≥ 1)." };
-  }
-  if (!Number.isInteger(input.postHour) || input.postHour < 0 || input.postHour > 23) {
-    return { error: "Post hour must be 0–23 (UTC)." };
-  }
-  if (!Number.isInteger(input.postMinute) || input.postMinute < 0 || input.postMinute > 59) {
-    return { error: "Post minute must be 0–59." };
-  }
-
-  await ensureSettingsRow();
-  await db
-    .update(botSetting)
-    .set({
-      periodAnchor,
-      periodDays: input.periodDays,
-      postHour: input.postHour,
-      postMinute: input.postMinute,
-    })
     .where(eq(botSetting.id, "singleton"));
   revalidatePath(PAGE);
   await notifyChange();
@@ -280,8 +219,8 @@ export async function addReportChannel(input: {
 // count), then stamps `countResetAt = now`, zeroes all tallies, and zeroes the
 // team total so the next period starts fresh.
 export async function resetAllReportChannels(): Promise<Result> {
-  const denied = await adminGuard();
-  if (denied) return denied;
+  const session = await requireAdmin().catch(() => null);
+  if (!session) return { error: "Only admins can edit bot settings." };
 
   const now = new Date();
 
@@ -302,6 +241,7 @@ export async function resetAllReportChannels(): Promise<Result> {
 
   // Archive when there are tickets OR reviews to record for the period.
   const archived = total > 0 || currentReviews.length > 0;
+  let archivedPeriodId: string | null = null;
   if (archived) {
     const last = (
       await db
@@ -311,6 +251,7 @@ export async function resetAllReportChannels(): Promise<Result> {
         .limit(1)
     )[0];
     const periodId = randomUUID();
+    archivedPeriodId = periodId;
     await db.insert(reportPeriod).values({
       id: periodId,
       startedAt: last?.endedAt ?? null, // the previous period's end, or null for the first
@@ -348,6 +289,16 @@ export async function resetAllReportChannels(): Promise<Result> {
       .where(eq(botSetting.id, "singleton"));
   }
 
+  // Audit the reset (every click, even a no-op that archived nothing).
+  await db.insert(resetLog).values({
+    id: randomUUID(),
+    scope: "all",
+    actorId: session.user.id,
+    actorName: session.user.name || session.user.email || "Admin",
+    periodId: archivedPeriodId,
+    createdAt: now,
+  });
+
   revalidatePath(PAGE);
   revalidatePath("/reports");
   revalidatePath("/reports/history");
@@ -369,13 +320,13 @@ export async function deleteReportChannel(formData: FormData) {
 // counting screenshots from this moment, and clear the live tally immediately so
 // the dashboard and reports page update without waiting for the next bot tick.
 export async function resetReportChannel(id: string): Promise<Result> {
-  const denied = await adminGuard();
-  if (denied) return denied;
+  const session = await requireAdmin().catch(() => null);
+  if (!session) return { error: "Only admins can edit bot settings." };
   if (!id) return { error: "Missing channel." };
 
   const row = (
     await db
-      .select({ currentCount: reportChannel.currentCount })
+      .select({ currentCount: reportChannel.currentCount, name: reportChannel.name })
       .from(reportChannel)
       .where(eq(reportChannel.id, id))
       .limit(1)
@@ -396,7 +347,17 @@ export async function resetReportChannel(id: string): Promise<Result> {
       .where(eq(ticketCount.id, "singleton"));
   }
 
+  await db.insert(resetLog).values({
+    id: randomUUID(),
+    scope: "channel",
+    channelName: row.name || null,
+    actorId: session.user.id,
+    actorName: session.user.name || session.user.email || "Admin",
+    createdAt: new Date(),
+  });
+
   revalidatePath(PAGE);
+  revalidatePath("/reports/history");
   await notifyChange();
   return { ok: true };
 }

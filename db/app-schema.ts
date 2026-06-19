@@ -225,6 +225,23 @@ export const reportPeriodEntry = pgTable("report_period_entry", {
   count: integer("count").notNull().default(0),
 });
 
+// An audit row written every time an admin resets ticket counts — a single
+// channel ("Reset", scope 'channel') or all of them ("Reset all", scope 'all').
+// Actor + names are denormalized (no FK, like the other content tables) so the
+// trail survives even if the user, channel, or archived period is later removed.
+// `periodId` links a "Reset all" to the report_period it archived (null for a
+// single-channel reset or a no-op reset that archived nothing). Shown on
+// /reports/history.
+export const resetLog = pgTable("reset_log", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(), // 'all' | 'channel'
+  channelName: text("channel_name"), // null for scope 'all'
+  actorId: text("actor_id"),
+  actorName: text("actor_name").notNull().default(""),
+  periodId: text("period_id"), // archived report_period a "Reset all" created, or null
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // A manually logged Trustpilot/Google review: an admin uploads the screenshot
 // (stored as a data URL like news/guides images) and it counts as one for its
 // `source` in the current period. `periodId` is null while it is in the live
@@ -242,18 +259,24 @@ export const review = pgTable("review", {
 });
 
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →
-// Discord bot page and read by the bot. All times are UTC. `periodAnchor` is a
-// Friday a 14-day period ends on. `token` is the Discord bot token (set-only via
-// the UI, never sent back to the browser). Presence fields drive the bot's
-// Discord status. `runRequestedAt` is bumped by the "Run now" button.
+// Discord bot page and read by the bot. `token` is the Discord bot token
+// (set-only via the UI, never sent back to the browser). Presence fields drive
+// the bot's Discord status. `runRequestedAt` is bumped by the "Run now" button
+// and by "Reset all" — the only ways the bot posts (there is no scheduled or
+// automatic posting). `periodDays` is the report range-label / averages window.
+//
+// DORMANT (retained to avoid a destructive migration, no longer read or written;
+// same pattern as report_channel.lastSeenMessageId): `enabled`, `autoReset`
+// (auto-reset removed), `periodAnchor`, `postHour`, `postMinute` (scheduled
+// posting removed).
 export const botSetting = pgTable("bot_setting", {
   id: text("id").primaryKey().default("singleton"),
   token: text("token"),
-  enabled: boolean("enabled").notNull().default(true),
-  periodAnchor: text("period_anchor").notNull().default("2026-06-26"),
+  enabled: boolean("enabled").notNull().default(true), // dormant
+  periodAnchor: text("period_anchor").notNull().default("2026-06-26"), // dormant
   periodDays: integer("period_days").notNull().default(14),
-  postHour: integer("post_hour").notNull().default(17),
-  postMinute: integer("post_minute").notNull().default(0),
+  postHour: integer("post_hour").notNull().default(17), // dormant
+  postMinute: integer("post_minute").notNull().default(0), // dormant
   presenceStatus: text("presence_status").notNull().default("online"), // online|idle|dnd|invisible
   presenceActivityType: text("presence_activity_type").notNull().default("none"), // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: text("presence_activity_text").notNull().default(""),
@@ -263,10 +286,7 @@ export const botSetting = pgTable("bot_setting", {
   // member channel + the announcement channel (reading the archived period, since
   // the live counts are already zeroed), then clears it back to false.
   resetAfterRun: boolean("reset_after_run").notNull().default(false),
-  // When true (default), the live counts reset automatically at each period
-  // boundary. Turn off to keep counts accumulating until an admin resets a
-  // channel manually (the per-channel / "Reset all" buttons).
-  autoReset: boolean("auto_reset").notNull().default(true),
+  autoReset: boolean("auto_reset").notNull().default(true), // dormant (auto-reset removed)
   // Period-end leaderboard announcement: posted to `announcementChannelId` when a
   // report runs (if `announcementEnabled`). The ranked member list is generated;
   // the title/color/intro/footer are the admin-customizable styling.

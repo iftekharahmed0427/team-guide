@@ -9,7 +9,6 @@ import BotStatusPanel from "./bot-status-panel";
 import BotControls from "./bot-controls";
 import TokenForm from "./token-form";
 import PresenceForm from "./presence-form";
-import ScheduleForm from "./schedule-form";
 import AnnouncementForm from "./announcement-form";
 import ReportChannelForm from "./report-channel-form";
 import ResetChannelButton from "./reset-channel-button";
@@ -23,18 +22,10 @@ export default async function DiscordBotSettingsPage() {
   const token = settingRow?.token ?? null;
   const hasToken = !!token;
   const tokenLast4 = token ? token.slice(-4) : null;
-  const enabled = settingRow?.enabled ?? true;
-  const autoReset = settingRow?.autoReset ?? true;
   const presence = {
     presenceStatus: settingRow?.presenceStatus ?? "online",
     presenceActivityType: settingRow?.presenceActivityType ?? "none",
     presenceActivityText: settingRow?.presenceActivityText ?? "",
-  };
-  const schedule = {
-    periodAnchor: settingRow?.periodAnchor ?? "2026-06-26",
-    periodDays: settingRow?.periodDays ?? 14,
-    postHour: settingRow?.postHour ?? 17,
-    postMinute: settingRow?.postMinute ?? 0,
   };
   const announcement = {
     announcementChannelId: settingRow?.announcementChannelId ?? "",
@@ -75,7 +66,7 @@ export default async function DiscordBotSettingsPage() {
       <div>
         <h2 className="text-sm font-semibold tracking-tight">Discord bot</h2>
         <p className="text-xs text-muted">
-          Status, credentials, presence, schedule, and report channels for the
+          Status, credentials, presence, announcement, and report channels for the
           ticket-counting bot.
         </p>
       </div>
@@ -95,11 +86,11 @@ export default async function DiscordBotSettingsPage() {
         <div className={cardHead}>
           <h3 className="text-sm font-semibold tracking-tight">Controls</h3>
           <p className="text-xs text-muted">
-            Pause posting, or run a report immediately to test.
+            Post a report to Discord immediately to test. The bot never posts on its own.
           </p>
         </div>
         <div className="p-5">
-          <BotControls enabled={enabled} hasToken={hasToken} />
+          <BotControls hasToken={hasToken} />
         </div>
       </section>
 
@@ -128,19 +119,6 @@ export default async function DiscordBotSettingsPage() {
         </div>
       </section>
 
-      {/* Schedule */}
-      <section className={card}>
-        <div className={cardHead}>
-          <h3 className="text-sm font-semibold tracking-tight">Schedule</h3>
-          <p className="text-xs text-muted">
-            Period length and when the summary is posted (all times UTC).
-          </p>
-        </div>
-        <div className="p-5">
-          <ScheduleForm settings={schedule} />
-        </div>
-      </section>
-
       {/* Announcement */}
       <section className={card}>
         <div className={cardHead}>
@@ -160,13 +138,13 @@ export default async function DiscordBotSettingsPage() {
           <h3 className="text-sm font-semibold tracking-tight">Report channels</h3>
           <p className="text-xs text-muted">
             Each channel is scanned for screenshot uploads from its member.
-            Counting starts after the most recent bot message in the channel;
-            use Reset to zero a channel and count from now.
+            Counting starts from the last reset and accumulates until you reset
+            again; use Reset to zero a channel and count from now.
           </p>
         </div>
 
         <div className="border-b border-border p-5">
-          <ReportChannelsControls autoReset={autoReset} channelCount={channels.length} />
+          <ReportChannelsControls channelCount={channels.length} />
         </div>
 
         <div className="border-b border-border p-5">

@@ -10,8 +10,6 @@ import {
   getSettings,
   getReportChannels,
   getLiveChannels,
-  getTicketPeriodStart,
-  rolloverTicketCounts,
   updateChannelCount,
   setTicketTotal,
   notifyAppEvent,
@@ -27,7 +25,6 @@ import {
 } from "./db.ts";
 import { runReport, postArchivedReport } from "./report.ts";
 import { countWindow } from "./count.ts";
-import { isPeriodEnd, currentPeriodStart } from "./period.ts";
 
 const args = new Set(process.argv.slice(2));
 const RUN_NOW = args.has("--now"); // one-shot report, then exit
@@ -118,19 +115,6 @@ async function reloginWith(token: string): Promise<void> {
 
 // ── Reporting ────────────────────────────────────────────────────────────────
 
-function scheduledFireMs(s: Settings): number {
-  const now = new Date();
-  return Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    s.postHour,
-    s.postMinute,
-    0,
-    0,
-  );
-}
-
 async function doReport(s: Settings): Promise<void> {
   if (!client) return;
   reporting = true;
@@ -168,8 +152,7 @@ async function doReport(s: Settings): Promise<void> {
 // ── Live dashboard count ─────────────────────────────────────────────────────
 
 // Keep the dashboard "Tickets solved" total fresh. Runs only while connected;
-// rolls the counts over on a new period, then re-counts every channel's
-// in-progress window (after its most recent bot message, above any manual reset).
+// re-counts every channel's window above its last manual reset.
 async function countTick(): Promise<void> {
   if (shuttingDown || counting || reporting) return;
   if (!client || !client.isReady()) return;
@@ -184,29 +167,16 @@ async function countTick(): Promise<void> {
     }
     if (!s.token) return; // not configured; the main tick handles disconnect
 
-    const periodStart = currentPeriodStart(new Date(), s);
-
-    // With auto-reset off, counts accumulate across periods and only a manual
-    // reset (count_reset_at) bounds the window — so skip the period rollover and
-    // drop the period floor entirely.
-    let rollover = false;
-    if (s.autoReset) {
-      const storedStart = await getTicketPeriodStart();
-      rollover = storedStart == null || storedStart !== periodStart;
-      if (rollover) await rolloverTicketCounts(periodStart);
-    }
-    const periodFloor = s.autoReset ? periodStart : 0;
-
+    // Counts accumulate until an admin resets a channel: the only floor is its
+    // manual reset (count_reset_at), and another bot's messages are not a floor,
+    // so a count persists instead of dropping when some bot posts in the channel.
     const channels = await getLiveChannels();
     let total = 0;
-    let changed = rollover; // a rollover reset is itself a visible change
+    let changed = false;
 
     for (const ch of channels) {
-      // A manual reset wins when it is newer than the period floor.
-      const floor = ch.resetAt && ch.resetAt > periodFloor ? ch.resetAt : periodFloor;
-      // In manual mode (auto-reset off) ignore the bot-message floor, so counts
-      // persist until an admin resets instead of dropping when a bot posts.
-      const res = await countWindow(client, ch, floor, s.autoReset);
+      const floor = ch.resetAt ?? 0;
+      const res = await countWindow(client, ch, floor, false);
 
       if (!res.ok) {
         // Keep the last good tally for this channel; don't drop the team total.
@@ -293,20 +263,11 @@ async function tick(): Promise<void> {
   if (reporting) return;
   const last = await getLastReportAt().catch(() => 0);
 
-  // Run-now is a manual override (ignores the enabled toggle).
+  // The bot only posts when a human asks: "Run now" or "Reset all" (both bump
+  // run_requested_at). There is no scheduled / automatic posting.
   if (s.runRequestedAt > last) {
-    console.log("[bot] run-now requested, running report");
+    console.log("[bot] run requested, running report");
     await doReport(s);
-    return;
-  }
-
-  // Scheduled: once we cross the post time on a period-end Friday.
-  if (s.enabled && isPeriodEnd(new Date(), s)) {
-    const fire = scheduledFireMs(s);
-    if (Date.now() >= fire && last < fire) {
-      console.log("[bot] scheduled period end, running report");
-      await doReport(s);
-    }
   }
 }
 

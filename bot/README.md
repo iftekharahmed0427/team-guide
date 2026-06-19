@@ -1,26 +1,25 @@
 # Team Guide Reports Bot
 
 A small Discord bot that counts **screenshot tickets** in each team member's
-report channel and posts a summary embed at the end of every 14-day period
-(ending on a Friday, UTC).
+report channel and posts a summary embed when an admin closes a period from the
+website ("Reset all") or clicks "Run now". It never posts on its own.
 
 - Each member has their own report channel. When they finish a ticket they post
   a screenshot there.
 - Only **uploaded image attachments** are counted. Text, links, stickers, and
   emoji are ignored. **Each image counts as one ticket** (3 screenshots in one
   message is 3 tickets).
-- Counting starts **after the most recent message from another bot** in the
-  channel (e.g. the ticket panel), so screenshots above that message are ignored.
-  The reporting bot's own summary embeds are skipped, so posting a report never
-  resets the count. If no other bot has posted in the period, the whole period is
-  counted.
+- Counting starts at the channel's **last reset** (the per-channel Reset or the
+  last "Reset all") and includes every screenshot since — another bot's messages
+  are not a boundary, and the reporting bot's own summary embeds are skipped, so
+  posting a report never affects the count.
 - A deleted screenshot stops counting: the bot recounts current channel state, so
   removing an image drops it back out of the tally.
-- At each period end the bot posts an embed in every report channel:
-  *"You solved **N** tickets this period."*
+- When an admin runs **Reset all** or **Run now**, the bot posts an embed in every
+  report channel: *"You solved **N** tickets this period."*
 
-It counts by scanning each channel's last-14-days history over the REST API at
-period end, so it does **not** need the privileged *Message Content* intent.
+It counts by scanning each channel's history since its last reset over the REST
+API, so it does **not** need the privileged *Message Content* intent.
 
 ## Everything is controlled from the website
 
@@ -34,11 +33,11 @@ runtime (polled every 30s) and reports its health back:
   report time, and the last error.
 - **Presence.** The bot's Discord status (online/idle/dnd/invisible) and activity
   (Playing, Watching, or a custom status).
-- **Enable toggle.** Pause or resume posting without stopping the container.
-- **Run now.** Trigger a report immediately. This is a manual override and runs
-  even if posting is paused.
-- **Schedule.** Period anchor (a Friday), length, and UTC post time.
+- **Run now.** Post a report to Discord immediately.
+- **Reset all.** Close the current period: archive the standings to history, zero
+  every channel, and post the report. The only other way the bot posts.
 - **Report channels.** Channel ID plus which member owns it (or "count everyone").
+  Each row has a **Reset** that zeroes just that channel.
 - **Announcement.** Optional period-end leaderboard embed posted to a channel.
   The top three are ranked with 🥇🥈🥉 medals and everyone after by number, with a
   **Total tickets done** line at the end. An optional **message** line is posted
@@ -49,27 +48,21 @@ runtime (polled every 30s) and reports its health back:
 
 The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
 
-## How counting and timing work
+## How counting and resets work
 
-- A period is `period_days` (14) long and ends on the configured anchor Friday
-  and every 14 days from it. The anchor must be a Friday; the website enforces
-  this.
-- The bot posts once it crosses the configured UTC time on a period-end Friday.
-  It also catches up if it was offline at that moment, as long as it comes back
-  the same day.
-- A channel's count is the image attachments posted by its member in the
-  `(periodEnd - 14 days, periodEnd]` window, but no earlier than the most recent
-  message from another bot in the channel (or a manual reset); the reporting
-  bot's own embeds are ignored. Deleted messages do not count.
-- **Auto-reset (on by default).** The live counts reset automatically at each
-  period boundary. Turn it off (Settings > Discord bot > Report channels) to keep
-  counts accumulating across periods and reset only when you choose.
-- **Report channels.** Each row has a **Reset** button that zeroes that channel
-  and makes counting start from that moment; **Reset all** does it for every
-  channel at once (handy when switching auto-reset off). **Reset all also archives
-  the current standings into history** (date range + each member's count) before
-  zeroing, so it doubles as the manual period-close. Admins review past periods
-  at `/reports/history` and can delete any of them.
+- Counts are **manual-only**: nothing resets or posts on a timer. A channel's
+  count is every image attachment its member has posted since the channel's last
+  reset, recounted live. Another bot's messages are not a boundary; the reporting
+  bot's own embeds are ignored; deleted messages drop back out.
+- **Reset (per channel).** Zeroes that channel and starts counting from that
+  moment.
+- **Reset all.** Zeroes every channel at once and **archives the current standings
+  into history** (date range + each member's count) before zeroing, so it is the
+  manual period-close — then the bot posts the just-closed period's report to
+  Discord.
+- Every reset (per-channel or Reset all) is recorded with who did it and when.
+  Admins review past periods and the reset log at `/reports/history` and can
+  delete any archived period.
 
 ## 1. Create the Discord bot
 

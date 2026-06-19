@@ -2,38 +2,11 @@ import type { Settings } from "./db.ts";
 
 const DAY_MS = 86_400_000;
 
-function utcMidnight(d: Date): number {
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
-
-// Is `now`'s UTC date a period boundary (a Friday whose distance from the anchor
-// is a whole number of periods)? The anchor is itself a period-end Friday, so
-// every date PERIOD_DAYS apart is also a boundary. The Friday guard makes the
-// spec explicit and is robust if PERIOD_DAYS is ever changed off a 7-multiple.
-export function isPeriodEnd(now: Date, cfg: Settings): boolean {
-  const anchor = Date.parse(`${cfg.periodAnchor}T00:00:00Z`);
-  const today = utcMidnight(now);
-  const diffDays = Math.round((today - anchor) / DAY_MS);
-  const onBoundary = ((diffDays % cfg.periodDays) + cfg.periodDays) % cfg.periodDays === 0;
-  return onBoundary && new Date(today).getUTCDay() === 5;
-}
-
-// The 14-day window that just ended at `end` (the fire time): (start, end].
+// The `periodDays`-long window that just ended at `end` (the run-now time):
+// (start, end]. Used only for the report's range label + commissions window.
 export function periodWindow(end: Date, cfg: Settings): { start: number; end: number } {
   const endMs = end.getTime();
   return { start: endMs - cfg.periodDays * DAY_MS, end: endMs };
-}
-
-// Start (UTC ms) of the in-progress period that contains `now` — the most recent
-// period boundary at or before now. Boundaries sit `periodDays` apart from the
-// anchor (itself a period-end Friday), so the live counter's window
-// (currentPeriodStart, now] is the in-progress version of the window the report
-// for the next boundary will post.
-export function currentPeriodStart(now: Date, cfg: Settings): number {
-  const anchor = Date.parse(`${cfg.periodAnchor}T00:00:00Z`);
-  const periodMs = cfg.periodDays * DAY_MS;
-  const periodsSinceAnchor = Math.floor((now.getTime() - anchor) / periodMs);
-  return anchor + periodsSinceAnchor * periodMs;
 }
 
 export function formatRange(startMs: number, endMs: number): string {
