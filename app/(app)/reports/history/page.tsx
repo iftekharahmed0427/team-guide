@@ -4,7 +4,7 @@ import { desc, inArray } from "drizzle-orm";
 import { ArrowLeft, History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportPeriod, reportPeriodEntry } from "@/db/app-schema";
+import { reportPeriod, reportPeriodEntry, review } from "@/db/app-schema";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/datetime";
 import DeletePeriodButton from "./delete-period-button";
 
@@ -31,6 +31,22 @@ export default async function ReportHistoryPage() {
     const list = entriesByPeriod.get(e.periodId) ?? [];
     list.push(e);
     entriesByPeriod.set(e.periodId, list);
+  }
+
+  // Review counts per source for each archived period (reviews share the period).
+  const reviewRows = ids.length
+    ? await db
+        .select({ periodId: review.periodId, source: review.source })
+        .from(review)
+        .where(inArray(review.periodId, ids))
+    : [];
+  const reviewsByPeriod = new Map<string, { trustpilot: number; google: number }>();
+  for (const r of reviewRows) {
+    if (!r.periodId) continue;
+    const c = reviewsByPeriod.get(r.periodId) ?? { trustpilot: 0, google: 0 };
+    if (r.source === "trustpilot") c.trustpilot++;
+    else if (r.source === "google") c.google++;
+    reviewsByPeriod.set(r.periodId, c);
   }
 
   const card = "border border-border bg-surface";
@@ -64,6 +80,7 @@ export default async function ReportHistoryPage() {
           ) : (
             periods.map((p) => {
               const rows = entriesByPeriod.get(p.id) ?? [];
+              const rev = reviewsByPeriod.get(p.id);
               const started = p.startedAt ? fmtDate(p.startedAt) : "start";
               const ended = fmtDate(p.endedAt);
               return (
@@ -76,6 +93,11 @@ export default async function ReportHistoryPage() {
                       <p className="text-xs text-muted">
                         Reset {fmtDateTime(p.endedAt)} · Total tickets done: {p.total}
                       </p>
+                      {rev ? (
+                        <p className="text-xs text-muted">
+                          Reviews: {rev.trustpilot} Trustpilot · {rev.google} Google
+                        </p>
+                      ) : null}
                     </div>
                     <DeletePeriodButton id={p.id} />
                   </div>

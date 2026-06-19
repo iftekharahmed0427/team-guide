@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, isNull, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import {
@@ -11,6 +11,7 @@ import {
   ticketCount,
   reportPeriod,
   reportPeriodEntry,
+  review,
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 
@@ -282,9 +283,15 @@ export async function resetAllReportChannels(): Promise<Result> {
     })
     .from(reportChannel);
   const total = channels.reduce((sum, c) => sum + (c.count ?? 0), 0);
+  // Reviews share the report period: the current ones (periodId null) get stamped
+  // with the period we archive here.
+  const currentReviews = await db
+    .select({ id: review.id })
+    .from(review)
+    .where(isNull(review.periodId));
 
-  // Only archive when there is something to record.
-  if (total > 0) {
+  // Archive when there are tickets OR reviews to record for the period.
+  if (total > 0 || currentReviews.length > 0) {
     const last = (
       await db
         .select({ endedAt: reportPeriod.endedAt })
@@ -309,6 +316,9 @@ export async function resetAllReportChannels(): Promise<Result> {
         count: c.count ?? 0,
       }));
     if (entries.length > 0) await db.insert(reportPeriodEntry).values(entries);
+    if (currentReviews.length > 0) {
+      await db.update(review).set({ periodId }).where(isNull(review.periodId));
+    }
   }
 
   await db.update(reportChannel).set({ countResetAt: now, currentCount: 0, countedAt: now });
@@ -317,6 +327,7 @@ export async function resetAllReportChannels(): Promise<Result> {
   revalidatePath(PAGE);
   revalidatePath("/reports");
   revalidatePath("/reports/history");
+  revalidatePath("/reviews");
   await notifyChange();
   return { ok: true };
 }

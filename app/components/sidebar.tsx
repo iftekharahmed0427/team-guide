@@ -11,6 +11,7 @@ import {
   BookOpen,
   Ticket,
   HandCoins,
+  Star,
   Settings,
   LifeBuoy,
   LogOut,
@@ -44,6 +45,7 @@ const primaryNav: NavItem[] = [
   { label: "Guides", icon: BookOpen, href: "/guides" },
   { label: "Board", icon: SquareKanban, href: "/board" },
   { label: "Reports", icon: Ticket, href: "/reports" },
+  { label: "Reviews", icon: Star, href: "/reviews" },
   { label: "Commissions", icon: HandCoins, href: "/commissions" },
   { label: "Team", icon: Users, href: "/team" },
 ];

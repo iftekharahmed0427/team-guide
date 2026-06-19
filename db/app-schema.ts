@@ -225,6 +225,22 @@ export const reportPeriodEntry = pgTable("report_period_entry", {
   count: integer("count").notNull().default(0),
 });
 
+// A manually logged Trustpilot/Google review: an admin uploads the screenshot
+// (stored as a data URL like news/guides images) and it counts as one for its
+// `source` in the current period. `periodId` is null while it is in the live
+// period; "Reset all" stamps the current reviews with the report_period it
+// archives, so reviews share the same period boundaries as the ticket counts.
+export const review = pgTable("review", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(), // 'trustpilot' | 'google'
+  imageUrl: text("image_url").notNull(), // screenshot data URL
+  note: text("note").notNull().default(""),
+  addedById: text("added_by_id"),
+  addedByName: text("added_by_name").notNull().default(""),
+  periodId: text("period_id").references(() => reportPeriod.id, { onDelete: "cascade" }), // null = current period
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →
 // Discord bot page and read by the bot. All times are UTC. `periodAnchor` is a
 // Friday a 14-day period ends on. `token` is the Discord bot token (set-only via
