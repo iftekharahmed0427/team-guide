@@ -9,9 +9,10 @@ report channel and posts a summary embed at the end of every 14-day period
 - Only **uploaded image attachments** are counted. Text, links, stickers, and
   emoji are ignored. **Each image counts as one ticket** (3 screenshots in one
   message is 3 tickets).
-- Counting starts **after the most recent bot message** in the channel (the
-  ticket panel, or the period summary this bot posts), so screenshots above that
-  message are ignored. If no bot has posted in the period, the whole period is
+- Counting starts **after the most recent message from another bot** in the
+  channel (e.g. the ticket panel), so screenshots above that message are ignored.
+  The reporting bot's own summary embeds are skipped, so posting a report never
+  resets the count. If no other bot has posted in the period, the whole period is
   counted.
 - A deleted screenshot stops counting: the bot recounts current channel state, so
   removing an image drops it back out of the tally.
@@ -57,7 +58,8 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
   the same day.
 - A channel's count is the image attachments posted by its member in the
   `(periodEnd - 14 days, periodEnd]` window, but no earlier than the most recent
-  bot message in the channel (or a manual reset). Deleted messages do not count.
+  message from another bot in the channel (or a manual reset); the reporting
+  bot's own embeds are ignored. Deleted messages do not count.
 - **Auto-reset (on by default).** The live counts reset automatically at each
   period boundary. Turn it off (Settings > Discord bot > Report channels) to keep
   counts accumulating across periods and reset only when you choose.

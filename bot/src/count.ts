@@ -28,17 +28,19 @@ export type CountResult =
 //
 // The window is (floor, now], where `floor` is the LATEST of:
 //   • `windowStart` — the period start, or a later manual-reset time, and
-//   • the most recent BOT message in the channel.
-// So counting always begins AFTER a bot's message: report channels get a bot
-// post (the ticket panel, or the period summary this bot itself posts) that
-// marks where a fresh count should start, and screenshots above it are ignored.
-// If no bot has posted since `windowStart`, the whole window is counted.
+//   • the most recent message from ANOTHER bot in the channel.
+// So counting always begins AFTER another bot's message: report channels get a
+// bot post (e.g. the ticket panel) that marks where a fresh count should start,
+// and screenshots above it are ignored. The reporting bot's OWN messages (the
+// per-channel summary embeds it posts) are skipped — otherwise posting a report
+// would zero the live count on the next tick. If no other bot has posted since
+// `windowStart`, the whole window is counted.
 //
-// Walks history backward via REST and stops as soon as it reaches the floor or a
-// bot message, so a channel with regular bot posts is cheap to count. Because it
-// recounts current state on every call, deleted screenshots fall out of the
-// tally on their own (no Message Content intent is needed for attachments or for
-// author.bot).
+// Walks history backward via REST and stops as soon as it reaches the floor or
+// another bot's message, so a channel with regular bot posts is cheap to count.
+// Because it recounts current state on every call, deleted screenshots fall out
+// of the tally on their own (no Message Content intent is needed for attachments
+// or for author.bot).
 export async function countWindow(
   client: Client,
   entry: ReportEntry,
@@ -50,6 +52,7 @@ export async function countWindow(
       return { ok: false, error: "not a readable text channel" };
     }
 
+    const selfId = client.user?.id; // ignore our own report embeds as a floor
     let count = 0;
     let newestId: string | null = null;
     let before: Snowflake | undefined;
@@ -73,8 +76,11 @@ export async function countWindow(
           done = true; // reached the period / reset floor
           break;
         }
+        // Our own summary embeds must not act as the floor (that would zero the
+        // count right after we post) and carry no images anyway.
+        if (m.author.id === selfId) continue;
         if (m.author.bot) {
-          done = true; // reached the most recent bot message; stop counting
+          done = true; // reached another bot's message; stop counting
           break;
         }
         count += imagesInMessage(m, entry);
