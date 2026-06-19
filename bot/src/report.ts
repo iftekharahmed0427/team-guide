@@ -85,6 +85,9 @@ function parseColor(hex: string): number {
   return m && m[1] ? parseInt(m[1], 16) : 0x5865f2;
 }
 
+// Top three get medals; everyone after is numbered #4, #5, …
+const MEDALS = ["🥇", "🥈", "🥉"];
+
 function buildLeaderboardEmbed(
   ranking: { name: string; count: number }[],
   settings: Settings,
@@ -92,33 +95,42 @@ function buildLeaderboardEmbed(
   const ranked = [...ranking].sort((a, b) => b.count - a.count);
   const lines = ranked.map((r, i) => {
     const noun = r.count === 1 ? "ticket" : "tickets";
-    return `**#${i + 1}** ${r.name} - ${r.count} ${noun}`;
+    const rank = i < MEDALS.length ? MEDALS[i] : `**#${i + 1}**`;
+    return `${rank} ${r.name} - ${r.count} ${noun}`;
   });
+  const total = ranked.reduce((sum, r) => sum + r.count, 0);
   const body = lines.length > 0 ? lines.join("\n") : "No tickets were logged this period.";
+
+  const sections: string[] = [];
   const intro = settings.announcementIntro.trim();
+  if (intro) sections.push(intro);
+  sections.push(body);
+  sections.push(`**Total tickets done: ${total}**`);
+
   const embed = new EmbedBuilder()
     .setTitle(settings.announcementTitle.trim() || "Ticket count for this period")
     .setColor(parseColor(settings.announcementColor))
-    .setDescription(intro ? `${intro}\n\n${body}` : body)
+    .setDescription(sections.join("\n\n"))
     .setTimestamp(new Date());
   const footer = settings.announcementFooter.trim();
   if (footer) embed.setFooter({ text: footer });
   return embed;
 }
 
-// The optional ping line posted as message content above the embed. A role
-// mention only notifies from `content` (never from inside an embed), so this is
-// kept separate from the intro. `{role}` in the text is replaced with the
-// <@&id> mention; if the placeholder is absent the mention is prepended. Returns
-// "" when no role is configured.
-function buildPingContent(settings: Settings): string {
+// The optional message line posted as content above the embed (e.g. "Great job
+// this period, {role}"). A role mention only notifies from `content`, never from
+// inside an embed, so the ping lives here. `{role}` is replaced with the <@&id>
+// mention; without the placeholder the mention is prepended. Works with a role
+// (ping), without a role (plain message), or neither (empty).
+function buildAnnouncementContent(settings: Settings): string {
   const roleId = settings.announcementRoleId?.trim();
-  if (!roleId) return "";
-  const mention = `<@&${roleId}>`;
+  const mention = roleId ? `<@&${roleId}>` : "";
   const text = settings.announcementPingText.trim();
   if (!text) return mention;
-  if (text.includes("{role}")) return text.replace(/\{role\}/g, mention);
-  return `${mention} ${text}`;
+  if (text.includes("{role}")) {
+    return text.replace(/\{role\}/g, mention).replace(/ {2,}/g, " ").trim();
+  }
+  return mention ? `${mention} ${text}` : text;
 }
 
 async function postLeaderboard(
@@ -130,7 +142,7 @@ async function postLeaderboard(
   if (!settings.announcementEnabled || !settings.announcementChannelId) return;
 
   const embed = buildLeaderboardEmbed(ranking, settings);
-  const content = buildPingContent(settings);
+  const content = buildAnnouncementContent(settings);
   const roleId = settings.announcementRoleId?.trim() || null;
 
   if (opts.dryRun) {

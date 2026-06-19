@@ -161,22 +161,24 @@ export default function AnnouncementForm({ announcement }: { announcement: Annou
           </div>
           <div>
             <label className={label} htmlFor="annPing">
-              Ping message
+              Message (above embed)
             </label>
             <input
               id="annPing"
               value={pingText}
               onChange={(e) => setPingText(e.target.value)}
-              placeholder="Good job {role}!"
+              placeholder="Great job this period, {role}"
               className={field}
             />
           </div>
         </div>
         <p className="text-xs text-muted">
-          Posted above the embed so the role actually pings. Put{" "}
-          <code className="font-mono text-foreground">{"{role}"}</code> where the
-          mention should appear. The role must be mentionable, or the bot needs the
-          &quot;Mention @everyone, @here, and All Roles&quot; permission.
+          Posted as the line above the embed.{" "}
+          <code className="font-mono text-foreground">{"{role}"}</code> becomes the
+          ping-role mention (leave the role blank for a plain message). A role
+          mention only notifies from here, never from inside the embed, so a
+          non-mentionable role needs the bot&apos;s &quot;Mention @everyone, @here,
+          and All Roles&quot; permission.
         </p>
       </div>
 
