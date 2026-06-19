@@ -38,6 +38,12 @@ runtime (polled every 30s) and reports its health back:
   even if posting is paused.
 - **Schedule.** Period anchor (a Friday), length, and UTC post time.
 - **Report channels.** Channel ID plus which member owns it (or "count everyone").
+- **Announcement.** Optional period-end leaderboard embed posted to a channel,
+  with an optional **role ping** line above it: set a role ID and a message like
+  `Good job {role}!` (the `{role}` placeholder becomes the mention, which Discord
+  auto-resolves to the role name). The role must be **mentionable**, or the bot
+  needs the *Mention @everyone, @here, and All Roles* permission, for the ping to
+  notify members.
 
 The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
 
@@ -73,6 +79,10 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
    ```
    https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot&permissions=84992
    ```
+
+   To ping a non-mentionable role in the announcement, also grant **Mention
+   @everyone, @here, and All Roles** (permission integer `216064`). Skip this if
+   you instead mark the pinged role as mentionable in its Discord settings.
 
 ## 2. Run
 

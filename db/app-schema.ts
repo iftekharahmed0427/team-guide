@@ -229,6 +229,12 @@ export const botSetting = pgTable("bot_setting", {
   announcementColor: text("announcement_color").notNull().default("#5865f2"),
   announcementIntro: text("announcement_intro").notNull().default(""),
   announcementFooter: text("announcement_footer").notNull().default("Team Guide"),
+  // Optional role ping posted as message content ABOVE the embed (mentions inside
+  // an embed never notify). `announcementRoleId` is the role snowflake (null = no
+  // ping); `announcementPingText` is the line, where `{role}` marks where the
+  // <@&id> mention goes (prepended if the placeholder is absent).
+  announcementRoleId: text("announcement_role_id"),
+  announcementPingText: text("announcement_ping_text").notNull().default(""),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())

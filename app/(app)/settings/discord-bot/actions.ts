@@ -187,6 +187,8 @@ export async function updateAnnouncement(input: {
   announcementColor: string;
   announcementIntro: string;
   announcementFooter: string;
+  announcementRoleId: string;
+  announcementPingText: string;
 }): Promise<Result> {
   const denied = await adminGuard();
   if (denied) return denied;
@@ -202,6 +204,10 @@ export async function updateAnnouncement(input: {
   if (color && !HEX.test(color)) {
     return { error: "Color must be a 6-digit hex, e.g. #5865f2." };
   }
+  const roleId = input.announcementRoleId.trim();
+  if (roleId && !SNOWFLAKE.test(roleId)) {
+    return { error: "Ping role ID must be a Discord ID (numbers only)." };
+  }
 
   await ensureSettingsRow();
   await db
@@ -214,6 +220,8 @@ export async function updateAnnouncement(input: {
       announcementColor: color ? (color.startsWith("#") ? color : `#${color}`) : "#5865f2",
       announcementIntro: input.announcementIntro.trim().slice(0, 500),
       announcementFooter: input.announcementFooter.trim().slice(0, 200),
+      announcementRoleId: roleId || null,
+      announcementPingText: input.announcementPingText.trim().slice(0, 200),
     })
     .where(eq(botSetting.id, "singleton"));
   revalidatePath(PAGE);

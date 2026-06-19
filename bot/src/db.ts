@@ -29,6 +29,8 @@ export type Settings = {
   announcementColor: string; // hex, e.g. #5865f2
   announcementIntro: string;
   announcementFooter: string;
+  announcementRoleId: string | null; // role to ping above the embed, or null
+  announcementPingText: string; // ping line; {role} marks the mention spot
 };
 
 export type ReportEntry = {
@@ -56,6 +58,8 @@ const DEFAULT_SETTINGS: Settings = {
   announcementColor: "#5865f2",
   announcementIntro: "",
   announcementFooter: "Team Guide",
+  announcementRoleId: null,
+  announcementPingText: "",
 };
 
 let pool: pg.Pool | null = null;
@@ -78,7 +82,8 @@ export async function getSettings(): Promise<Settings> {
     `select token, enabled, auto_reset, period_anchor, period_days, post_hour, post_minute,
             presence_status, presence_activity_type, presence_activity_text, run_requested_at,
             announcement_channel_id, announcement_enabled, announcement_title,
-            announcement_color, announcement_intro, announcement_footer
+            announcement_color, announcement_intro, announcement_footer,
+            announcement_role_id, announcement_ping_text
      from bot_setting where id = 'singleton' limit 1`,
   );
   const r = rows[0];
@@ -87,6 +92,10 @@ export async function getSettings(): Promise<Settings> {
     r.announcement_channel_id == null || String(r.announcement_channel_id).trim() === ""
       ? null
       : String(r.announcement_channel_id);
+  const roleId =
+    r.announcement_role_id == null || String(r.announcement_role_id).trim() === ""
+      ? null
+      : String(r.announcement_role_id);
   return {
     token: r.token == null || String(r.token).trim() === "" ? null : String(r.token),
     enabled: r.enabled !== false,
@@ -105,6 +114,8 @@ export async function getSettings(): Promise<Settings> {
     announcementColor: String(r.announcement_color ?? "#5865f2"),
     announcementIntro: String(r.announcement_intro ?? ""),
     announcementFooter: String(r.announcement_footer ?? "Team Guide"),
+    announcementRoleId: roleId,
+    announcementPingText: String(r.announcement_ping_text ?? ""),
   };
 }
 

@@ -43,6 +43,8 @@ export default async function DiscordBotSettingsPage() {
     announcementColor: settingRow?.announcementColor ?? "#5865f2",
     announcementIntro: settingRow?.announcementIntro ?? "",
     announcementFooter: settingRow?.announcementFooter ?? "Team Guide",
+    announcementRoleId: settingRow?.announcementRoleId ?? "",
+    announcementPingText: settingRow?.announcementPingText ?? "",
   };
 
   const status = await getBotStatusPayload();

@@ -12,6 +12,8 @@ type Announcement = {
   announcementColor: string;
   announcementIntro: string;
   announcementFooter: string;
+  announcementRoleId: string;
+  announcementPingText: string;
 };
 
 const label = "mb-1.5 block text-xs font-medium text-muted";
@@ -30,6 +32,8 @@ export default function AnnouncementForm({ announcement }: { announcement: Annou
   );
   const [intro, setIntro] = useState(announcement.announcementIntro);
   const [footer, setFooter] = useState(announcement.announcementFooter);
+  const [roleId, setRoleId] = useState(announcement.announcementRoleId);
+  const [pingText, setPingText] = useState(announcement.announcementPingText);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -45,6 +49,8 @@ export default function AnnouncementForm({ announcement }: { announcement: Annou
         announcementColor: color,
         announcementIntro: intro,
         announcementFooter: footer,
+        announcementRoleId: roleId.trim(),
+        announcementPingText: pingText,
       });
       if ("error" in res) {
         setError(res.error);
@@ -136,6 +142,42 @@ export default function AnnouncementForm({ announcement }: { announcement: Annou
           placeholder="Shown above the leaderboard, e.g. Great work this period, team!"
           className="w-full resize-none border border-border bg-surface-2 px-3 py-2 text-sm leading-6 text-foreground outline-none focus:border-muted"
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,15rem)_1fr]">
+          <div>
+            <label className={label} htmlFor="annRole">
+              Ping role ID (optional)
+            </label>
+            <input
+              id="annRole"
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value)}
+              inputMode="numeric"
+              placeholder="123456789012345678"
+              className={`${field} font-mono`}
+            />
+          </div>
+          <div>
+            <label className={label} htmlFor="annPing">
+              Ping message
+            </label>
+            <input
+              id="annPing"
+              value={pingText}
+              onChange={(e) => setPingText(e.target.value)}
+              placeholder="Good job {role}!"
+              className={field}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted">
+          Posted above the embed so the role actually pings. Put{" "}
+          <code className="font-mono text-foreground">{"{role}"}</code> where the
+          mention should appear. The role must be mentionable, or the bot needs the
+          &quot;Mention @everyone, @here, and All Roles&quot; permission.
+        </p>
       </div>
 
       <div>

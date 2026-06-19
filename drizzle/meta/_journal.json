@@ -127,6 +127,13 @@
       "when": 1781842590678,
       "tag": "0017_curved_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781844068696,
+      "tag": "0018_harsh_warbird",
+      "breakpoints": true
     }
   ]
 }

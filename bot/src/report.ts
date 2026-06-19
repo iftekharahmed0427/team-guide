@@ -106,6 +106,21 @@ function buildLeaderboardEmbed(
   return embed;
 }
 
+// The optional ping line posted as message content above the embed. A role
+// mention only notifies from `content` (never from inside an embed), so this is
+// kept separate from the intro. `{role}` in the text is replaced with the
+// <@&id> mention; if the placeholder is absent the mention is prepended. Returns
+// "" when no role is configured.
+function buildPingContent(settings: Settings): string {
+  const roleId = settings.announcementRoleId?.trim();
+  if (!roleId) return "";
+  const mention = `<@&${roleId}>`;
+  const text = settings.announcementPingText.trim();
+  if (!text) return mention;
+  if (text.includes("{role}")) return text.replace(/\{role\}/g, mention);
+  return `${mention} ${text}`;
+}
+
 async function postLeaderboard(
   client: Client,
   settings: Settings,
@@ -115,9 +130,15 @@ async function postLeaderboard(
   if (!settings.announcementEnabled || !settings.announcementChannelId) return;
 
   const embed = buildLeaderboardEmbed(ranking, settings);
+  const content = buildPingContent(settings);
+  const roleId = settings.announcementRoleId?.trim() || null;
 
   if (opts.dryRun) {
-    console.log(`[report] leaderboard (dry-run):\n${embed.data.description ?? ""}`);
+    console.log(
+      `[report] leaderboard (dry-run):` +
+        (content ? `\n${content}` : "") +
+        `\n${embed.data.description ?? ""}`,
+    );
     return;
   }
 
@@ -129,7 +150,13 @@ async function postLeaderboard(
       console.error("[report] announcement: cannot send (missing access / Send Messages?)");
       return;
     }
-    await channel.send({ embeds: [embed] });
+    // Whitelist only the configured role so the ping fires and nothing else
+    // (@everyone/@here/users) can be mentioned from the content.
+    await channel.send({
+      content: content || undefined,
+      embeds: [embed],
+      allowedMentions: { parse: [], roles: roleId ? [roleId] : [] },
+    });
     console.log("[report] leaderboard posted");
   } catch (err) {
     console.error("[report] announcement send failed:", err);
