@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TrendingUp, RotateCcw } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 
 export type ReportEntry = {
@@ -9,6 +10,8 @@ export type ReportEntry = {
   image: string | null;
   count: number;
   isYou: boolean;
+  avgPerDay: number;
+  lastReset: string | null; // formatted date + time, or null if never reset
 };
 
 // One rolling digit: clips a 0-9 strip and slides it to `d`. It starts at 0 and
@@ -67,7 +70,18 @@ function Card({ entry }: { entry: ReportEntry }) {
         <Odometer value={entry.count} />
       </span>
 
-      <span className="text-xs text-muted">{noun} this period</span>
+      <span className="text-xs text-muted">{noun}</span>
+
+      <div className="mt-1 flex w-full flex-col items-center gap-1 border-t border-border pt-2.5 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          <TrendingUp size={12} strokeWidth={1.75} className="shrink-0" />
+          {entry.avgPerDay}/day avg
+        </span>
+        <span className="flex items-center gap-1.5 text-center">
+          <RotateCcw size={12} strokeWidth={1.75} className="shrink-0" />
+          {entry.lastReset ? `Reset ${entry.lastReset}` : "No reset yet"}
+        </span>
+      </div>
     </div>
   );
 }
