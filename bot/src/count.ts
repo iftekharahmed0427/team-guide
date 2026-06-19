@@ -19,90 +19,31 @@ function imagesInMessage(msg: Message, entry: ReportEntry): number {
   return n;
 }
 
-export type ChannelResult = {
-  entry: ReportEntry;
-  ok: boolean;
-  count: number;
-  error?: string;
-};
-
-// Count image attachments posted in the (windowStart, now] window. When the
-// entry has a userId, only that member's uploads count. Walks message history
-// backwards via REST (no Message Content intent needed for attachments).
-export async function countChannelTickets(
-  client: Client,
-  entry: ReportEntry,
-  windowStart: number,
-): Promise<ChannelResult> {
-  try {
-    const channel = await client.channels.fetch(entry.channelId);
-    if (!channel || !channel.isTextBased() || !("messages" in channel)) {
-      return { entry, ok: false, count: 0, error: "not a readable text channel" };
-    }
-
-    let count = 0;
-    let before: Snowflake | undefined;
-
-    while (true) {
-      const batch = await channel.messages.fetch(
-        before ? { limit: 100, before } : { limit: 100 },
-      );
-      if (batch.size === 0) break;
-
-      let oldestId: Snowflake | undefined;
-      let oldestTs = Number.POSITIVE_INFINITY;
-      let reachedOlder = false;
-
-      for (const msg of batch.values()) {
-        if (msg.createdTimestamp < oldestTs) {
-          oldestTs = msg.createdTimestamp;
-          oldestId = msg.id;
-        }
-        if (msg.createdTimestamp <= windowStart) {
-          reachedOlder = true;
-          continue;
-        }
-        if (entry.userId && msg.author.id !== entry.userId) continue;
-        for (const att of msg.attachments.values()) {
-          if (isImageAttachment(att)) count++;
-        }
-      }
-
-      if (reachedOlder || batch.size < 100 || !oldestId) break;
-      before = oldestId;
-    }
-
-    return { entry, ok: true, count };
-  } catch (err) {
-    return {
-      entry,
-      ok: false,
-      count: 0,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
-
-// ── Live counting (dashboard) ────────────────────────────────────────────────
-//
-// The dashboard "Tickets solved" card needs a near-realtime count without
-// re-walking channel history every few seconds. So the bot does ONE full count
-// of the in-progress period (liveCountFull) to seed `lastSeenMessageId`, then on
-// each tick fetches only the messages newer than that (liveCountAfter) and adds
-// to the running tally. New messages per tick are usually zero, so a 5s cadence
-// is ~1 cheap request per channel and never approaches Discord's rate limits.
-
-export type LiveResult =
+export type CountResult =
   | { ok: true; count: number; newestId: string | null }
   | { ok: false; error: string };
 
-// Full count of image-attachment tickets in (periodStart, now], plus the id of
-// the channel's newest message so incremental counting can continue from there.
-export async function liveCountFull(
+// Count image-attachment "tickets" for `entry` in the active window, and return
+// the channel's newest message id.
+//
+// The window is (floor, now], where `floor` is the LATEST of:
+//   • `windowStart` — the period start, or a later manual-reset time, and
+//   • the most recent BOT message in the channel.
+// So counting always begins AFTER a bot's message: report channels get a bot
+// post (the ticket panel, or the period summary this bot itself posts) that
+// marks where a fresh count should start, and screenshots above it are ignored.
+// If no bot has posted since `windowStart`, the whole window is counted.
+//
+// Walks history backward via REST and stops as soon as it reaches the floor or a
+// bot message, so a channel with regular bot posts is cheap to count. Because it
+// recounts current state on every call, deleted screenshots fall out of the
+// tally on their own (no Message Content intent is needed for attachments or for
+// author.bot).
+export async function countWindow(
   client: Client,
   entry: ReportEntry,
-  periodStart: number,
-): Promise<LiveResult> {
+  windowStart: number,
+): Promise<CountResult> {
   try {
     const channel = await client.channels.fetch(entry.channelId);
     if (!channel || !channel.isTextBased() || !("messages" in channel)) {
@@ -111,87 +52,37 @@ export async function liveCountFull(
 
     let count = 0;
     let newestId: string | null = null;
-    let newestTs = Number.NEGATIVE_INFINITY;
     let before: Snowflake | undefined;
+    let done = false;
 
-    while (true) {
+    while (!done) {
       const batch = await channel.messages.fetch(
         before ? { limit: 100, before } : { limit: 100 },
       );
       if (batch.size === 0) break;
 
-      let oldestId: Snowflake | undefined;
-      let oldestTs = Number.POSITIVE_INFINITY;
-      let reachedOlder = false;
+      // A batch is not guaranteed to be ordered, so sort newest → oldest; that
+      // way the first bot message we meet is the most recent one.
+      const ordered = [...batch.values()].sort(
+        (a, b) => b.createdTimestamp - a.createdTimestamp,
+      );
+      if (newestId === null) newestId = ordered[0]!.id; // channel's newest message
 
-      for (const msg of batch.values()) {
-        if (msg.createdTimestamp < oldestTs) {
-          oldestTs = msg.createdTimestamp;
-          oldestId = msg.id;
+      for (const m of ordered) {
+        if (m.createdTimestamp <= windowStart) {
+          done = true; // reached the period / reset floor
+          break;
         }
-        if (msg.createdTimestamp > newestTs) {
-          newestTs = msg.createdTimestamp;
-          newestId = msg.id;
+        if (m.author.bot) {
+          done = true; // reached the most recent bot message; stop counting
+          break;
         }
-        if (msg.createdTimestamp <= periodStart) {
-          reachedOlder = true;
-          continue;
-        }
-        count += imagesInMessage(msg, entry);
+        count += imagesInMessage(m, entry);
       }
 
-      if (reachedOlder || batch.size < 100 || !oldestId) break;
-      before = oldestId;
-    }
-
-    return { ok: true, count, newestId };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-// Count image-attachment tickets in messages newer than `afterId`, returning how
-// many to ADD to the running tally and the new newest id. Fetches only the new
-// messages (paginating forward if a burst exceeds 100), so it is cheap to call
-// frequently.
-export async function liveCountAfter(
-  client: Client,
-  entry: ReportEntry,
-  afterId: string,
-): Promise<LiveResult> {
-  try {
-    const channel = await client.channels.fetch(entry.channelId);
-    if (!channel || !channel.isTextBased() || !("messages" in channel)) {
-      return { ok: false, error: "not a readable text channel" };
-    }
-
-    let count = 0;
-    let newestId = afterId;
-    let newestTs = Number.NEGATIVE_INFINITY;
-    let after: Snowflake = afterId;
-
-    while (true) {
-      const batch = await channel.messages.fetch({ limit: 100, after });
-      if (batch.size === 0) break;
-
-      let maxId: Snowflake | undefined;
-      let maxTs = Number.NEGATIVE_INFINITY;
-
-      for (const msg of batch.values()) {
-        count += imagesInMessage(msg, entry);
-        if (msg.createdTimestamp > maxTs) {
-          maxTs = msg.createdTimestamp;
-          maxId = msg.id;
-        }
-      }
-
-      if (maxId && maxTs > newestTs) {
-        newestTs = maxTs;
-        newestId = maxId;
-      }
-
-      if (batch.size < 100 || !maxId) break;
-      after = maxId; // walk forward through the backlog
+      const oldestId = ordered[ordered.length - 1]!.id;
+      if (done || batch.size < 100) break;
+      before = oldestId; // walk further back
     }
 
     return { ok: true, count, newestId };

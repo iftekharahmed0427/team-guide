@@ -1,0 +1,1 @@
+ALTER TABLE "report_channel" ADD COLUMN "count_reset_at" timestamp;

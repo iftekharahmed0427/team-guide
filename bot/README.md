@@ -9,6 +9,12 @@ report channel and posts a summary embed at the end of every 14-day period
 - Only **uploaded image attachments** are counted. Text, links, stickers, and
   emoji are ignored. **Each image counts as one ticket** (3 screenshots in one
   message is 3 tickets).
+- Counting starts **after the most recent bot message** in the channel (the
+  ticket panel, or the period summary this bot posts), so screenshots above that
+  message are ignored. If no bot has posted in the period, the whole period is
+  counted.
+- A deleted screenshot stops counting: the bot recounts current channel state, so
+  removing an image drops it back out of the tally.
 - At each period end the bot posts an embed in every report channel:
   *"You solved **N** tickets this period."*
 
@@ -44,7 +50,14 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
   It also catches up if it was offline at that moment, as long as it comes back
   the same day.
 - A channel's count is the image attachments posted by its member in the
-  `(periodEnd - 14 days, periodEnd]` window. Deleted messages do not count.
+  `(periodEnd - 14 days, periodEnd]` window, but no earlier than the most recent
+  bot message in the channel (or a manual reset). Deleted messages do not count.
+- **Auto-reset (on by default).** The live counts reset automatically at each
+  period boundary. Turn it off (Settings > Discord bot > Report channels) to keep
+  counts accumulating across periods and reset only when you choose.
+- **Report channels.** Each row has a **Reset** button that zeroes that channel
+  and makes counting start from that moment; **Reset all** does it for every
+  channel at once (handy when switching auto-reset off).
 
 ## 1. Create the Discord bot
 
@@ -110,5 +123,5 @@ left untouched.
 | `src/config.ts` | Validate `DATABASE_URL` |
 | `src/db.ts` | Read settings + channels, write status/heartbeat |
 | `src/period.ts` | Period boundary + window math (UTC) |
-| `src/count.ts` | Scan a channel's history, count image attachments |
+| `src/count.ts` | Scan a channel's history, count image attachments after the latest bot message |
 | `src/report.ts` | Count all channels, build + post the embed |

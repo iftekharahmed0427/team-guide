@@ -23,7 +23,7 @@ import {
   type Settings,
 } from "./db.ts";
 import { runReport } from "./report.ts";
-import { liveCountFull, liveCountAfter } from "./count.ts";
+import { countWindow } from "./count.ts";
 import { isPeriodEnd, currentPeriodStart } from "./period.ts";
 
 const args = new Set(process.argv.slice(2));
@@ -31,19 +31,18 @@ const RUN_NOW = args.has("--now"); // one-shot report, then exit
 const DRY_RUN = args.has("--dry-run"); // count + log, never post
 
 const TICK_MS = 30_000;
-// The live dashboard count runs on its own faster cadence. It is rate-safe: after
-// one seeding full count it only fetches messages newer than `lastSeenMessageId`,
-// so a tick is ~1 cheap request per channel. A periodic full re-count corrects
-// drift from deleted messages.
+// The live dashboard count runs on its own faster cadence. It re-counts each
+// channel's in-progress window every tick; because counting starts after the
+// most recent bot message (see count.ts), the walk usually stops after one cheap
+// request per channel, and recounting current state is what lets deleted
+// screenshots drop back out of the tally.
 const COUNT_TICK_MS = 5_000;
-const RECONCILE_MS = 10 * 60_000;
 
 let client: Client | null = null;
 let loggedInToken: string | null = null;
 let appliedPresence = "";
 let reporting = false;
 let counting = false;
-let lastReconcileMs = 0;
 let lastTotalWritten: number | null = null;
 let shuttingDown = false;
 
@@ -151,8 +150,8 @@ async function doReport(s: Settings): Promise<void> {
 // ── Live dashboard count ─────────────────────────────────────────────────────
 
 // Keep the dashboard "Tickets solved" total fresh. Runs only while connected;
-// re-seeds (full count) on a new period or when a reconcile is due, otherwise
-// adds just the messages posted since the last tick.
+// rolls the counts over on a new period, then re-counts every channel's
+// in-progress window (after its most recent bot message, above any manual reset).
 async function countTick(): Promise<void> {
   if (shuttingDown || counting || reporting) return;
   if (!client || !client.isReady()) return;
@@ -168,21 +167,26 @@ async function countTick(): Promise<void> {
     if (!s.token) return; // not configured; the main tick handles disconnect
 
     const periodStart = currentPeriodStart(new Date(), s);
-    const storedStart = await getTicketPeriodStart();
-    const rollover = storedStart == null || storedStart !== periodStart;
-    const reconcileDue = Date.now() - lastReconcileMs >= RECONCILE_MS;
 
-    if (rollover) await rolloverTicketCounts(periodStart);
+    // With auto-reset off, counts accumulate across periods and only a manual
+    // reset (count_reset_at) bounds the window — so skip the period rollover and
+    // drop the period floor entirely.
+    let rollover = false;
+    if (s.autoReset) {
+      const storedStart = await getTicketPeriodStart();
+      rollover = storedStart == null || storedStart !== periodStart;
+      if (rollover) await rolloverTicketCounts(periodStart);
+    }
+    const periodFloor = s.autoReset ? periodStart : 0;
 
     const channels = await getLiveChannels();
     let total = 0;
     let changed = rollover; // a rollover reset is itself a visible change
 
     for (const ch of channels) {
-      const full = rollover || reconcileDue || ch.lastSeenMessageId == null;
-      const res = full
-        ? await liveCountFull(client, ch, periodStart)
-        : await liveCountAfter(client, ch, ch.lastSeenMessageId!);
+      // A manual reset wins when it is newer than the period floor.
+      const floor = ch.resetAt && ch.resetAt > periodFloor ? ch.resetAt : periodFloor;
+      const res = await countWindow(client, ch, floor);
 
       if (!res.ok) {
         // Keep the last good tally for this channel; don't drop the team total.
@@ -190,21 +194,12 @@ async function countTick(): Promise<void> {
         continue;
       }
 
-      if (full) {
-        await updateChannelCount(ch.channelId, res.count, res.newestId);
-        if (res.count !== ch.currentCount) changed = true;
-        total += res.count;
-      } else {
-        const newCount = ch.currentCount + res.count;
-        if (res.count > 0 || res.newestId !== ch.lastSeenMessageId) {
-          await updateChannelCount(ch.channelId, newCount, res.newestId);
-        }
-        if (newCount !== ch.currentCount) changed = true;
-        total += newCount;
+      if (res.count !== ch.currentCount) {
+        await updateChannelCount(ch.channelId, res.count);
+        changed = true;
       }
+      total += res.count;
     }
-
-    if (reconcileDue) lastReconcileMs = Date.now();
 
     await setTicketTotal(total);
     // Refresh the dashboard + reports page when any per-member count moved (the

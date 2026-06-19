@@ -1,6 +1,6 @@
 import { EmbedBuilder, type Client, type TextBasedChannel } from "discord.js";
 import type { ReportEntry, Settings } from "./db.ts";
-import { countChannelTickets } from "./count.ts";
+import { countWindow } from "./count.ts";
 import { formatRange, periodWindow } from "./period.ts";
 
 type RunOptions = { dryRun?: boolean };
@@ -26,7 +26,9 @@ export async function runReport(
 
   for (const entry of channels) {
     const label = entry.name || entry.userId || entry.channelId;
-    const result = await countChannelTickets(client, entry, start);
+    // A manual reset only applies within the current period.
+    const floor = entry.resetAt && entry.resetAt > start ? entry.resetAt : start;
+    const result = await countWindow(client, entry, floor);
 
     if (!result.ok) {
       console.error(`[report] ${label}: SKIPPED, ${result.error}`);

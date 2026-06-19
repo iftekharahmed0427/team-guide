@@ -12,6 +12,8 @@ import PresenceForm from "./presence-form";
 import ScheduleForm from "./schedule-form";
 import AnnouncementForm from "./announcement-form";
 import ReportChannelForm from "./report-channel-form";
+import ResetChannelButton from "./reset-channel-button";
+import ReportChannelsControls from "./report-channels-controls";
 
 export default async function DiscordBotSettingsPage() {
   const settingRow = (
@@ -22,6 +24,7 @@ export default async function DiscordBotSettingsPage() {
   const hasToken = !!token;
   const tokenLast4 = token ? token.slice(-4) : null;
   const enabled = settingRow?.enabled ?? true;
+  const autoReset = settingRow?.autoReset ?? true;
   const presence = {
     presenceStatus: settingRow?.presenceStatus ?? "online",
     presenceActivityType: settingRow?.presenceActivityType ?? "none",
@@ -155,7 +158,13 @@ export default async function DiscordBotSettingsPage() {
           <h3 className="text-sm font-semibold tracking-tight">Report channels</h3>
           <p className="text-xs text-muted">
             Each channel is scanned for screenshot uploads from its member.
+            Counting starts after the most recent bot message in the channel;
+            use Reset to zero a channel and count from now.
           </p>
+        </div>
+
+        <div className="border-b border-border p-5">
+          <ReportChannelsControls autoReset={autoReset} channelCount={channels.length} />
         </div>
 
         <div className="border-b border-border p-5">
@@ -187,17 +196,20 @@ export default async function DiscordBotSettingsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 pr-5 pl-3 text-right">
-                    <form action={deleteReportChannel} className="inline">
-                      <input type="hidden" name="id" value={c.id} />
-                      <button
-                        type="submit"
-                        aria-label="Remove channel"
-                        className="inline-flex h-7 w-7 items-center justify-center border border-border text-muted transition-colors hover:border-red-500/50 hover:text-red-400"
-                      >
-                        <Trash2 size={14} strokeWidth={1.75} />
-                      </button>
-                    </form>
+                  <td className="py-3 pr-5 pl-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <ResetChannelButton id={c.id} name={c.name} />
+                      <form action={deleteReportChannel} className="inline">
+                        <input type="hidden" name="id" value={c.id} />
+                        <button
+                          type="submit"
+                          aria-label="Remove channel"
+                          className="inline-flex h-7 w-7 items-center justify-center border border-border text-muted transition-colors hover:border-red-500/50 hover:text-red-400"
+                        >
+                          <Trash2 size={14} strokeWidth={1.75} />
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}

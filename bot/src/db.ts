@@ -14,6 +14,7 @@ pg.types.setTypeParser(1114, (v) => new Date(v.replace(" ", "T") + "Z"));
 export type Settings = {
   token: string | null;
   enabled: boolean;
+  autoReset: boolean; // reset the live counts automatically at each period boundary
   periodAnchor: string; // YYYY-MM-DD, a Friday a period ends on
   periodDays: number;
   postHour: number; // UTC
@@ -34,11 +35,13 @@ export type ReportEntry = {
   channelId: string;
   userId: string | null; // Discord snowflake; null = count everyone's uploads
   name: string;
+  resetAt: number | null; // ms epoch floor from a manual reset, or null
 };
 
 const DEFAULT_SETTINGS: Settings = {
   token: null,
   enabled: true,
+  autoReset: true,
   periodAnchor: "2026-06-26",
   periodDays: 14,
   postHour: 17,
@@ -72,7 +75,7 @@ function getPool(): pg.Pool {
 
 export async function getSettings(): Promise<Settings> {
   const { rows } = await getPool().query(
-    `select token, enabled, period_anchor, period_days, post_hour, post_minute,
+    `select token, enabled, auto_reset, period_anchor, period_days, post_hour, post_minute,
             presence_status, presence_activity_type, presence_activity_text, run_requested_at,
             announcement_channel_id, announcement_enabled, announcement_title,
             announcement_color, announcement_intro, announcement_footer
@@ -87,6 +90,7 @@ export async function getSettings(): Promise<Settings> {
   return {
     token: r.token == null || String(r.token).trim() === "" ? null : String(r.token),
     enabled: r.enabled !== false,
+    autoReset: r.auto_reset !== false,
     periodAnchor: String(r.period_anchor),
     periodDays: Number(r.period_days),
     postHour: Number(r.post_hour),
@@ -106,12 +110,13 @@ export async function getSettings(): Promise<Settings> {
 
 export async function getReportChannels(): Promise<ReportEntry[]> {
   const { rows } = await getPool().query(
-    "select channel_id, user_id, name from report_channel order by created_at asc",
+    "select channel_id, user_id, name, count_reset_at from report_channel order by created_at asc",
   );
   return rows.map((r) => ({
     channelId: String(r.channel_id),
     userId: r.user_id == null ? null : String(r.user_id),
     name: r.name == null ? "" : String(r.name),
+    resetAt: r.count_reset_at ? new Date(r.count_reset_at).getTime() : null,
   }));
 }
 
@@ -158,21 +163,19 @@ export async function getLastReportAt(): Promise<number> {
 // ── Live ticket counts (dashboard) ───────────────────────────────────────────
 
 export type LiveChannel = ReportEntry & {
-  lastSeenMessageId: string | null;
   currentCount: number;
 };
 
 export async function getLiveChannels(): Promise<LiveChannel[]> {
   const { rows } = await getPool().query(
-    `select channel_id, user_id, name, last_seen_message_id, current_count
+    `select channel_id, user_id, name, count_reset_at, current_count
      from report_channel order by created_at asc`,
   );
   return rows.map((r) => ({
     channelId: String(r.channel_id),
     userId: r.user_id == null ? null : String(r.user_id),
     name: r.name == null ? "" : String(r.name),
-    lastSeenMessageId:
-      r.last_seen_message_id == null ? null : String(r.last_seen_message_id),
+    resetAt: r.count_reset_at ? new Date(r.count_reset_at).getTime() : null,
     currentCount: Number(r.current_count ?? 0),
   }));
 }
@@ -195,8 +198,7 @@ export async function rolloverTicketCounts(periodStartMs: number): Promise<void>
     await client.query("begin");
     await client.query(
       `update report_channel
-         set previous_count = current_count, current_count = 0,
-             last_seen_message_id = null, counted_at = now()`,
+         set previous_count = current_count, current_count = 0, counted_at = now()`,
     );
     await client.query(
       `insert into ticket_count (id, total, previous_total, period_start, updated_at)
@@ -218,13 +220,12 @@ export async function rolloverTicketCounts(periodStartMs: number): Promise<void>
 export async function updateChannelCount(
   channelId: string,
   currentCount: number,
-  lastSeenMessageId: string | null,
 ): Promise<void> {
   await getPool().query(
     `update report_channel
-       set current_count = $2, last_seen_message_id = $3, counted_at = now()
+       set current_count = $2, counted_at = now()
      where channel_id = $1`,
-    [channelId, currentCount, lastSeenMessageId],
+    [channelId, currentCount],
   );
 }
 

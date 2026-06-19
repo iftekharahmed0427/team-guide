@@ -155,12 +155,16 @@ export const shift = pgTable("shift", {
 // snowflake and display name; `userId` null means count everyone's uploads in
 // the channel. The bot reads these rows to know which channels to count + post.
 //
-// The live counter fields are maintained by the bot for the dashboard: it counts
-// image attachments incrementally (only fetching messages newer than
-// `lastSeenMessageId`) so it can refresh every few seconds without re-walking
-// channel history and tripping Discord rate limits. `currentCount` is this
+// The live counter fields are maintained by the bot for the dashboard. The bot
+// re-counts each channel's in-progress window every few seconds (cheap because
+// counting starts after the most recent bot message in the channel), so deleted
+// screenshots drop out of the tally on their own. `currentCount` is this
 // channel's tally for the in-progress period; `previousCount` is its final tally
-// for the period that just ended (kept so the dashboard delta survives a rollover).
+// for the period that just ended (kept so the dashboard delta survives a
+// rollover). `countResetAt`, set by the per-channel "Reset" button, is a floor on
+// the counting window so an admin can zero a channel mid-period.
+// (`lastSeenMessageId` is retained from the old incremental counter and no longer
+// read; left in place to avoid a destructive migration.)
 export const reportChannel = pgTable(
   "report_channel",
   {
@@ -168,9 +172,10 @@ export const reportChannel = pgTable(
     channelId: text("channel_id").notNull(),
     userId: text("user_id"), // Discord snowflake; null = count all uploads
     name: text("name").notNull().default(""),
-    lastSeenMessageId: text("last_seen_message_id"), // newest message already counted
+    lastSeenMessageId: text("last_seen_message_id"), // legacy; unused
     currentCount: integer("current_count").notNull().default(0),
     previousCount: integer("previous_count").notNull().default(0),
+    countResetAt: timestamp("count_reset_at"), // manual reset floor for counting
     countedAt: timestamp("counted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -211,6 +216,10 @@ export const botSetting = pgTable("bot_setting", {
   presenceActivityType: text("presence_activity_type").notNull().default("none"), // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: text("presence_activity_text").notNull().default(""),
   runRequestedAt: timestamp("run_requested_at"),
+  // When true (default), the live counts reset automatically at each period
+  // boundary. Turn off to keep counts accumulating until an admin resets a
+  // channel manually (the per-channel / "Reset all" buttons).
+  autoReset: boolean("auto_reset").notNull().default(true),
   // Period-end leaderboard announcement: posted to `announcementChannelId` when a
   // report runs (if `announcementEnabled`). The ranked member list is generated;
   // the title/color/intro/footer are the admin-customizable styling.

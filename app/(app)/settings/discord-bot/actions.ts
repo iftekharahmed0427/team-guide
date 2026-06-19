@@ -2,10 +2,10 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportChannel, botSetting } from "@/db/app-schema";
+import { reportChannel, botSetting, ticketCount } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 
 const PAGE = "/settings/discord-bot";
@@ -106,6 +106,16 @@ export async function setEnabled(enabled: boolean): Promise<Result> {
   if (denied) return denied;
   await ensureSettingsRow();
   await db.update(botSetting).set({ enabled }).where(eq(botSetting.id, "singleton"));
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+export async function setAutoReset(autoReset: boolean): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  await ensureSettingsRow();
+  await db.update(botSetting).set({ autoReset }).where(eq(botSetting.id, "singleton"));
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -240,6 +250,24 @@ export async function addReportChannel(input: {
   return { ok: true };
 }
 
+// Reset every channel at once (e.g. when moving over to manual resets): stamp
+// `countResetAt = now` and zero all tallies, then zero the team total.
+export async function resetAllReportChannels(): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+
+  const now = new Date();
+  await db.update(reportChannel).set({ countResetAt: now, currentCount: 0, countedAt: now });
+  await db
+    .update(ticketCount)
+    .set({ total: 0 })
+    .where(eq(ticketCount.id, "singleton"));
+
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
 export async function deleteReportChannel(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
@@ -247,4 +275,40 @@ export async function deleteReportChannel(formData: FormData) {
   await db.delete(reportChannel).where(eq(reportChannel.id, id));
   revalidatePath(PAGE);
   await notifyChange();
+}
+
+// Manually zero a channel's count: stamp `countResetAt = now` so the bot starts
+// counting screenshots from this moment, and clear the live tally immediately so
+// the dashboard and reports page update without waiting for the next bot tick.
+export async function resetReportChannel(id: string): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  if (!id) return { error: "Missing channel." };
+
+  const row = (
+    await db
+      .select({ currentCount: reportChannel.currentCount })
+      .from(reportChannel)
+      .where(eq(reportChannel.id, id))
+      .limit(1)
+  )[0];
+  if (!row) return { error: "Channel not found." };
+
+  await db
+    .update(reportChannel)
+    .set({ countResetAt: new Date(), currentCount: 0, countedAt: new Date() })
+    .where(eq(reportChannel.id, id));
+
+  // Subtract this channel's tally from the team total (the bot recomputes it on
+  // its next tick, but this keeps the dashboard correct in the meantime).
+  if (row.currentCount > 0) {
+    await db
+      .update(ticketCount)
+      .set({ total: sql`greatest(${ticketCount.total} - ${row.currentCount}, 0)` })
+      .where(eq(ticketCount.id, "singleton"));
+  }
+
+  revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
 }
