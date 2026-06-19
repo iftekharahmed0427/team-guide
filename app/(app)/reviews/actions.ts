@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { review } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
 
 const PAGE = "/reviews";
 const SOURCES = new Set(["trustpilot", "google"]);
@@ -32,10 +33,21 @@ export async function addReview(input: {
   if (!session) return { error: "Only admins can add reviews." };
 
   if (!SOURCES.has(input.source)) return { error: "Pick a review source." };
-  const imageUrl = input.imageUrl.trim();
-  if (!imageUrl.startsWith("data:image/")) return { error: "Attach a screenshot of the review." };
-  if (imageUrl.length > MAX_IMAGE_CHARS) {
+  const dataUrl = input.imageUrl.trim();
+  if (!dataUrl.startsWith("data:image/")) return { error: "Attach a screenshot of the review." };
+  if (dataUrl.length > MAX_IMAGE_CHARS) {
     return { error: "That image is too large. Try a tighter screenshot." };
+  }
+
+  // Upload to the private bucket and store the object key; fall back to inlining
+  // the data URL if storage isn't configured.
+  let imageUrl = dataUrl;
+  if (storageEnabled()) {
+    try {
+      imageUrl = await uploadDataUrl(dataUrl, "reviews");
+    } catch {
+      return { error: "Couldn't upload the screenshot. Try again." };
+    }
   }
 
   await db.insert(review).values({
@@ -55,7 +67,13 @@ export async function deleteReview(id: string): Promise<Result> {
   const session = await requireAdmin();
   if (!session) return { error: "Only admins can delete reviews." };
   if (!id) return { error: "Missing review." };
+
+  const row = (await db.select({ imageUrl: review.imageUrl }).from(review).where(eq(review.id, id)).limit(1))[0];
   await db.delete(review).where(eq(review.id, id));
+  // Remove the stored object too (keys, not inline data URLs).
+  if (row?.imageUrl && !row.imageUrl.startsWith("data:")) {
+    await deleteObject(row.imageUrl);
+  }
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };

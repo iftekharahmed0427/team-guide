@@ -4,8 +4,16 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { review, reportPeriod } from "@/db/app-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { signedGetUrl } from "@/lib/storage";
 import ReviewForm from "./review-form";
 import ReviewDeleteButton from "./review-delete-button";
+
+// A stored key needs a short-lived presigned URL; a legacy inline data URL is
+// already renderable as-is.
+async function displayUrl(imageUrl: string): Promise<string> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  return (await signedGetUrl(imageUrl)) ?? "";
+}
 
 const SOURCE_LABEL: Record<string, string> = {
   trustpilot: "Trustpilot",
@@ -41,6 +49,11 @@ export default async function ReviewsPage() {
   const periodLabel = lastArchive?.endedAt
     ? `Current period: since ${formatDate(lastArchive.endedAt)}`
     : "Current period: ongoing (no reset yet)";
+
+  // Resolve a renderable URL for each screenshot (presigned for stored keys).
+  const items = await Promise.all(
+    rows.map(async (r) => ({ ...r, src: await displayUrl(r.imageUrl) })),
+  );
 
   const trustpilot = rows.filter((r) => r.source === "trustpilot").length;
   const google = rows.filter((r) => r.source === "google").length;
@@ -92,11 +105,11 @@ export default async function ReviewsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rows.map((r) => (
+              {items.map((r) => (
                 <div key={r.id} className="flex flex-col border border-border bg-surface">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={r.imageUrl}
+                    src={r.src}
                     alt={`${SOURCE_LABEL[r.source] ?? "Review"} screenshot`}
                     className="aspect-video w-full border-b border-border object-cover"
                   />
