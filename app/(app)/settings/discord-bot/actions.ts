@@ -256,9 +256,19 @@ export async function addReportChannel(input: {
   }
   const name = input.name.trim().slice(0, 80);
 
+  // Floor a newly added channel at the current period's start (the last "Reset
+  // all") so it only counts screenshots posted after that reset, not old ones.
+  const lastReset = (
+    await db
+      .select({ endedAt: reportPeriod.endedAt })
+      .from(reportPeriod)
+      .orderBy(desc(reportPeriod.endedAt))
+      .limit(1)
+  )[0];
+
   await db
     .insert(reportChannel)
-    .values({ id: randomUUID(), channelId, userId, name })
+    .values({ id: randomUUID(), channelId, userId, name, countResetAt: lastReset?.endedAt ?? null })
     .onConflictDoUpdate({ target: reportChannel.channelId, set: { userId, name } });
   revalidatePath(PAGE);
   await notifyChange();
@@ -291,7 +301,8 @@ export async function resetAllReportChannels(): Promise<Result> {
     .where(isNull(review.periodId));
 
   // Archive when there are tickets OR reviews to record for the period.
-  if (total > 0 || currentReviews.length > 0) {
+  const archived = total > 0 || currentReviews.length > 0;
+  if (archived) {
     const last = (
       await db
         .select({ endedAt: reportPeriod.endedAt })
@@ -323,6 +334,19 @@ export async function resetAllReportChannels(): Promise<Result> {
 
   await db.update(reportChannel).set({ countResetAt: now, currentCount: 0, countedAt: now });
   await db.update(ticketCount).set({ total: 0 }).where(eq(ticketCount.id, "singleton"));
+
+  // Signal the bot to post the just-closed period's report to Discord (per-channel
+  // embeds + the announcement) — only when something was actually archived, so it
+  // never re-posts an older period for a no-op reset. `runRequestedAt` is the
+  // trigger; `resetAfterRun` tells the bot to read the archived period (live
+  // counts are now zeroed).
+  if (archived) {
+    await ensureSettingsRow();
+    await db
+      .update(botSetting)
+      .set({ runRequestedAt: now, resetAfterRun: true })
+      .where(eq(botSetting.id, "singleton"));
+  }
 
   revalidatePath(PAGE);
   revalidatePath("/reports");

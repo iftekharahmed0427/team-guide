@@ -258,6 +258,11 @@ export const botSetting = pgTable("bot_setting", {
   presenceActivityType: text("presence_activity_type").notNull().default("none"), // none|Playing|Watching|Listening|Competing|Custom
   presenceActivityText: text("presence_activity_text").notNull().default(""),
   runRequestedAt: timestamp("run_requested_at"),
+  // "Reset all" sets this true after it archives + zeroes the counts. The bot
+  // sees it on its next poll, posts the just-closed period's report to each
+  // member channel + the announcement channel (reading the archived period, since
+  // the live counts are already zeroed), then clears it back to false.
+  resetAfterRun: boolean("reset_after_run").notNull().default(false),
   // When true (default), the live counts reset automatically at each period
   // boundary. Turn off to keep counts accumulating until an admin resets a
   // channel manually (the per-channel / "Reset all" buttons).

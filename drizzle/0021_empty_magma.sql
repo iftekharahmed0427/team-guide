@@ -1,0 +1,1 @@
+ALTER TABLE "bot_setting" ADD COLUMN "reset_after_run" boolean DEFAULT false NOT NULL;

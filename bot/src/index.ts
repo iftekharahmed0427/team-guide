@@ -19,10 +19,13 @@ import {
   recordError,
   recordReport,
   getLastReportAt,
+  getLatestArchivedPeriod,
+  getPeriodEntries,
+  clearResetAfterRun,
   closeDb,
   type Settings,
 } from "./db.ts";
-import { runReport } from "./report.ts";
+import { runReport, postArchivedReport } from "./report.ts";
 import { countWindow } from "./count.ts";
 import { isPeriodEnd, currentPeriodStart } from "./period.ts";
 
@@ -133,7 +136,22 @@ async function doReport(s: Settings): Promise<void> {
   reporting = true;
   try {
     const channels = await getReportChannels();
-    await runReport(client, s, channels, new Date(), { dryRun: false });
+    if (s.resetAfterRun) {
+      // "Reset all" already archived + zeroed the counts on the website; post the
+      // just-closed period's report from the archive. Always clear the flag (even
+      // if posting hiccups) so it can't loop or fall back to a zeroed live report.
+      try {
+        const period = await getLatestArchivedPeriod();
+        if (period) {
+          const entries = await getPeriodEntries(period.id);
+          await postArchivedReport(client, s, channels, period, entries);
+        }
+      } finally {
+        await clearResetAfterRun().catch(() => {});
+      }
+    } else {
+      await runReport(client, s, channels, new Date(), { dryRun: false });
+    }
     await recordReport();
   } catch (e) {
     console.error("[bot] report failed:", e);

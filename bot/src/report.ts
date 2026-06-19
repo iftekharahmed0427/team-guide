@@ -1,8 +1,10 @@
 import { EmbedBuilder, type Client, type TextBasedChannel } from "discord.js";
-import type { ReportEntry, Settings } from "./db.ts";
+import type { ArchivedPeriod, PeriodEntry, ReportEntry, Settings } from "./db.ts";
 import { getMemberCommissions, type MemberCommission } from "./db.ts";
 import { countWindow } from "./count.ts";
 import { formatRange, periodWindow } from "./period.ts";
+
+const DAY_MS = 86_400_000;
 
 type RunOptions = { dryRun?: boolean };
 
@@ -62,6 +64,51 @@ export async function runReport(
   }
 
   await postLeaderboard(client, settings, ranking, opts);
+}
+
+// Post the report for an ALREADY-archived period (used by "Reset all", which
+// zeroes the live counts on the website first). Counts come from the archived
+// entries (matched to channels by member id), not a live recount. Posts the same
+// per-channel embeds + announcement leaderboard as a normal report.
+export async function postArchivedReport(
+  client: Client,
+  settings: Settings,
+  channels: ReportEntry[],
+  period: ArchivedPeriod,
+  entries: PeriodEntry[],
+): Promise<void> {
+  const start = period.startedAtMs ?? period.endedAtMs - settings.periodDays * DAY_MS;
+  const range = formatRange(start, period.endedAtMs);
+  const countFor = (ch: ReportEntry) =>
+    entries.find((e) => e.userId === ch.userId)?.count ?? 0;
+
+  console.log(`[report] posting archived period ${range}, ${channels.length} channel(s)`);
+  const ranking: { name: string; count: number }[] = [];
+
+  for (const entry of channels) {
+    const label = entry.name || entry.userId || entry.channelId;
+    const count = countFor(entry);
+    ranking.push({ name: label, count });
+    try {
+      const channel = (await client.channels.fetch(entry.channelId)) as TextBasedChannel | null;
+      if (!channel || !channel.isSendable()) {
+        console.error(`[report] ${label}: cannot send (missing Send Messages?)`);
+        continue;
+      }
+      const mention = entry.userId ? `<@${entry.userId}>` : "";
+      const commissions = entry.userId
+        ? await getMemberCommissions(entry.userId, start, period.endedAtMs)
+        : [];
+      await channel.send({
+        content: mention || undefined,
+        embeds: [buildEmbed(count, range, commissions)],
+      });
+    } catch (err) {
+      console.error(`[report] ${label}: send failed:`, err);
+    }
+  }
+
+  await postLeaderboard(client, settings, ranking, {});
 }
 
 // ── Per-channel summary ───────────────────────────────────────────────────────

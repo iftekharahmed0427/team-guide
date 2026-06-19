@@ -15,6 +15,7 @@ export type Settings = {
   token: string | null;
   enabled: boolean;
   autoReset: boolean; // reset the live counts automatically at each period boundary
+  resetAfterRun: boolean; // a "Reset all" requested this report; post from the archived period
   periodAnchor: string; // YYYY-MM-DD, a Friday a period ends on
   periodDays: number;
   postHour: number; // UTC
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS: Settings = {
   token: null,
   enabled: true,
   autoReset: true,
+  resetAfterRun: false,
   periodAnchor: "2026-06-26",
   periodDays: 14,
   postHour: 17,
@@ -79,7 +81,7 @@ function getPool(): pg.Pool {
 
 export async function getSettings(): Promise<Settings> {
   const { rows } = await getPool().query(
-    `select token, enabled, auto_reset, period_anchor, period_days, post_hour, post_minute,
+    `select token, enabled, auto_reset, reset_after_run, period_anchor, period_days, post_hour, post_minute,
             presence_status, presence_activity_type, presence_activity_text, run_requested_at,
             announcement_channel_id, announcement_enabled, announcement_title,
             announcement_color, announcement_intro, announcement_footer,
@@ -100,6 +102,7 @@ export async function getSettings(): Promise<Settings> {
     token: r.token == null || String(r.token).trim() === "" ? null : String(r.token),
     enabled: r.enabled !== false,
     autoReset: r.auto_reset !== false,
+    resetAfterRun: r.reset_after_run === true,
     periodAnchor: String(r.period_anchor),
     periodDays: Number(r.period_days),
     postHour: Number(r.post_hour),
@@ -129,6 +132,42 @@ export async function getReportChannels(): Promise<ReportEntry[]> {
     name: r.name == null ? "" : String(r.name),
     resetAt: r.count_reset_at ? new Date(r.count_reset_at).getTime() : null,
   }));
+}
+
+// ── Archived period (read by the bot to post a "Reset all" report) ────────────
+
+export type ArchivedPeriod = { id: string; startedAtMs: number | null; endedAtMs: number };
+export type PeriodEntry = { name: string; userId: string | null; count: number };
+
+export async function getLatestArchivedPeriod(): Promise<ArchivedPeriod | null> {
+  const { rows } = await getPool().query(
+    "select id, started_at, ended_at from report_period order by ended_at desc limit 1",
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: String(r.id),
+    startedAtMs: r.started_at ? new Date(r.started_at).getTime() : null,
+    endedAtMs: new Date(r.ended_at).getTime(),
+  };
+}
+
+export async function getPeriodEntries(periodId: string): Promise<PeriodEntry[]> {
+  const { rows } = await getPool().query(
+    "select name, user_id, count from report_period_entry where period_id = $1",
+    [periodId],
+  );
+  return rows.map((r) => ({
+    name: r.name == null ? "" : String(r.name),
+    userId: r.user_id == null ? null : String(r.user_id),
+    count: Number(r.count ?? 0),
+  }));
+}
+
+export async function clearResetAfterRun(): Promise<void> {
+  await getPool().query(
+    "update bot_setting set reset_after_run = false where id = 'singleton'",
+  );
 }
 
 export type MemberCommission = { customerEmail: string; amount: number };
