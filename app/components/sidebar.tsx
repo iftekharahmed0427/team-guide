@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import Avatar from "@/app/components/avatar";
+import SearchPalette from "@/app/components/search-palette";
 import { setViewAsMember } from "@/app/components/view-as-actions";
 
 type SidebarUser = {
@@ -136,6 +137,10 @@ export default function Sidebar({
           <p className="text-sm font-semibold tracking-tight">Team Guide</p>
           <p className="text-[11px] text-muted">Workspace</p>
         </div>
+      </div>
+
+      <div className="px-3 pt-3">
+        <SearchPalette />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto py-4">
