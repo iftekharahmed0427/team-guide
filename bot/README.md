@@ -66,7 +66,10 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
   counts accumulating across periods and reset only when you choose.
 - **Report channels.** Each row has a **Reset** button that zeroes that channel
   and makes counting start from that moment; **Reset all** does it for every
-  channel at once (handy when switching auto-reset off).
+  channel at once (handy when switching auto-reset off). **Reset all also archives
+  the current standings into history** (date range + each member's count) before
+  zeroing, so it doubles as the manual period-close. Admins review past periods
+  at `/reports/history` and can delete any of them.
 
 ## 1. Create the Discord bot
 

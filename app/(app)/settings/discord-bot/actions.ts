@@ -2,10 +2,16 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportChannel, botSetting, ticketCount } from "@/db/app-schema";
+import {
+  reportChannel,
+  botSetting,
+  ticketCount,
+  reportPeriod,
+  reportPeriodEntry,
+} from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 
 const PAGE = "/settings/discord-bot";
@@ -258,20 +264,59 @@ export async function addReportChannel(input: {
   return { ok: true };
 }
 
-// Reset every channel at once (e.g. when moving over to manual resets): stamp
-// `countResetAt = now` and zero all tallies, then zero the team total.
+// Reset every channel at once — the manual period-closing action. Archives the
+// current standings into history (a report_period + one entry per member with a
+// count), then stamps `countResetAt = now`, zeroes all tallies, and zeroes the
+// team total so the next period starts fresh.
 export async function resetAllReportChannels(): Promise<Result> {
   const denied = await adminGuard();
   if (denied) return denied;
 
   const now = new Date();
+
+  const channels = await db
+    .select({
+      name: reportChannel.name,
+      userId: reportChannel.userId,
+      count: reportChannel.currentCount,
+    })
+    .from(reportChannel);
+  const total = channels.reduce((sum, c) => sum + (c.count ?? 0), 0);
+
+  // Only archive when there is something to record.
+  if (total > 0) {
+    const last = (
+      await db
+        .select({ endedAt: reportPeriod.endedAt })
+        .from(reportPeriod)
+        .orderBy(desc(reportPeriod.endedAt))
+        .limit(1)
+    )[0];
+    const periodId = randomUUID();
+    await db.insert(reportPeriod).values({
+      id: periodId,
+      startedAt: last?.endedAt ?? null, // the previous period's end, or null for the first
+      endedAt: now,
+      total,
+    });
+    const entries = channels
+      .filter((c) => (c.count ?? 0) > 0)
+      .map((c) => ({
+        id: randomUUID(),
+        periodId,
+        name: c.name ?? "",
+        userId: c.userId ?? null,
+        count: c.count ?? 0,
+      }));
+    if (entries.length > 0) await db.insert(reportPeriodEntry).values(entries);
+  }
+
   await db.update(reportChannel).set({ countResetAt: now, currentCount: 0, countedAt: now });
-  await db
-    .update(ticketCount)
-    .set({ total: 0 })
-    .where(eq(ticketCount.id, "singleton"));
+  await db.update(ticketCount).set({ total: 0 }).where(eq(ticketCount.id, "singleton"));
 
   revalidatePath(PAGE);
+  revalidatePath("/reports");
+  revalidatePath("/reports/history");
   await notifyChange();
   return { ok: true };
 }

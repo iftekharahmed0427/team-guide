@@ -199,6 +199,32 @@ export const ticketCount = pgTable("ticket_count", {
     .notNull(),
 });
 
+// An archived reporting period. A snapshot of every channel's standing is taken
+// when an admin runs "Reset all" (the manual period-closing action): one
+// `report_period` row plus a `report_period_entry` per member. `startedAt` is
+// when the period began (the previous reset's end, null for the first ever);
+// `endedAt` is the reset moment. Admins view these in /reports/history and can
+// delete a period (cascades to its entries).
+export const reportPeriod = pgTable("report_period", {
+  id: text("id").primaryKey(),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at").defaultNow().notNull(),
+  total: integer("total").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One member's final count within an archived period (name/userId denormalized,
+// so the row is a stable snapshot even if the channel is later edited or removed).
+export const reportPeriodEntry = pgTable("report_period_entry", {
+  id: text("id").primaryKey(),
+  periodId: text("period_id")
+    .notNull()
+    .references(() => reportPeriod.id, { onDelete: "cascade" }),
+  name: text("name").notNull().default(""),
+  userId: text("user_id"),
+  count: integer("count").notNull().default(0),
+});
+
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →
 // Discord bot page and read by the bot. All times are UTC. `periodAnchor` is a
 // Friday a 14-day period ends on. `token` is the Discord bot token (set-only via

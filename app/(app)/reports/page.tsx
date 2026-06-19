@@ -1,23 +1,13 @@
 import { and, asc, desc, eq } from "drizzle-orm";
+import Link from "next/link";
+import { History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportChannel, botSetting } from "@/db/app-schema";
+import { reportChannel, botSetting, reportPeriod } from "@/db/app-schema";
 import { user as userTable, account } from "@/db/auth-schema";
 import ReportGrid, { type ReportEntry } from "./report-grid";
 
 const DAY_MS = 86_400_000;
-
-// The in-progress reporting period (mirrors the bot's period.ts): the most
-// recent boundary at or before now, and the next boundary after it. Boundaries
-// sit `periodDays` apart from the anchor Friday.
-function currentPeriod(anchor: string, periodDays: number, now: number) {
-  const anchorMs = Date.parse(`${anchor}T00:00:00Z`);
-  const periodMs = Math.max(1, periodDays) * DAY_MS;
-  if (Number.isNaN(anchorMs)) return { startMs: now, endMs: now + periodMs };
-  const periodsSince = Math.floor((now - anchorMs) / periodMs);
-  const startMs = anchorMs + periodsSince * periodMs;
-  return { startMs, endMs: startMs + periodMs };
-}
 
 // Dates render in UTC (the period boundaries are defined in UTC), so the output
 // is the same for every viewer and matches the bot's reports.
@@ -45,17 +35,28 @@ const fmtDateTime = (ms: number) =>
 export default async function ReportsPage() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
+  const isAdmin = session?.user.role === "admin";
   const now = Date.now();
 
   const setting = (
     await db
-      .select({ periodAnchor: botSetting.periodAnchor, periodDays: botSetting.periodDays })
+      .select({ periodDays: botSetting.periodDays })
       .from(botSetting)
       .where(eq(botSetting.id, "singleton"))
       .limit(1)
   )[0];
   const periodDays = setting?.periodDays ?? 14;
-  const { startMs, endMs } = currentPeriod(setting?.periodAnchor ?? "2026-06-26", periodDays, now);
+
+  // The current period in manual mode runs from the last "Reset all" (the end of
+  // the most recent archived period) to now — there is no fixed end.
+  const lastArchive = (
+    await db
+      .select({ endedAt: reportPeriod.endedAt })
+      .from(reportPeriod)
+      .orderBy(desc(reportPeriod.endedAt))
+      .limit(1)
+  )[0];
+  const periodStartMs = lastArchive?.endedAt ? new Date(lastArchive.endedAt).getTime() : null;
 
   // Resolve each channel's member (Discord snowflake -> account -> user) for the
   // avatar and canonical name; left join so counts-everyone channels still show.
@@ -97,7 +98,12 @@ export default async function ReportsPage() {
   });
 
   const total = entries.reduce((sum, e) => sum + e.count, 0);
-  const periodLabel = `${fmtDate(startMs)} – ${fmtDate(endMs)}`;
+  const periodDaysTracked = periodStartMs
+    ? Math.max(1, Math.round((now - periodStartMs) / DAY_MS))
+    : 0;
+  const periodLabel = periodStartMs
+    ? `Current period: since ${fmtDate(periodStartMs)} (${periodDaysTracked} ${periodDaysTracked === 1 ? "day" : "days"})`
+    : "Current period: ongoing (no reset yet)";
 
   return (
     <>
@@ -106,9 +112,20 @@ export default async function ReportsPage() {
           <h1 className="text-base font-semibold tracking-tight">Reports</h1>
           <p className="text-xs text-muted">Live ticket counts for the current period</p>
         </div>
-        <div className="hidden text-right leading-tight sm:block">
-          <p className="text-xs text-muted">Team total</p>
-          <p className="text-lg font-semibold tabular-nums">{total.toLocaleString()}</p>
+        <div className="flex items-center gap-4">
+          {isAdmin ? (
+            <Link
+              href="/reports/history"
+              className="btn-wipe inline-flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground"
+            >
+              <History size={15} strokeWidth={1.75} />
+              History
+            </Link>
+          ) : null}
+          <div className="hidden text-right leading-tight sm:block">
+            <p className="text-xs text-muted">Team total</p>
+            <p className="text-lg font-semibold tabular-nums">{total.toLocaleString()}</p>
+          </div>
         </div>
       </header>
 
@@ -117,9 +134,7 @@ export default async function ReportsPage() {
           <h1 className="mb-2 text-center text-4xl font-semibold tracking-tight">
             Live ticket count
           </h1>
-          <p className="mb-6 text-center text-xs text-muted">
-            Current period: {periodLabel} ({periodDays} {periodDays === 1 ? "day" : "days"})
-          </p>
+          <p className="mb-6 text-center text-xs text-muted">{periodLabel}</p>
           <ReportGrid entries={entries} />
         </div>
       </main>

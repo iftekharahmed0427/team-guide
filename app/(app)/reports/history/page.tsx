@@ -1,0 +1,132 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { desc, inArray } from "drizzle-orm";
+import { ArrowLeft, History } from "lucide-react";
+import { getSession } from "@/lib/auth";
+import { db } from "@/db";
+import { reportPeriod, reportPeriodEntry } from "@/db/app-schema";
+import DeletePeriodButton from "./delete-period-button";
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+const fmtDate = (d: Date) =>
+  d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+const fmtDateTime = (d: Date) =>
+  d.toLocaleString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }) + " UTC";
+
+// Admin-only archive of past reporting periods. Each period is a snapshot taken
+// when an admin ran "Reset all"; rows can be deleted individually.
+export default async function ReportHistoryPage() {
+  const session = await getSession();
+  if (session?.user.role !== "admin") redirect("/");
+
+  const periods = await db.select().from(reportPeriod).orderBy(desc(reportPeriod.endedAt));
+  const ids = periods.map((p) => p.id);
+  const allEntries = ids.length
+    ? await db
+        .select()
+        .from(reportPeriodEntry)
+        .where(inArray(reportPeriodEntry.periodId, ids))
+        .orderBy(desc(reportPeriodEntry.count))
+    : [];
+
+  const entriesByPeriod = new Map<string, typeof allEntries>();
+  for (const e of allEntries) {
+    const list = entriesByPeriod.get(e.periodId) ?? [];
+    list.push(e);
+    entriesByPeriod.set(e.periodId, list);
+  }
+
+  const card = "border border-border bg-surface";
+
+  return (
+    <>
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
+        <div>
+          <h1 className="text-base font-semibold tracking-tight">Report history</h1>
+          <p className="text-xs text-muted">Archived periods from each Reset all</p>
+        </div>
+        <Link
+          href="/reports"
+          className="btn-wipe inline-flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground"
+        >
+          <ArrowLeft size={15} strokeWidth={1.75} />
+          Back to reports
+        </Link>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-6">
+          {periods.length === 0 ? (
+            <div className={`${card} flex flex-col items-center gap-2 px-5 py-16 text-center`}>
+              <History size={22} strokeWidth={1.5} className="text-muted" />
+              <p className="text-sm text-muted">
+                No archived periods yet. A period is saved here each time an admin runs
+                Reset all on the Discord bot settings.
+              </p>
+            </div>
+          ) : (
+            periods.map((p) => {
+              const rows = entriesByPeriod.get(p.id) ?? [];
+              const started = p.startedAt ? fmtDate(p.startedAt) : "start";
+              const ended = fmtDate(p.endedAt);
+              return (
+                <section key={p.id} className={card}>
+                  <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+                    <div className="leading-tight">
+                      <h2 className="text-sm font-semibold tracking-tight">
+                        {started} – {ended}
+                      </h2>
+                      <p className="text-xs text-muted">
+                        Reset {fmtDateTime(p.endedAt)} · Total tickets done: {p.total}
+                      </p>
+                    </div>
+                    <DeletePeriodButton id={p.id} />
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-muted">
+                      No tickets were recorded this period.
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-xs uppercase tracking-wide text-muted">
+                          <th className="w-16 py-2 pl-5 pr-3 text-left font-medium">Rank</th>
+                          <th className="py-2 px-3 text-left font-medium">Member</th>
+                          <th className="w-24 py-2 pr-5 pl-3 text-right font-medium">Tickets</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((e, i) => (
+                          <tr key={e.id} className="border-b border-border last:border-0">
+                            <td className="py-2.5 pl-5 pr-3 text-left">
+                              {i < MEDALS.length ? (
+                                <span className="text-base">{MEDALS[i]}</span>
+                              ) : (
+                                <span className="text-muted">#{i + 1}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 font-medium">{e.name || "Member"}</td>
+                            <td className="py-2.5 pr-5 pl-3 text-right tabular-nums">{e.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              );
+            })
+          )}
+        </div>
+      </main>
+    </>
+  );
+}
