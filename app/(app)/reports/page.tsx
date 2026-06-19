@@ -3,7 +3,7 @@ import Link from "next/link";
 import { History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { reportChannel, botSetting, reportPeriod } from "@/db/app-schema";
+import { reportChannel, botSetting, reportPeriod, ticketCount } from "@/db/app-schema";
 import { user as userTable, account } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import ReportGrid, { type ReportEntry } from "./report-grid";
@@ -29,16 +29,25 @@ export default async function ReportsPage() {
   )[0];
   const periodDays = setting?.periodDays ?? 14;
 
-  // The current period in manual mode runs from the last "Reset all" (the end of
-  // the most recent archived period) to now — there is no fixed end.
-  const lastArchive = (
-    await db
+  // When did the current period start? Prefer the most recent "Reset all" (the
+  // end of the last archived period); otherwise fall back to the period start the
+  // bot tracks (set by its automatic rollover), so the label still reflects a
+  // reset even when no "Reset all" archive has been made. Only "no reset yet"
+  // when neither exists.
+  const [lastArchive, tc] = await Promise.all([
+    db
       .select({ endedAt: reportPeriod.endedAt })
       .from(reportPeriod)
       .orderBy(desc(reportPeriod.endedAt))
-      .limit(1)
-  )[0];
-  const periodStartMs = lastArchive?.endedAt ? new Date(lastArchive.endedAt).getTime() : null;
+      .limit(1),
+    db
+      .select({ periodStart: ticketCount.periodStart })
+      .from(ticketCount)
+      .where(eq(ticketCount.id, "singleton"))
+      .limit(1),
+  ]);
+  const periodStartSource = lastArchive[0]?.endedAt ?? tc[0]?.periodStart ?? null;
+  const periodStartMs = periodStartSource ? new Date(periodStartSource).getTime() : null;
 
   // Resolve each channel's member (Discord snowflake -> account -> user) for the
   // avatar and canonical name; left join so counts-everyone channels still show.
