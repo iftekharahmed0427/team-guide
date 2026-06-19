@@ -5,28 +5,10 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportChannel, botSetting, reportPeriod } from "@/db/app-schema";
 import { user as userTable, account } from "@/db/auth-schema";
+import { formatDate, formatDateTime } from "@/lib/datetime";
 import ReportGrid, { type ReportEntry } from "./report-grid";
 
 const DAY_MS = 86_400_000;
-
-// Dates render in UTC (the period boundaries are defined in UTC), so the output
-// is the same for every viewer and matches the bot's reports.
-const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-const fmtDateTime = (ms: number) =>
-  new Date(ms).toLocaleString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }) + " UTC";
 
 // Member-facing leaderboard of screenshot/ticket counts per report channel. The
 // counts are kept live by the bot (bot/src/index.ts countTick) and the whole
@@ -93,7 +75,7 @@ export default async function ReportsPage() {
       count,
       isYou: !!r.userId && r.userId === currentUserId,
       avgPerDay: Math.round((count / daysTracked) * 10) / 10,
-      lastReset: resetMs ? fmtDateTime(resetMs) : null,
+      lastReset: resetMs ? formatDateTime(resetMs) : null,
     };
   });
 
@@ -102,7 +84,7 @@ export default async function ReportsPage() {
     ? Math.max(1, Math.round((now - periodStartMs) / DAY_MS))
     : 0;
   const periodLabel = periodStartMs
-    ? `Current period: since ${fmtDate(periodStartMs)} (${periodDaysTracked} ${periodDaysTracked === 1 ? "day" : "days"})`
+    ? `Current period: since ${formatDate(periodStartMs)} (${periodDaysTracked} ${periodDaysTracked === 1 ? "day" : "days"})`
     : "Current period: ongoing (no reset yet)";
 
   return (

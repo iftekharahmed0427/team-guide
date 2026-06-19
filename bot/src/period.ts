@@ -39,10 +39,10 @@ export function currentPeriodStart(now: Date, cfg: Settings): number {
 export function formatRange(startMs: number, endMs: number): string {
   const fmt = (ms: number) =>
     new Date(ms).toLocaleDateString("en-US", {
-      timeZone: "UTC",
+      timeZone: "America/New_York",
       month: "short",
       day: "numeric",
       year: "numeric",
     });
-  return `${fmt(startMs)} – ${fmt(endMs)} (UTC)`;
+  return `${fmt(startMs)} – ${fmt(endMs)} (ET)`;
 }

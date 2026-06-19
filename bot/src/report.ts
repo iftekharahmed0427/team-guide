@@ -1,5 +1,6 @@
 import { EmbedBuilder, type Client, type TextBasedChannel } from "discord.js";
 import type { ReportEntry, Settings } from "./db.ts";
+import { getMemberCommissions, type MemberCommission } from "./db.ts";
 import { countWindow } from "./count.ts";
 import { formatRange, periodWindow } from "./period.ts";
 
@@ -46,9 +47,13 @@ export async function runReport(
         continue;
       }
       const mention = entry.userId ? `<@${entry.userId}>` : "";
+      // The member's approved commissions in this period (email - payout).
+      const commissions = entry.userId
+        ? await getMemberCommissions(entry.userId, start, end.getTime())
+        : [];
       await channel.send({
         content: mention || undefined,
-        embeds: [buildEmbed(result.count, range)],
+        embeds: [buildEmbed(result.count, range, commissions)],
       });
     } catch (err) {
       console.error(`[report] ${label}: send failed:`, err);
@@ -60,9 +65,17 @@ export async function runReport(
 
 // ── Per-channel summary ───────────────────────────────────────────────────────
 
-function buildEmbed(count: number, range: string): EmbedBuilder {
+function formatUSD(n: number): string {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function buildEmbed(
+  count: number,
+  range: string,
+  commissions: MemberCommission[],
+): EmbedBuilder {
   const noun = count === 1 ? "ticket" : "tickets";
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle("🎫 Ticket Report")
     .setColor(0x5865f2)
     .setDescription(
@@ -76,6 +89,20 @@ function buildEmbed(count: number, range: string): EmbedBuilder {
     )
     .setFooter({ text: "Team Guide" })
     .setTimestamp(new Date());
+
+  // List the member's commissions for the period: "email - $amount" per line.
+  if (commissions.length > 0) {
+    const total = commissions.reduce((sum, c) => sum + c.amount, 0);
+    const lines = commissions.map((c) => `${c.customerEmail} - ${formatUSD(c.amount)}`);
+    let value = lines.join("\n");
+    // Discord caps a field value at 1024 chars; trim whole lines if it overflows.
+    if (value.length > 1000) value = value.slice(0, 1000).replace(/\n[^\n]*$/, "") + "\n…";
+    embed.addFields({
+      name: `Commissions this period (${commissions.length}) · ${formatUSD(total)}`,
+      value,
+    });
+  }
+  return embed;
 }
 
 // ── Leaderboard announcement ──────────────────────────────────────────────────

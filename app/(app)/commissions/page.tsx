@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { commission } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
+import { formatDateTime } from "@/lib/datetime";
 import CommissionForm from "./commission-form";
 import CommissionDirectory, { type MemberData } from "./commission-directory";
 
@@ -11,13 +12,7 @@ const SHORT_MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-function formatWhen(d: Date | string) {
-  const x = new Date(d);
-  const date = `${SHORT_MONTHS[x.getMonth()]} ${x.getDate()}, ${x.getFullYear()}`;
-  const time = x.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${date}, ${time}`;
-}
-
+// Renewal is a plain calendar date (no time); format it literally, no tz shift.
 function formatRenewal(d: string | null) {
   if (!d) return null;
   const x = new Date(`${d}T00:00:00Z`);
@@ -111,7 +106,7 @@ export default async function CommissionsPage() {
         productPrice: r.productPrice,
         commissionRate: r.commissionRate,
         reviewNote: r.reviewNote,
-        createdAtLabel: formatWhen(r.createdAt),
+        createdAtLabel: formatDateTime(r.createdAt),
       });
     }
     // Members with work awaiting review first, then alphabetical.
@@ -177,7 +172,7 @@ export default async function CommissionsPage() {
                           {c.ticketName}
                         </p>
                         <p className="truncate text-xs text-muted">{c.customerEmail}</p>
-                        <p className="mt-2 text-xs text-muted">{formatWhen(c.createdAt)}</p>
+                        <p className="mt-2 text-xs text-muted">{formatDateTime(c.createdAt)}</p>
                       </div>
                       <StatusBadge status={c.status} />
                     </div>

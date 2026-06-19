@@ -5,21 +5,10 @@ import { ArrowLeft, History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportPeriod, reportPeriodEntry } from "@/db/app-schema";
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/datetime";
 import DeletePeriodButton from "./delete-period-button";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
-
-const fmtDate = (d: Date) =>
-  d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
-const fmtDateTime = (d: Date) =>
-  d.toLocaleString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }) + " UTC";
 
 // Admin-only archive of past reporting periods. Each period is a snapshot taken
 // when an admin ran "Reset all"; rows can be deleted individually.

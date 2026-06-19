@@ -131,6 +131,33 @@ export async function getReportChannels(): Promise<ReportEntry[]> {
   }));
 }
 
+export type MemberCommission = { customerEmail: string; amount: number };
+
+// Approved commissions a member (by Discord snowflake) submitted in (startMs, endMs].
+// Links report_channel.userId (Discord id) → account → commission.submittedById.
+// `amount` is the payout (price * rate / 100), computed here like the website.
+export async function getMemberCommissions(
+  discordUserId: string,
+  startMs: number,
+  endMs: number,
+): Promise<MemberCommission[]> {
+  const { rows } = await getPool().query(
+    `select c.customer_email, c.product_price, c.commission_rate
+     from commission c
+     join account a on a.user_id = c.submitted_by_id and a.provider_id = 'discord'
+     where a.account_id = $1
+       and c.status = 'approved'
+       and c.created_at >  to_timestamp($2 / 1000.0) at time zone 'UTC'
+       and c.created_at <= to_timestamp($3 / 1000.0) at time zone 'UTC'
+     order by c.created_at asc`,
+    [discordUserId, startMs, endMs],
+  );
+  return rows.map((r) => ({
+    customerEmail: String(r.customer_email),
+    amount: (Number(r.product_price ?? 0) * Number(r.commission_rate ?? 0)) / 100,
+  }));
+}
+
 // ── Status the bot writes back for the website to display ────────────────────
 
 export async function heartbeat(state: string, botTag: string | null): Promise<void> {
