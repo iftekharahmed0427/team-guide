@@ -46,10 +46,10 @@ export default function SearchPalette() {
     }
   }, [items, loading]);
 
-  function openPalette() {
+  const openPalette = useCallback(() => {
     setOpen(true);
     void load();
-  }
+  }, [load]);
   function closePalette() {
     setOpen(false);
     setQuery("");
@@ -76,6 +76,13 @@ export default function SearchPalette() {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  // Let other parts of the app (e.g. the dashboard search bar) open the palette.
+  useEffect(() => {
+    const onOpen = () => openPalette();
+    window.addEventListener("open-search", onOpen);
+    return () => window.removeEventListener("open-search", onOpen);
+  }, [openPalette]);
 
   const fuse = useMemo(
     () =>

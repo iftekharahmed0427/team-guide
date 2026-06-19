@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { count, desc, eq, isNull } from "drizzle-orm";
 import {
-  Search,
   Bell,
   Plus,
   CheckCheck,
@@ -17,6 +16,7 @@ import { newsPost, unavailability, shift, note, ticketCount } from "@/db/app-sch
 import { user } from "@/db/auth-schema";
 import AvailabilityCalendar from "@/app/components/availability-calendar";
 import ShiftCheckin from "@/app/components/shift-checkin";
+import DashboardSearch from "@/app/components/dashboard-search";
 
 type Stat = {
   label: string;
@@ -137,14 +137,7 @@ export default async function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 border border-border bg-surface-2 px-3 md:flex">
-            <Search size={16} strokeWidth={1.75} className="text-muted" />
-            <input
-              type="text"
-              placeholder="Search guides, people, projects"
-              className="h-9 w-64 bg-transparent text-sm text-foreground outline-none placeholder:text-muted"
-            />
-          </div>
+          <DashboardSearch />
           <button
             type="button"
             aria-label="Notifications"
