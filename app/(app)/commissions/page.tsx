@@ -1,13 +1,10 @@
-import { desc, eq, sql } from "drizzle-orm";
-import { Trash2 } from "lucide-react";
+import { desc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { commission } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
-import Avatar from "@/app/components/avatar";
 import CommissionForm from "./commission-form";
-import CommissionReview from "./commission-review";
-import { deleteCommission } from "./actions";
+import CommissionDirectory, { type MemberData } from "./commission-directory";
 
 const SHORT_MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -16,7 +13,9 @@ const SHORT_MONTHS = [
 
 function formatWhen(d: Date | string) {
   const x = new Date(d);
-  return `${SHORT_MONTHS[x.getMonth()]} ${x.getDate()}, ${x.getFullYear()}`;
+  const date = `${SHORT_MONTHS[x.getMonth()]} ${x.getDate()}, ${x.getFullYear()}`;
+  const time = x.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${date}, ${time}`;
 }
 
 function formatRenewal(d: string | null) {
@@ -51,6 +50,7 @@ export default async function CommissionsPage() {
   const currentUserId = session?.user.id ?? "";
   const isAdmin = session?.user.role === "admin";
 
+  // Newest first (by full timestamp). Admins see everyone; members see only theirs.
   const rows = await db
     .select({
       id: commission.id,
@@ -69,21 +69,85 @@ export default async function CommissionsPage() {
     .from(commission)
     .leftJoin(user, eq(commission.submittedById, user.id))
     .where(isAdmin ? undefined : eq(commission.submittedById, currentUserId))
-    // Pending first so admins see what needs review at the top.
-    .orderBy(sql`case when ${commission.status} = 'pending' then 0 else 1 end`, desc(commission.createdAt));
+    .orderBy(desc(commission.createdAt));
 
   const pendingCount = rows.filter((r) => r.status === "pending").length;
 
+  // ── Admin: one card per member, drilling into that member's commissions ──────
+  if (isAdmin) {
+    const byMember = new Map<string, MemberData>();
+    for (const r of rows) {
+      const key = r.submittedById ?? "unknown";
+      let m = byMember.get(key);
+      if (!m) {
+        m = {
+          id: key,
+          name: r.submittedByName || "Member",
+          image: r.submitterImage ?? null,
+          approved: 0,
+          pending: 0,
+          denied: 0,
+          earnings: 0,
+          commissions: [],
+        };
+        byMember.set(key, m);
+      }
+      const payout =
+        r.productPrice != null ? (r.productPrice * (r.commissionRate ?? 0)) / 100 : 0;
+      if (r.status === "approved") {
+        m.approved++;
+        m.earnings += payout;
+      } else if (r.status === "denied") {
+        m.denied++;
+      } else {
+        m.pending++;
+      }
+      m.commissions.push({
+        id: r.id,
+        ticketName: r.ticketName,
+        customerEmail: r.customerEmail,
+        status: r.status,
+        renewalDate: r.renewalDate,
+        productPrice: r.productPrice,
+        commissionRate: r.commissionRate,
+        reviewNote: r.reviewNote,
+        createdAtLabel: formatWhen(r.createdAt),
+      });
+    }
+    // Members with work awaiting review first, then alphabetical.
+    const members = [...byMember.values()].sort(
+      (a, b) => b.pending - a.pending || a.name.localeCompare(b.name),
+    );
+
+    return (
+      <>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
+          <div>
+            <h1 className="text-base font-semibold tracking-tight">Commissions</h1>
+            <p className="text-xs text-muted">
+              {members.length} member{members.length === 1 ? "" : "s"} · {rows.length} total ·{" "}
+              {pendingCount} awaiting review
+            </p>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-4">
+            <CommissionForm />
+            <CommissionDirectory members={members} />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // ── Member: their own commissions, read-only, newest first ───────────────────
   return (
     <>
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
         <div>
           <h1 className="text-base font-semibold tracking-tight">Commissions</h1>
-          <p className="text-xs text-muted">
-            {isAdmin
-              ? `${rows.length} total · ${pendingCount} awaiting review`
-              : "Submit a commission and track its status"}
-          </p>
+          <p className="text-xs text-muted">Submit a commission and track its status</p>
         </div>
       </header>
 
@@ -92,7 +156,7 @@ export default async function CommissionsPage() {
           <CommissionForm />
 
           <h2 className="px-1 pt-2 text-xs font-medium uppercase tracking-wider text-muted">
-            {isAdmin ? "All commissions" : "Your commissions"}
+            Your commissions
           </h2>
 
           {rows.length === 0 ? (
@@ -104,52 +168,6 @@ export default async function CommissionsPage() {
               {rows.map((c) => {
                 const payout =
                   c.productPrice != null ? (c.productPrice * (c.commissionRate ?? 0)) / 100 : null;
-
-                if (isAdmin) {
-                  return (
-                    <div key={c.id} className="border border-border bg-surface">
-                      <div className="flex items-start justify-between gap-3 p-4">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-foreground">
-                            {c.ticketName}
-                          </p>
-                          <p className="truncate text-xs text-muted">{c.customerEmail}</p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Avatar name={c.submittedByName} image={c.submitterImage} size={20} />
-                            <span className="text-xs text-muted">
-                              {c.submittedByName || "Member"} · {formatWhen(c.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <StatusBadge status={c.status} />
-                          <form action={deleteCommission} className="flex">
-                            <input type="hidden" name="id" value={c.id} />
-                            <button
-                              type="submit"
-                              aria-label="Delete commission"
-                              className="flex h-7 w-7 items-center justify-center border border-transparent text-muted transition-colors hover:border-red-500/50 hover:text-red-400"
-                            >
-                              <Trash2 size={14} strokeWidth={1.75} />
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                      <CommissionReview
-                        c={{
-                          id: c.id,
-                          status: c.status,
-                          renewalDate: c.renewalDate,
-                          productPrice: c.productPrice,
-                          commissionRate: c.commissionRate,
-                          reviewNote: c.reviewNote,
-                        }}
-                      />
-                    </div>
-                  );
-                }
-
-                // Member view: read-only status + payout once approved.
                 const renewal = formatRenewal(c.renewalDate);
                 return (
                   <div key={c.id} className="border border-border bg-surface p-4">
@@ -159,6 +177,7 @@ export default async function CommissionsPage() {
                           {c.ticketName}
                         </p>
                         <p className="truncate text-xs text-muted">{c.customerEmail}</p>
+                        <p className="mt-2 text-xs text-muted">{formatWhen(c.createdAt)}</p>
                       </div>
                       <StatusBadge status={c.status} />
                     </div>

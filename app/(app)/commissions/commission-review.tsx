@@ -2,15 +2,26 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check, X, Pencil } from "lucide-react";
 import { reviewCommission } from "./actions";
 
 const labelCls = "mb-1 block text-xs text-muted";
 const inputCls =
   "h-9 w-full border border-border bg-surface-2 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-foreground/40";
 
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
 function formatUSD(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function formatRenewal(d: string | null): string | null {
+  if (!d) return null;
+  const x = new Date(`${d}T00:00:00Z`);
+  return `${SHORT_MONTHS[x.getUTCMonth()]} ${x.getUTCDate()}, ${x.getUTCFullYear()}`;
 }
 
 export default function CommissionReview({
@@ -26,6 +37,10 @@ export default function CommissionReview({
   };
 }) {
   const router = useRouter();
+  const decided = c.status === "approved" || c.status === "denied";
+  // Pending commissions open straight into the review form; decided ones show a
+  // summary first and only reveal the form (with the decision buttons) on Edit.
+  const [editing, setEditing] = useState(!decided);
   const [renewalDate, setRenewalDate] = useState(c.renewalDate ?? "");
   const [price, setPrice] = useState(c.productPrice != null ? String(c.productPrice) : "");
   const [rate, setRate] = useState(String(c.commissionRate ?? 15));
@@ -60,8 +75,48 @@ export default function CommissionReview({
         setError(res.error);
         return;
       }
+      setEditing(false); // collapse back to the summary after deciding
       router.refresh();
     });
+  }
+
+  // Summary view for an already-decided commission.
+  if (!editing) {
+    const renewal = formatRenewal(c.renewalDate);
+    const settled = c.productPrice != null ? (c.productPrice * (c.commissionRate ?? 0)) / 100 : 0;
+    return (
+      <div className="flex items-start justify-between gap-3 border-t border-border p-4">
+        <div className="min-w-0">
+          {c.status === "approved" ? (
+            <>
+              <p className="text-xs text-muted">Commission</p>
+              <p className="text-lg font-semibold tabular-nums text-foreground">
+                {formatUSD(settled)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {c.commissionRate}% of {formatUSD(c.productPrice ?? 0)}
+                {renewal ? ` · renews ${renewal}` : ""}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted">This commission was denied.</p>
+          )}
+          {c.reviewNote ? (
+            <p className="mt-2 text-xs leading-5 text-muted">
+              <span className="text-foreground">Note:</span> {c.reviewNote}
+            </p>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="btn-wipe flex h-8 shrink-0 items-center gap-1.5 border border-border px-3 text-xs font-medium text-muted transition-colors hover:text-foreground"
+        >
+          <Pencil size={13} strokeWidth={1.75} />
+          Edit
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -135,6 +190,16 @@ export default function CommissionReview({
         </p>
 
         <div className="flex items-center gap-2">
+          {decided ? (
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={pending}
+              className="flex h-9 items-center px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => decide("denied")}
