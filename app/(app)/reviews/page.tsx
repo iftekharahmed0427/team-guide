@@ -1,5 +1,6 @@
 import { desc, isNull } from "drizzle-orm";
-import { Star } from "lucide-react";
+import Link from "next/link";
+import { Star, History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { review, reportPeriod } from "@/db/app-schema";
@@ -7,6 +8,7 @@ import { formatDate, formatDateTime } from "@/lib/datetime";
 import { signedGetUrl } from "@/lib/storage";
 import ReviewForm from "./review-form";
 import ReviewDeleteButton from "./review-delete-button";
+import ReviewLightbox from "./review-lightbox";
 
 // A stored key needs a short-lived presigned URL; a legacy inline data URL is
 // already renderable as-is.
@@ -72,9 +74,18 @@ export default async function ReviewsPage() {
           <h1 className="text-base font-semibold tracking-tight">Reviews</h1>
           <p className="text-xs text-muted">{periodLabel}</p>
         </div>
-        <div className="hidden text-right leading-tight sm:block">
-          <p className="text-xs text-muted">This period</p>
-          <p className="text-lg font-semibold tabular-nums">{total.toLocaleString()}</p>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/reviews/history"
+            className="btn-wipe inline-flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground"
+          >
+            <History size={15} strokeWidth={1.75} />
+            History
+          </Link>
+          <div className="hidden text-right leading-tight sm:block">
+            <p className="text-xs text-muted">This period</p>
+            <p className="text-lg font-semibold tabular-nums">{total.toLocaleString()}</p>
+          </div>
         </div>
       </header>
 
@@ -107,11 +118,9 @@ export default async function ReviewsPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((r) => (
                 <div key={r.id} className="flex flex-col border border-border bg-surface">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <ReviewLightbox
                     src={r.src}
                     alt={`${SOURCE_LABEL[r.source] ?? "Review"} screenshot`}
-                    className="aspect-video w-full border-b border-border object-cover"
                   />
                   <div className="flex flex-1 flex-col gap-2 p-3">
                     <div className="flex items-center justify-between gap-2">
