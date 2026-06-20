@@ -17,6 +17,10 @@ website ("Reset all") or clicks "Run now". It never posts on its own.
   removing an image drops it back out of the tally.
 - When an admin runs **Reset all** or **Run now**, the bot posts an embed in every
   report channel: *"You solved **N** tickets this period."*
+- Each report channel's **topic** is kept in sync with its live count:
+  *"Tickets this period: N | Last updated X minutes ago"* (refreshed about every
+  10 minutes — Discord rate-limits topic edits — and needs the **Manage Channels**
+  permission; without it the update is skipped, logged, not fatal).
 
 It counts by scanning each channel's history since its last reset over the REST
 API, so it does **not** need the privileged *Message Content* intent.
@@ -83,12 +87,17 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
    @everyone, @here, and All Roles** (permission integer `216064`). Skip this if
    you instead mark the pinged role as mentionable in its Discord settings.
 
+   To let the bot write each member's ticket count into their channel **topic**,
+   also grant **Manage Channels** (base + Manage Channels = permission integer
+   `85008`; or just add a per-channel permission overwrite on each report
+   channel). Without it the topic updates are skipped (logged, not fatal).
+
 ## 2. Run
 
 ```bash
 cp .env.example .env        # set DATABASE_URL
 bun install
-bun start                   # connects, applies presence, posts on schedule / run-now
+bun start                   # connects, applies presence, syncs topics, posts on Run now / Reset all
 
 # one-shot helpers (use the token + config already in the DB):
 bun run dry                 # count the last period and log totals; post nothing

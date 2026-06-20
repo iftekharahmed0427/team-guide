@@ -226,11 +226,12 @@ export async function getLastReportAt(): Promise<number> {
 
 export type LiveChannel = ReportEntry & {
   currentCount: number;
+  countedAt: number | null; // when the count last changed (drives the topic's "last updated")
 };
 
 export async function getLiveChannels(): Promise<LiveChannel[]> {
   const { rows } = await getPool().query(
-    `select channel_id, user_id, name, count_reset_at, current_count
+    `select channel_id, user_id, name, count_reset_at, current_count, counted_at
      from report_channel order by created_at asc`,
   );
   return rows.map((r) => ({
@@ -239,6 +240,7 @@ export async function getLiveChannels(): Promise<LiveChannel[]> {
     name: r.name == null ? "" : String(r.name),
     resetAt: r.count_reset_at ? new Date(r.count_reset_at).getTime() : null,
     currentCount: Number(r.current_count ?? 0),
+    countedAt: r.counted_at ? new Date(r.counted_at).getTime() : null,
   }));
 }
 
