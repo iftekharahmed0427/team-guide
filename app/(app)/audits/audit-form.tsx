@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Check } from "lucide-react";
 import CustomSelect from "@/app/components/custom-select";
 import { createAudit } from "./actions";
-import { AUDIT_CRITERIA, FIVE_POINT_GUIDE, computeTotals, percentage, type Criterion } from "./criteria";
+import { AUDIT_CRITERIA, FIVE_POINT_GUIDE, TICKET_TYPES, computeTotals, percentage, type Criterion } from "./criteria";
 
 type Member = { id: string; name: string };
 type Entry = { na: boolean; score: number; comment: string };
@@ -45,6 +45,11 @@ export default function AuditForm({ members }: { members: Member[] }) {
       ...members.map((m) => ({ value: m.id, label: m.name })),
     ],
     [members],
+  );
+
+  const typeOptions = useMemo(
+    () => [{ value: "", label: "Select a type…" }, ...TICKET_TYPES.map((t) => ({ value: t, label: t }))],
+    [],
   );
 
   const { total, possible } = useMemo(
@@ -98,8 +103,8 @@ export default function AuditForm({ members }: { members: Member[] }) {
             <input id="ticketNumber" value={ticketNumber} onChange={(e) => setTicketNumber(e.target.value)} placeholder="e.g. 48213" className={inputCls} />
           </div>
           <div>
-            <label className={labelCls} htmlFor="ticketType">Ticket type</label>
-            <input id="ticketType" value={ticketType} onChange={(e) => setTicketType(e.target.value)} placeholder="e.g. Billing, Technical…" className={inputCls} />
+            <span className={labelCls}>Ticket type</span>
+            <CustomSelect name="ticketType" options={typeOptions} defaultValue="" onChange={setTicketType} />
           </div>
           <div>
             <label className={labelCls} htmlFor="ticketDate">Ticket date</label>

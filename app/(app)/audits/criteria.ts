@@ -83,6 +83,18 @@ export const AUDIT_CRITERIA: Criterion[] = [
 
 export const CRITERIA_BY_KEY = new Map(AUDIT_CRITERIA.map((c) => [c.key, c] as const));
 
+// The support queues a ticket can belong to (the "Ticket Type" dropdown).
+export const TICKET_TYPES = [
+  "Ultimate Support",
+  "Activation Critical",
+  "Performance Issues",
+  "General Questions",
+  "Billing",
+  "Mods, Plugins, Server Settings",
+  "Transfers/Migrations/Plan Changes",
+  "Partnerships/Affiliates",
+];
+
 export const TOTAL_POSSIBLE = AUDIT_CRITERIA.reduce((sum, c) => sum + c.maxPoints, 0); // 36
 
 // Short guide for the 5-point items (from the sheet).
