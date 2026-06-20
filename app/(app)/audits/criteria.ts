@@ -87,7 +87,7 @@ export const TOTAL_POSSIBLE = AUDIT_CRITERIA.reduce((sum, c) => sum + c.maxPoint
 
 // Short guide for the 5-point items (from the sheet).
 export const FIVE_POINT_GUIDE =
-  "0 = did not display · 1 = attempted · 3–4 = displayed, needs improvement · 5 = fully displayed";
+  "0 = did not display · 1 = attempted · 3-4 = displayed, needs improvement · 5 = fully displayed";
 
 export const FIVE_POINT_LABELS: Record<number, string> = {
   0: "Did not display the behavior",

@@ -225,7 +225,7 @@ export const reportPeriodEntry = pgTable("report_period_entry", {
   count: integer("count").notNull().default(0),
 });
 
-// An audit row written every time an admin resets ticket counts — a single
+// An audit row written every time an admin resets ticket counts: a single
 // channel ("Reset", scope 'channel') or all of them ("Reset all", scope 'all').
 // Actor + names are denormalized (no FK, like the other content tables) so the
 // trail survives even if the user, channel, or archived period is later removed.
@@ -262,7 +262,7 @@ export const review = pgTable("review", {
 // Discord bot page and read by the bot. `token` is the Discord bot token
 // (set-only via the UI, never sent back to the browser). Presence fields drive
 // the bot's Discord status. `runRequestedAt` is bumped by the "Run now" button
-// and by "Reset all" — the only ways the bot posts (there is no scheduled or
+// and by "Reset all", the only ways the bot posts (there is no scheduled or
 // automatic posting). `periodDays` is the report range-label / averages window.
 //
 // DORMANT (retained to avoid a destructive migration, no longer read or written;
@@ -360,7 +360,7 @@ export const botStatus = pgTable("bot_status", {
 // live in app/(app)/audits/criteria.ts). An admin fills it out for a team
 // member's ticket; that member can see their own. `memberId`/`reviewerId` are
 // denormalized user ids (no FK, like the content tables' authorId).
-// `totalScore`/`possibleScore` are computed + stored — `possibleScore` excludes
+// `totalScore`/`possibleScore` are computed + stored; `possibleScore` excludes
 // any criterion marked N/A, and percentage = total / possible.
 export const audit = pgTable("audit", {
   id: text("id").primaryKey(),
