@@ -1,15 +1,24 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
+import { asc, eq } from "drizzle-orm";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { audit, auditScore } from "@/db/app-schema";
+import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import { formatDateTime } from "@/lib/datetime";
+import { signedGetUrl } from "@/lib/storage";
 import Avatar from "@/app/components/avatar";
 import DeleteAuditButton from "../delete-audit-button";
+import AuditScreenshots from "../audit-screenshots";
 import { AUDIT_CRITERIA, percentage } from "../criteria";
+
+// A stored key needs a short-lived presigned URL; a legacy inline data URL is
+// already renderable as-is.
+async function displayUrl(imageUrl: string): Promise<string> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  return (await signedGetUrl(imageUrl)) ?? "";
+}
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -60,6 +69,14 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
 
   const scores = await db.select().from(auditScore).where(eq(auditScore.auditId, id));
   const byKey = new Map(scores.map((s) => [s.criterionKey, s]));
+  const shotRows = await db
+    .select()
+    .from(auditScreenshot)
+    .where(eq(auditScreenshot.auditId, id))
+    .orderBy(asc(auditScreenshot.createdAt));
+  const shots = await Promise.all(
+    shotRows.map(async (s) => ({ id: s.id, src: await displayUrl(s.imageUrl) })),
+  );
   const pct = percentage(a.totalScore, a.possibleScore);
   const ticketDate = formatTicketDate(a.ticketDate);
 
@@ -134,6 +151,15 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
             })}
           </section>
 
+          {shots.length > 0 ? (
+            <section className={`${card} p-5`}>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+                Screenshots ({shots.length})
+              </p>
+              <AuditScreenshots images={shots} />
+            </section>
+          ) : null}
+
           {a.summary ? (
             <section className={`${card} p-5`}>
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted">Overall feedback</p>
@@ -142,7 +168,14 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
           ) : null}
 
           {isAdmin ? (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Link
+                href={`/audits/${a.id}/edit`}
+                className="btn-wipe inline-flex h-8 items-center gap-2 border border-border px-3 text-xs text-muted transition-colors hover:text-foreground"
+              >
+                <Pencil size={13} strokeWidth={1.75} />
+                Edit
+              </Link>
               <DeleteAuditButton id={a.id} />
             </div>
           ) : null}

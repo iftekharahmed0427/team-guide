@@ -393,3 +393,15 @@ export const auditScore = pgTable("audit_score", {
   score: integer("score").notNull().default(0),
   comment: text("comment").notNull().default(""),
 });
+
+// A screenshot attached to an audit (evidence of the ticket). Stored like the
+// review screenshots: a private-bucket object key, or an inline data URL when
+// storage is not configured (see lib/storage.ts).
+export const auditScreenshot = pgTable("audit_screenshot", {
+  id: text("id").primaryKey(),
+  auditId: text("audit_id")
+    .notNull()
+    .references(() => audit.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
