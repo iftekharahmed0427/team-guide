@@ -13,6 +13,7 @@ import {
   Ticket,
   HandCoins,
   Star,
+  ClipboardCheck,
   Settings,
   LifeBuoy,
   LogOut,
@@ -48,6 +49,7 @@ const primaryNav: NavItem[] = [
   { label: "Reports", icon: Ticket, href: "/reports" },
   { label: "Reviews", icon: Star, href: "/reviews" },
   { label: "Commissions", icon: HandCoins, href: "/commissions" },
+  { label: "Audits", icon: ClipboardCheck, href: "/audits" },
   { label: "Team", icon: Users, href: "/team" },
 ];
 

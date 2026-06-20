@@ -353,3 +353,43 @@ export const botStatus = pgTable("bot_status", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+// ── Support ticket QA audits ──────────────────────────────────────────────────
+
+// One QA review of a support ticket against the scorecard rubric (the criteria
+// live in app/(app)/audits/criteria.ts). An admin fills it out for a team
+// member's ticket; that member can see their own. `memberId`/`reviewerId` are
+// denormalized user ids (no FK, like the content tables' authorId).
+// `totalScore`/`possibleScore` are computed + stored — `possibleScore` excludes
+// any criterion marked N/A, and percentage = total / possible.
+export const audit = pgTable("audit", {
+  id: text("id").primaryKey(),
+  ticketNumber: text("ticket_number").notNull().default(""),
+  ticketType: text("ticket_type").notNull().default(""),
+  ticketDate: date("ticket_date", { mode: "string" }), // the ticket's date, optional
+  memberId: text("member_id"), // the audited agent's user id
+  memberName: text("member_name").notNull().default(""),
+  reviewerId: text("reviewer_id"), // the admin who reviewed
+  reviewerName: text("reviewer_name").notNull().default(""),
+  totalScore: integer("total_score").notNull().default(0),
+  possibleScore: integer("possible_score").notNull().default(0),
+  summary: text("summary").notNull().default(""), // optional overall feedback
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// One criterion's result within an audit. `criterionKey` matches AUDIT_CRITERIA;
+// `na` excludes the criterion from the totals, otherwise `score` is 0..maxPoints.
+export const auditScore = pgTable("audit_score", {
+  id: text("id").primaryKey(),
+  auditId: text("audit_id")
+    .notNull()
+    .references(() => audit.id, { onDelete: "cascade" }),
+  criterionKey: text("criterion_key").notNull(),
+  na: boolean("na").notNull().default(false),
+  score: integer("score").notNull().default(0),
+  comment: text("comment").notNull().default(""),
+});

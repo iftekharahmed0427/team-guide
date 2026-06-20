@@ -162,6 +162,13 @@
       "when": 1781890538561,
       "tag": "0022_secret_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1781965904161,
+      "tag": "0023_stormy_whizzer",
+      "breakpoints": true
     }
   ]
 }
