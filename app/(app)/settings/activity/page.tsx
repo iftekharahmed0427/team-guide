@@ -17,6 +17,8 @@ const ACTION_LABELS: Record<string, string> = {
   "guide.updated": "edited a guide",
   "guide.deleted": "deleted a guide",
   "guide.game_added": "added a game",
+  "specialty.added": "assigned a game specialty",
+  "specialty.removed": "removed a game specialty",
   "board.task_created": "added a board card",
   "board.task_moved": "moved a board card",
   "board.task_deleted": "deleted a board card",

@@ -183,6 +183,13 @@
       "when": 1781972147785,
       "tag": "0025_loud_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1781972917871,
+      "tag": "0026_parallel_wrecking_crew",
+      "breakpoints": true
     }
   ]
 }
