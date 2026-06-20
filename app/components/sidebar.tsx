@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,7 +16,6 @@ import {
   Settings,
   LifeBuoy,
   LogOut,
-  Box,
   Shield,
   Eye,
   Loader2,
@@ -130,9 +130,14 @@ export default function Sidebar({
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-        <div className="flex h-8 w-8 items-center justify-center border border-border bg-surface-2">
-          <Box size={18} strokeWidth={1.75} />
-        </div>
+        <Image
+          src="/logo.png"
+          alt="Team Guide"
+          width={2018}
+          height={819}
+          priority
+          className="h-8 w-auto shrink-0 object-contain"
+        />
         <div className="leading-tight">
           <p className="text-sm font-semibold tracking-tight">Team Guide</p>
           <p className="text-[11px] text-muted">Workspace</p>
