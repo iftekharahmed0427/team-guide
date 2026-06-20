@@ -22,12 +22,7 @@ export default function SearchPalette() {
   const [items, setItems] = useState<SearchItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
-  const [shortcut, setShortcut] = useState("Ctrl K");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (/mac/i.test(navigator.platform)) setShortcut("⌘ K");
-  }, []);
 
   // Load the index once, on first open.
   const load = useCallback(async () => {
@@ -139,7 +134,7 @@ export default function SearchPalette() {
         <Search size={15} strokeWidth={1.75} className="shrink-0" />
         <span className="flex-1 text-left">Search</span>
         <kbd className="shrink-0 border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted">
-          {shortcut}
+          ⌘ K
         </kbd>
       </button>
 

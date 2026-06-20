@@ -14,7 +14,7 @@ export default function DashboardSearch() {
       <Search size={16} strokeWidth={1.75} className="shrink-0" />
       <span className="w-56 text-left text-sm">Search news and guides</span>
       <kbd className="shrink-0 border border-border px-1.5 py-0.5 text-[10px] font-medium">
-        Ctrl K
+        ⌘ K
       </kbd>
     </button>
   );

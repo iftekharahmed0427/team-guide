@@ -15,7 +15,6 @@ import {
   Star,
   ClipboardCheck,
   Settings,
-  LifeBuoy,
   LogOut,
   Shield,
   Eye,
@@ -55,7 +54,6 @@ const primaryNav: NavItem[] = [
 
 const secondaryNav: NavItem[] = [
   { label: "Settings", icon: Settings, href: "/settings", adminOnly: true },
-  { label: "Support", icon: LifeBuoy },
 ];
 
 function NavRow({ item, active }: { item: NavItem; active: boolean }) {
