@@ -14,6 +14,7 @@ import {
   HandCoins,
   Star,
   ClipboardCheck,
+  Gamepad2,
   Settings,
   LogOut,
   Shield,
@@ -49,6 +50,7 @@ const primaryNav: NavItem[] = [
   { label: "Reviews", icon: Star, href: "/reviews" },
   { label: "Commissions", icon: HandCoins, href: "/commissions" },
   { label: "Audits", icon: ClipboardCheck, href: "/audits" },
+  { label: "Specialists", icon: Gamepad2, href: "/specialties" },
   { label: "Team", icon: Users, href: "/team" },
 ];
 

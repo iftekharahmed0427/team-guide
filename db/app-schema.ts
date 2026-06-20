@@ -115,6 +115,27 @@ export const boardTaskAssignee = pgTable(
   (t) => [unique("board_task_assignee_unique").on(t.taskId, t.userId)],
 );
 
+// Which games each team member specializes in (the /specialties matrix). Admins
+// assign games to members so the team knows who to reach out to for a given
+// game; `level` ranks a member as the go-to ("primary") or the fallback
+// ("backup") for that game. Join table: one row per member-game pair (unique),
+// both sides FK'd with cascade so removing a member or a game cleans up.
+export const memberGame = pgTable(
+  "member_game",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    gameId: text("game_id")
+      .notNull()
+      .references(() => gameCategory.id, { onDelete: "cascade" }),
+    level: text("level").notNull().default("primary"), // primary | backup
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("member_game_unique").on(t.userId, t.gameId)],
+);
+
 // Free-form team notes. Anyone signed in can post; everyone sees them with the
 // author's name. Deletable by the author or an admin.
 export const note = pgTable("note", {
