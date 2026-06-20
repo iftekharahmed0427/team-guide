@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportPeriod } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 type Result = { ok: true } | { error: string };
 
@@ -15,6 +16,7 @@ export async function deleteReportPeriod(id: string): Promise<Result> {
   if (session?.user.role !== "admin") return { error: "Only admins can delete periods." };
   if (!id) return { error: "Missing period." };
   await db.delete(reportPeriod).where(eq(reportPeriod.id, id));
+  await logActivity("report_period.deleted");
   revalidatePath("/reports/history");
   await notifyChange();
   return { ok: true };

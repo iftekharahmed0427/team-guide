@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { commission } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 const PAGE = "/commissions";
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,6 +49,7 @@ export async function submitCommission(input: {
     submittedById: session.user.id,
     submittedByName: session.user.name || session.user.email || "Member",
   });
+  await logActivity("commission.submitted", ticketName);
   await notifyChange();
   revalidatePath(PAGE);
   return { ok: true };
@@ -96,6 +98,7 @@ export async function reviewCommission(input: {
       reviewedAt: new Date(),
     })
     .where(eq(commission.id, input.id));
+  await logActivity("commission.reviewed", input.decision);
   await notifyChange();
   revalidatePath(PAGE);
   return { ok: true };
@@ -107,6 +110,7 @@ export async function deleteCommission(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   await db.delete(commission).where(eq(commission.id, id));
+  await logActivity("commission.deleted");
   await notifyChange();
   revalidatePath(PAGE);
 }

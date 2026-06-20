@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { review } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
 
 const PAGE = "/reviews";
@@ -58,6 +59,7 @@ export async function addReview(input: {
     addedById: session.user.id,
     addedByName: session.user.name || session.user.email || "Admin",
   });
+  await logActivity("review.added", input.source);
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -74,6 +76,7 @@ export async function deleteReview(id: string): Promise<Result> {
   if (row?.imageUrl && !row.imageUrl.startsWith("data:")) {
     await deleteObject(row.imageUrl);
   }
+  await logActivity("review.deleted");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };

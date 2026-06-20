@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { note } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 async function requireMember() {
   const session = await getSession();
@@ -32,6 +33,7 @@ export async function createNote(
     authorId: session.user.id,
     authorName: session.user.name || session.user.email || "Member",
   });
+  await logActivity("note.created", text.slice(0, 60));
   await notifyChange();
   revalidatePath("/notes");
   revalidatePath("/");
@@ -58,6 +60,7 @@ export async function deleteNote(formData: FormData) {
   }
 
   await db.delete(note).where(eq(note.id, id));
+  await logActivity("note.deleted");
   await notifyChange();
   revalidatePath("/notes");
   revalidatePath("/");

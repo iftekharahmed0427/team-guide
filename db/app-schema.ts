@@ -405,3 +405,17 @@ export const auditScreenshot = pgTable("audit_screenshot", {
   imageUrl: text("image_url").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Portal-wide activity log: one row per meaningful action (and sign-in), written
+// by lib/activity.ts logActivity() next to each action's notifyChange(). Actor is
+// denormalized (no FK). `action` is a stable key like "audit.created"; the page
+// (/settings/activity, admin only) maps it to a friendly phrase. `targetLabel` is
+// the human label of the affected thing (ticket #, post title, channel name).
+export const activityLog = pgTable("activity_log", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id"),
+  actorName: text("actor_name").notNull().default(""),
+  action: text("action").notNull(),
+  targetLabel: text("target_label").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

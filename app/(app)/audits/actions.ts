@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
+import { logActivity } from "@/lib/activity";
 import { AUDIT_CRITERIA, computeTotals } from "./criteria";
 
 const PAGE = "/audits";
@@ -135,6 +136,7 @@ export async function createAudit(input: AuditFields & { screenshots: string[] }
     );
   }
 
+  await logActivity("audit.created", `#${p.values.ticketNumber}`);
   await notifyChange();
   revalidatePath(PAGE);
   return { ok: true, id };
@@ -186,6 +188,7 @@ export async function updateAudit(
     );
   }
 
+  await logActivity("audit.updated", `#${p.values.ticketNumber}`);
   await notifyChange();
   revalidatePath(PAGE);
   revalidatePath(`/audits/${input.id}`);
@@ -197,6 +200,7 @@ export async function updateAudit(
 export async function deleteAudit(id: string): Promise<void> {
   await requireAdmin();
   if (!id) return;
+  const a = (await db.select({ ticketNumber: audit.ticketNumber }).from(audit).where(eq(audit.id, id)).limit(1))[0];
   const shots = await db
     .select({ imageUrl: auditScreenshot.imageUrl })
     .from(auditScreenshot)
@@ -205,6 +209,7 @@ export async function deleteAudit(id: string): Promise<void> {
   for (const s of shots) {
     if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteObject(s.imageUrl);
   }
+  await logActivity("audit.deleted", a ? `#${a.ticketNumber}` : "");
   await notifyChange();
   revalidatePath(PAGE);
 }

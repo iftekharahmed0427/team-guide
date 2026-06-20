@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -79,6 +80,7 @@ export async function createPost(
     authorName: session.user.name || session.user.email || "Member",
   });
 
+  await logActivity("news.created", title);
   revalidatePath("/news");
   await notifyChange();
   return { slug };
@@ -123,6 +125,7 @@ export async function updatePost(
     })
     .where(eq(newsPost.id, id));
 
+  await logActivity("news.updated", title);
   revalidatePath("/news");
   revalidatePath(`/news/${existing.slug}`);
   await notifyChange();
@@ -133,7 +136,9 @@ export async function deletePost(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Missing post");
+  const p = (await db.select({ title: newsPost.title }).from(newsPost).where(eq(newsPost.id, id)).limit(1))[0];
   await db.delete(newsPost).where(eq(newsPost.id, id));
+  await logActivity("news.deleted", p?.title ?? "");
   revalidatePath("/news");
   await notifyChange();
   redirect("/news");

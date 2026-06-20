@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { boardTask, boardTaskComment, boardTaskAssignee } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 import { isStatus, displayName, type Task, type Comment } from "./columns";
 
 // The board is shared, so any signed-in member can edit it.
@@ -91,6 +92,7 @@ export async function createTask(input: {
     status,
     position: Date.now(),
   });
+  await logActivity("board.task_created", title);
   revalidatePath("/board");
   await notifyChange();
   return { ok: true };
@@ -109,6 +111,7 @@ export async function moveTask(input: {
     .update(boardTask)
     .set({ status, position: input.position })
     .where(eq(boardTask.id, input.id));
+  await logActivity("board.task_moved");
   revalidatePath("/board");
   await notifyChange();
 }
@@ -116,8 +119,10 @@ export async function moveTask(input: {
 export async function deleteTask(id: string): Promise<void> {
   await requireMember();
   if (!id) return;
+  const t = (await db.select({ title: boardTask.title }).from(boardTask).where(eq(boardTask.id, id)).limit(1))[0];
   // FK cascade removes the card's comments and assignees.
   await db.delete(boardTask).where(eq(boardTask.id, id));
+  await logActivity("board.task_deleted", t?.title ?? "");
   revalidatePath("/board");
   await notifyChange();
 }
@@ -174,6 +179,7 @@ export async function addComment(input: {
     authorId: session.user.id,
     authorName: displayName(session.user.name, session.user.email),
   });
+  await logActivity("board.comment_added");
   revalidatePath("/board");
   await notifyChange();
   return { ok: true };
@@ -196,6 +202,7 @@ export async function deleteComment(id: string): Promise<void> {
     throw new Error("You can only delete your own comments.");
   }
   await db.delete(boardTaskComment).where(eq(boardTaskComment.id, id));
+  await logActivity("board.comment_deleted");
   revalidatePath("/board");
   await notifyChange();
 }
@@ -217,6 +224,7 @@ export async function assignMember(input: {
     .insert(boardTaskAssignee)
     .values({ id: randomUUID(), taskId: input.taskId, userId: input.userId })
     .onConflictDoNothing();
+  await logActivity("board.member_assigned");
   revalidatePath("/board");
   await notifyChange();
   return { ok: true };
@@ -241,6 +249,7 @@ export async function unassignMember(input: {
         eq(boardTaskAssignee.userId, input.userId),
       ),
     );
+  await logActivity("board.member_unassigned");
   revalidatePath("/board");
   await notifyChange();
   return { ok: true };

@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot } from "lucide-react";
+import { Bot, ScrollText } from "lucide-react";
 
-const sections = [{ label: "Discord bot", href: "/settings/discord-bot", icon: Bot }];
+const sections = [
+  { label: "Discord bot", href: "/settings/discord-bot", icon: Bot },
+  { label: "Activity log", href: "/settings/activity", icon: ScrollText },
+];
 
 export default function SettingsNav() {
   const pathname = usePathname();

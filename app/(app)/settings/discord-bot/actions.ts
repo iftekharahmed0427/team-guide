@@ -15,6 +15,7 @@ import {
   review,
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 const PAGE = "/settings/discord-bot";
 const SNOWFLAKE = /^\d{5,25}$/;
@@ -63,6 +64,7 @@ export async function setBotToken(token: string): Promise<Result> {
   }
   await ensureSettingsRow();
   await db.update(botSetting).set({ token: value }).where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.token_set");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -73,6 +75,7 @@ export async function clearBotToken(): Promise<Result> {
   if (denied) return denied;
   await ensureSettingsRow();
   await db.update(botSetting).set({ token: null }).where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.token_cleared");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -102,6 +105,7 @@ export async function updatePresence(input: {
       presenceActivityText: input.presenceActivityText.trim().slice(0, 128),
     })
     .where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.presence_updated");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -117,6 +121,7 @@ export async function requestRunNow(): Promise<Result> {
     .update(botSetting)
     .set({ runRequestedAt: new Date() })
     .where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.run_now");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -170,6 +175,7 @@ export async function updateAnnouncement(input: {
       announcementPingText: input.announcementPingText.trim().slice(0, 200),
     })
     .where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.announcement_updated");
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -209,6 +215,7 @@ export async function addReportChannel(input: {
     .insert(reportChannel)
     .values({ id: randomUUID(), channelId, userId, name, countResetAt: lastReset?.endedAt ?? null })
     .onConflictDoUpdate({ target: reportChannel.channelId, set: { userId, name } });
+  await logActivity("bot.channel_added", name);
   revalidatePath(PAGE);
   await notifyChange();
   return { ok: true };
@@ -299,6 +306,7 @@ export async function resetAllReportChannels(): Promise<Result> {
     createdAt: now,
   });
 
+  await logActivity("bot.reset_all");
   revalidatePath(PAGE);
   revalidatePath("/reports");
   revalidatePath("/reports/history");
@@ -311,7 +319,9 @@ export async function deleteReportChannel(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
+  const ch = (await db.select({ name: reportChannel.name }).from(reportChannel).where(eq(reportChannel.id, id)).limit(1))[0];
   await db.delete(reportChannel).where(eq(reportChannel.id, id));
+  await logActivity("bot.channel_deleted", ch?.name ?? "");
   revalidatePath(PAGE);
   await notifyChange();
 }
@@ -356,6 +366,7 @@ export async function resetReportChannel(id: string): Promise<Result> {
     createdAt: new Date(),
   });
 
+  await logActivity("bot.channel_reset", row.name || "");
   revalidatePath(PAGE);
   revalidatePath("/reports/history");
   await notifyChange();

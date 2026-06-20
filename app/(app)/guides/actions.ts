@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { guide, gameCategory } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 import { getGames } from "./games";
 
 async function requireAdmin() {
@@ -84,6 +85,7 @@ export async function createGuide(
     authorName: session.user.name || session.user.email || "Member",
   });
 
+  await logActivity("guide.created", title);
   revalidatePath("/guides");
   await notifyChange();
   return { slug };
@@ -131,6 +133,7 @@ export async function updateGuide(
     })
     .where(eq(guide.id, id));
 
+  await logActivity("guide.updated", title);
   revalidatePath("/guides");
   revalidatePath(`/guides/${existing.slug}`);
   await notifyChange();
@@ -158,6 +161,7 @@ export async function addGame(
     .insert(gameCategory)
     .values({ id: randomUUID(), name: trimmed, position: games.length })
     .onConflictDoNothing();
+  await logActivity("guide.game_added", trimmed);
   revalidatePath("/guides");
   revalidatePath("/guides/new");
   await notifyChange();
@@ -168,7 +172,9 @@ export async function deleteGuide(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Missing guide");
+  const g = (await db.select({ title: guide.title }).from(guide).where(eq(guide.id, id)).limit(1))[0];
   await db.delete(guide).where(eq(guide.id, id));
+  await logActivity("guide.deleted", g?.title ?? "");
   revalidatePath("/guides");
   await notifyChange();
   redirect("/guides");

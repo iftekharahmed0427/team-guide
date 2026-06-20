@@ -4,9 +4,11 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { APIError } from "better-auth/api";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { invite } from "../db/app-schema";
+import { invite, activityLog } from "../db/app-schema";
+import { user as userTable } from "../db/auth-schema";
 
 const bootstrapAdmins = (process.env.AUTH_BOOTSTRAP_ADMINS ?? "")
   .split(",")
@@ -64,6 +66,31 @@ export const auth = betterAuth({
             });
           }
           return { data: { ...user, role } };
+        },
+      },
+    },
+    // Record each sign-in in the activity log (/settings/activity). Best-effort:
+    // wrapped so a logging failure can never block a login.
+    session: {
+      create: {
+        after: async (session) => {
+          try {
+            const u = (
+              await db
+                .select({ name: userTable.name, email: userTable.email })
+                .from(userTable)
+                .where(eq(userTable.id, session.userId))
+                .limit(1)
+            )[0];
+            await db.insert(activityLog).values({
+              id: randomUUID(),
+              actorId: session.userId,
+              actorName: u?.name || u?.email || "Someone",
+              action: "auth.signed_in",
+            });
+          } catch {
+            // never block sign-in
+          }
         },
       },
     },

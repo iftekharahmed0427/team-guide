@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { invite as inviteTable } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
+import { logActivity } from "@/lib/activity";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -34,6 +35,7 @@ export async function inviteMember(formData: FormData) {
     .insert(inviteTable)
     .values({ id: randomUUID(), email, role, invitedBy: session.user.email })
     .onConflictDoUpdate({ target: inviteTable.email, set: { role } });
+  await logActivity("invite.created", email);
   revalidatePath("/team");
   await notifyChange();
 }
@@ -57,6 +59,7 @@ export async function setMemberRole(formData: FormData) {
       .set({ role })
       .where(eq(inviteTable.email, rows[0].email.toLowerCase()));
   }
+  await logActivity("member.role_changed", `${rows[0]?.email ?? ""} (${role})`);
   revalidatePath("/team");
   await notifyChange();
 }
@@ -82,6 +85,7 @@ export async function removeMember(formData: FormData) {
       .delete(inviteTable)
       .where(eq(inviteTable.email, rows[0].email.toLowerCase()));
   }
+  await logActivity("member.removed", rows[0]?.email ?? "");
   revalidatePath("/team");
   await notifyChange();
 }
@@ -90,7 +94,9 @@ export async function revokeInvite(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("inviteId") ?? "");
   if (!id) throw new Error("Missing invite");
+  const inv = (await db.select({ email: inviteTable.email }).from(inviteTable).where(eq(inviteTable.id, id)).limit(1))[0];
   await db.delete(inviteTable).where(eq(inviteTable.id, id));
+  await logActivity("invite.revoked", inv?.email ?? "");
   revalidatePath("/team");
   await notifyChange();
 }
