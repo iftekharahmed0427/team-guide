@@ -21,6 +21,8 @@ website ("Reset all") or clicks "Run now". It never posts on its own.
   *"Tickets this period: N | Last updated X minutes ago"* (refreshed about every
   10 minutes — Discord rate-limits topic edits — and needs the **Manage Channels**
   permission; without it the update is skipped, logged, not fatal).
+- Each counted screenshot gets a **✅ reaction** so members can see which uploads
+  have been tallied (needs the **Add Reactions** permission; best-effort).
 
 It counts by scanning each channel's history since its last reset over the REST
 API, so it does **not** need the privileged *Message Content* intent.
@@ -87,10 +89,11 @@ The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
    @everyone, @here, and All Roles** (permission integer `216064`). Skip this if
    you instead mark the pinged role as mentionable in its Discord settings.
 
-   To let the bot write each member's ticket count into their channel **topic**,
-   also grant **Manage Channels** (base + Manage Channels = permission integer
-   `85008`; or just add a per-channel permission overwrite on each report
-   channel). Without it the topic updates are skipped (logged, not fatal).
+   To let the bot write each member's count into their channel **topic** and put a
+   ✅ on each screenshot it counts, also grant **Manage Channels** (for the topic)
+   and **Add Reactions** (for the tick). With both extras the invite integer is
+   `85072` (or add per-channel permission overwrites on each report channel).
+   Without them those actions are skipped (logged, not fatal).
 
 ## 2. Run
 

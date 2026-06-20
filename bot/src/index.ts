@@ -41,6 +41,9 @@ const COUNT_TICK_MS = 5_000;
 // or above ~10 min and edit each channel at most once per window.
 const TOPIC_REFRESH_MS = 10 * 60_000;
 
+// Reaction the live counter puts on each screenshot it tallies.
+const TICK_REACTION = "✅";
+
 let client: Client | null = null;
 let loggedInToken: string | null = null;
 let appliedPresence = "";
@@ -222,7 +225,7 @@ async function countTick(): Promise<void> {
 
     for (const ch of channels) {
       const floor = ch.resetAt ?? 0;
-      const res = await countWindow(client, ch, floor, false);
+      const res = await countWindow(client, ch, floor, false, TICK_REACTION);
 
       if (!res.ok) {
         // Keep the last good tally for this channel; don't drop the team total.
