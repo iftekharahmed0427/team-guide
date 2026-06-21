@@ -1,0 +1,1 @@
+ALTER TABLE "payment_override" ADD COLUMN "base_compensation" double precision DEFAULT 0 NOT NULL;

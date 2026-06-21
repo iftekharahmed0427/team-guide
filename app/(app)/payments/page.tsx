@@ -1,11 +1,9 @@
 import { CalendarRange, Ticket, Crown } from "lucide-react";
-import Avatar from "@/app/components/avatar";
 import { getSession } from "@/lib/auth";
 import { getPayableMembers, getCurrentPeriod, getPaymentRoles } from "@/lib/payments";
 import { formatDateShort } from "@/lib/datetime";
 import { formatUSD, TICKET_RATE, ticketPayout, effectiveTickets } from "./constants";
-import TicketCell from "./ticket-cell";
-import RoleCell from "./role-cell";
+import PaymentsTable from "./payments-table";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -25,7 +23,11 @@ export default async function PaymentsPage() {
     : members.filter((m) => m.userId && m.userId === currentUserId);
 
   const totalTickets = rows.reduce((s, m) => s + effectiveTickets(m), 0);
-  const totalPayout = ticketPayout(totalTickets);
+  // Ticket money is only earned by paid-per-ticket roles.
+  const ticketPay = rows.reduce(
+    (s, m) => s + (m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0),
+    0,
+  );
   const top = rows[0] && effectiveTickets(rows[0]) > 0 ? rows[0] : null;
 
   const elapsedDays = period.start
@@ -64,7 +66,7 @@ export default async function PaymentsPage() {
               icon={Ticket}
               label="Total tickets"
               value={String(totalTickets)}
-              sub={`${formatUSD(totalPayout)} owed`}
+              sub={`${formatUSD(ticketPay)} from tickets`}
             />
             <Card
               icon={Crown}
@@ -78,81 +80,7 @@ export default async function PaymentsPage() {
             />
           </div>
 
-          <div className="w-full border border-border bg-surface">
-            {rows.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-muted">
-                No ticket activity yet. Members appear here once they handle tickets in Reports.
-              </p>
-            ) : (
-              <table className="w-full caption-bottom text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="h-11 px-4 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted">
-                      Member
-                    </th>
-                    <th className="h-11 px-4 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted">
-                      Role
-                    </th>
-                    <th className="h-11 px-4 text-right align-middle text-xs font-medium uppercase tracking-wide text-muted">
-                      Tickets
-                    </th>
-                    <th className="h-11 px-4 text-right align-middle text-xs font-medium uppercase tracking-wide text-muted">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((m) => (
-                    <tr
-                      key={m.userId ?? m.channelId}
-                      className="border-b border-border transition-colors hover:bg-surface-2"
-                    >
-                      <td className="h-12 px-4 align-middle">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar name={m.name} image={m.image} size={26} />
-                          <span className="font-medium">{m.name}</span>
-                        </div>
-                      </td>
-                      <td className="h-12 px-4 align-middle">
-                        {isAdmin && m.userId ? (
-                          <RoleCell
-                            key={m.roleId ?? "none"}
-                            userId={m.userId}
-                            roleId={m.roleId}
-                            roles={roles}
-                          />
-                        ) : (
-                          <span className={m.roleName ? "text-foreground" : "text-muted"}>
-                            {m.roleName ?? "Unassigned"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="h-12 px-4 text-right align-middle tabular-nums">
-                        {isAdmin && m.userId ? (
-                          <TicketCell userId={m.userId} live={m.tickets} override={m.override} />
-                        ) : (
-                          effectiveTickets(m)
-                        )}
-                      </td>
-                      <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
-                        {formatUSD(ticketPayout(effectiveTickets(m)))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-border font-semibold">
-                    <td className="h-12 px-4 align-middle">Total</td>
-                    <td className="h-12 px-4 align-middle" />
-                    <td className="h-12 px-4 text-right align-middle tabular-nums">{totalTickets}</td>
-                    <td className="h-12 px-4 text-right align-middle tabular-nums">
-                      {formatUSD(totalPayout)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-          </div>
+          <PaymentsTable members={rows} roles={roles} editable={isAdmin} />
         </div>
       </main>
     </>

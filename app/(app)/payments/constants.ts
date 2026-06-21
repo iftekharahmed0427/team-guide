@@ -21,10 +21,13 @@ export type PayableMember = {
   override: number | null; // admin's fixed count; null = track the live count
   roleId: string | null; // assigned payment role; null = unassigned
   roleName: string | null; // its display name (denormalized for read)
+  paidPerTicket: boolean; // does the assigned role earn ticket pay (unassigned = true)
+  baseCompensation: number; // flat $ paid on top of ticket pay
 };
 
-// One assignable payment role from the admin-managed catalog.
-export type PaymentRole = { id: string; name: string };
+// One assignable payment role from the admin-managed catalog. `paidPerTicket`
+// marks the "Tickets" group (earns per ticket) vs base-only roles.
+export type PaymentRole = { id: string; name: string; paidPerTicket: boolean };
 
 // The count a member is actually paid on: the admin override when set, otherwise
 // the live Reports count.
@@ -35,4 +38,16 @@ export function effectiveTickets(m: { tickets: number; override: number | null }
 // Payout for a ticket count at the flat per-ticket rate.
 export function ticketPayout(tickets: number): number {
   return tickets * TICKET_RATE;
+}
+
+// Total a member is owed, role-based: ticket pay (on the effective count) only
+// when their role is paid-per-ticket, always plus their flat base compensation.
+export function memberTotal(m: {
+  tickets: number;
+  override: number | null;
+  paidPerTicket: boolean;
+  baseCompensation: number;
+}): number {
+  const ticketPart = m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0;
+  return ticketPart + (m.baseCompensation || 0);
 }

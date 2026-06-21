@@ -66,6 +66,24 @@ export async function renameRole(id: string, name: string): Promise<Result> {
   return { ok: true };
 }
 
+// Toggle whether a role is paid per ticket (the "Tickets" group) or base only.
+export async function setRolePayType(id: string, paidPerTicket: boolean): Promise<Result> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "Only admins can manage roles." };
+  }
+  if (!id) return { error: "Missing role." };
+
+  const role = (
+    await db.select({ name: paymentRole.name }).from(paymentRole).where(eq(paymentRole.id, id)).limit(1)
+  )[0];
+  await db.update(paymentRole).set({ paidPerTicket }).where(eq(paymentRole.id, id));
+  await logActivity("payment.role_paytype", role?.name ?? "a role");
+  await refresh();
+  return { ok: true };
+}
+
 // Delete a role. Members assigned to it are unassigned (FK on delete set null).
 export async function deleteRole(id: string): Promise<Result> {
   try {

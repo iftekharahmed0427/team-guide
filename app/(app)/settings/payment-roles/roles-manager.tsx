@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Ticket } from "lucide-react";
 import type { PaymentRole } from "@/app/(app)/payments/constants";
-import { createRole, renameRole, deleteRole } from "./actions";
+import { createRole, renameRole, deleteRole, setRolePayType } from "./actions";
 
 type Result = { ok: true } | { error: string };
 
@@ -53,6 +53,10 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
   function remove(id: string, name: string) {
     if (!window.confirm(`Delete the "${name}" role? Members assigned to it will be unassigned.`)) return;
     run(() => deleteRole(id));
+  }
+
+  function togglePayType(id: string, next: boolean) {
+    run(() => setRolePayType(id, next));
   }
 
   return (
@@ -107,6 +111,24 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
                   maxLength={60}
                   className="h-8 flex-1 border border-transparent bg-transparent px-2 text-sm text-foreground outline-none hover:border-border focus:border-muted focus:bg-surface-2"
                 />
+                <button
+                  type="button"
+                  onClick={() => togglePayType(r.id, !r.paidPerTicket)}
+                  disabled={pending}
+                  title={
+                    r.paidPerTicket
+                      ? "Paid per ticket - click for base only"
+                      : "Paid base only - click for per ticket"
+                  }
+                  className={`flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                    r.paidPerTicket
+                      ? "border-foreground/40 text-foreground"
+                      : "border-border text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Ticket size={13} strokeWidth={1.75} />
+                  {r.paidPerTicket ? "Per ticket" : "Base only"}
+                </button>
                 <button
                   type="button"
                   onClick={() => remove(r.id, r.name)}

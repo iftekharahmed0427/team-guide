@@ -413,6 +413,10 @@ export const paymentEligibility = pgTable("payment_eligibility", {
 export const paymentRole = pgTable("payment_role", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  // Whether members in this role are paid per ticket (the "Tickets" group) vs a
+  // flat base only. Drives the /payments Amount: paid-per-ticket roles earn
+  // ticket pay + base; other roles earn base only.
+  paidPerTicket: boolean("paid_per_ticket").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -427,6 +431,7 @@ export const paymentOverride = pgTable("payment_override", {
     .references(() => user.id, { onDelete: "cascade" }),
   ticketOverride: integer("ticket_override"), // null = track the live Reports count
   roleId: text("role_id").references(() => paymentRole.id, { onDelete: "set null" }),
+  baseCompensation: doublePrecision("base_compensation").notNull().default(0), // flat $ on top of ticket pay
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
