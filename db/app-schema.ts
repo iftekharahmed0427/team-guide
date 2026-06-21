@@ -358,6 +358,133 @@ export const commission = pgTable("commission", {
     .notNull(),
 });
 
+// DORMANT (retained to avoid a destructive migration; the payments tool was
+// reworked to a ticket-based payout and no longer uses this table). Was a manual
+// payment ledger row. Left in place like the other retired schema (e.g.
+// report_channel.lastSeenMessageId, bot_setting's dormant fields).
+export const payment = pgTable("payment", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id"),
+  memberName: text("member_name").notNull().default(""),
+  type: text("type").notNull().default("commission"),
+  amount: doublePrecision("amount").notNull().default(0),
+  status: text("status").notNull().default("owed"),
+  method: text("method").notNull().default(""),
+  periodLabel: text("period_label").notNull().default(""),
+  paidAt: date("paid_at", { mode: "string" }),
+  reference: text("reference").notNull().default(""),
+  note: text("note").notNull().default(""),
+  commissionId: text("commission_id"),
+  createdById: text("created_by_id"),
+  createdByName: text("created_by_name").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// Per-member current payout settings for /payments. The ticket payout is derived
+// live from the Reports counts ($1 each, see lib/payments.ts); this table stores
+// the admin's per-member overrides on top: the eligible/ineligible toggle plus
+// the manual amounts (base pay, bonus, commission, reimbursement), PayPal, and a
+// note. One row per user; no row means eligible with no manual amounts. (Manual
+// values persist until changed; the period-history feature will snapshot them.)
+export const paymentEligibility = pgTable("payment_eligibility", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  eligible: boolean("eligible").notNull().default(true),
+  baseCompensation: doublePrecision("base_compensation").notNull().default(0),
+  bonusAmount: doublePrecision("bonus_amount").notNull().default(0),
+  commission: doublePrecision("commission").notNull().default(0),
+  reimbursement: doublePrecision("reimbursement").notNull().default(0),
+  paypalEmail: text("paypal_email").notNull().default(""),
+  note: text("note").notNull().default(""),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// Catalog of payment roles (Tickets, Discord Manager, Backend, Disputes,
+// Management) shown in the /payments Role column and managed by admins at
+// /settings/payment-roles. `sortOrder` controls display order.
+export const paymentRole = pgTable("payment_role", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Per-member overrides for the rebuilt /payments sheet. One row per user; no row
+// means no overrides. `ticketOverride` (null = track the live Reports count) holds
+// a fixed admin count that takes precedence over the live count; `roleId` is the
+// member's assigned payment role (null = unassigned).
+export const paymentOverride = pgTable("payment_override", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  ticketOverride: integer("ticket_override"), // null = track the live Reports count
+  roleId: text("role_id").references(() => paymentRole.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// A compensation period for the team payout sheet (/payments). Biweekly,
+// numbered, with a date-range label. Auto-created from the Reports cycle but
+// every field is editable. `reviewBonus*` capture the period-level Trust Pilot /
+// Reviews bonus (whether it applies, the flat amount, and the review count).
+// `finalized` snapshots the period so its ticket counts stop tracking Reports.
+export const compPeriod = pgTable("comp_period", {
+  id: text("id").primaryKey(),
+  number: integer("number"), // period number (nullable; auto = last + 1)
+  label: text("label").notNull().default(""), // e.g. "Feb 27-Mar 12"
+  startDate: date("start_date", { mode: "string" }),
+  endDate: date("end_date", { mode: "string" }),
+  reviewBonusLabel: text("review_bonus_label").notNull().default("Trust Pilot Bonus"),
+  reviewBonusEnabled: boolean("review_bonus_enabled").notNull().default(false),
+  reviewBonusAmount: doublePrecision("review_bonus_amount").notNull().default(50),
+  reviewCount: integer("review_count").notNull().default(0),
+  finalized: boolean("finalized").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// One member's line on a compensation period. Covers both ticket members (role
+// "Tickets", paid tickets * ticketRate + bonus + commission) and role members
+// (a fixed baseCompensation + commission). Member is denormalized (no FK) so the
+// historical sheet stays stable; `memberId` links to a user when one matches.
+// Total is computed on read: tickets*rate + base + bonus + commission +
+// reimbursement (recoveredRevenue is the informational basis for commission, not
+// added). `bonusIncluded` is the per-member Yes/No for the period review bonus.
+export const compEntry = pgTable("comp_entry", {
+  id: text("id").primaryKey(),
+  periodId: text("period_id")
+    .notNull()
+    .references(() => compPeriod.id, { onDelete: "cascade" }),
+  memberId: text("member_id"),
+  memberName: text("member_name").notNull().default(""),
+  role: text("role").notNull().default("Tickets"),
+  tickets: integer("tickets").notNull().default(0),
+  ticketRate: doublePrecision("ticket_rate").notNull().default(1), // USD per ticket
+  baseCompensation: doublePrecision("base_compensation").notNull().default(0),
+  bonusIncluded: boolean("bonus_included").notNull().default(false),
+  bonusAmount: doublePrecision("bonus_amount").notNull().default(0),
+  commission: doublePrecision("commission").notNull().default(0),
+  recoveredRevenue: doublePrecision("recovered_revenue").notNull().default(0),
+  reimbursement: doublePrecision("reimbursement").notNull().default(0),
+  paypalEmail: text("paypal_email").notNull().default(""),
+  note: text("note").notNull().default(""),
+  position: doublePrecision("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Single-row health/state written by the bot, read by the website. The bot
 // refreshes `lastHeartbeatAt` on a timer; the website shows online when it is
 // recent. Errors and last report time are surfaced for visibility.

@@ -14,6 +14,14 @@ export function formatDate(d: Date | string | number): string {
   });
 }
 
+export function formatDateShort(d: Date | string | number): string {
+  return new Date(d).toLocaleDateString("en-US", {
+    timeZone: TZ,
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function formatDateTime(d: Date | string | number): string {
   return new Date(d).toLocaleString("en-US", {
     timeZone: TZ,

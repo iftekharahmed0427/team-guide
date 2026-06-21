@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, ScrollText } from "lucide-react";
+import { Bot, ScrollText, Tags } from "lucide-react";
 
 const sections = [
   { label: "Discord bot", href: "/settings/discord-bot", icon: Bot },
+  { label: "Payment roles", href: "/settings/payment-roles", icon: Tags },
   { label: "Activity log", href: "/settings/activity", icon: ScrollText },
 ];
 

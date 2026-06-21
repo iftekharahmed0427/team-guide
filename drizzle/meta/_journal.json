@@ -190,6 +190,48 @@
       "when": 1781972917871,
       "tag": "0026_parallel_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1781975486975,
+      "tag": "0027_messy_korath",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1781976589213,
+      "tag": "0028_sleepy_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1781977862853,
+      "tag": "0029_blue_archangel",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1781978860833,
+      "tag": "0030_clammy_domino",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782031340653,
+      "tag": "0031_loving_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782031845048,
+      "tag": "0032_odd_havok",
+      "breakpoints": true
     }
   ]
 }
