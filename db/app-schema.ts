@@ -417,6 +417,9 @@ export const paymentRole = pgTable("payment_role", {
   // flat base only. Drives the /payments Amount: paid-per-ticket roles earn
   // ticket pay + base; other roles earn base only.
   paidPerTicket: boolean("paid_per_ticket").notNull().default(false),
+  // Whether members in this role get the Bonus + Recovered revenue fields (the
+  // "Disputes" group). Bonus adds to Amount; recovered revenue is recorded only.
+  bonusEligible: boolean("bonus_eligible").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -432,6 +435,8 @@ export const paymentOverride = pgTable("payment_override", {
   ticketOverride: integer("ticket_override"), // null = track the live Reports count
   roleId: text("role_id").references(() => paymentRole.id, { onDelete: "set null" }),
   baseCompensation: doublePrecision("base_compensation").notNull().default(0), // flat $ on top of ticket pay
+  bonus: doublePrecision("bonus").notNull().default(0), // manual $ bonus (bonus-eligible roles); adds to Amount
+  recoveredRevenue: doublePrecision("recovered_revenue").notNull().default(0), // recorded only, not paid
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())

@@ -36,7 +36,10 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
         roleId: paymentOverride.roleId,
         roleName: paymentRole.name,
         paidPerTicket: paymentRole.paidPerTicket,
+        bonusEligible: paymentRole.bonusEligible,
         baseCompensation: paymentOverride.baseCompensation,
+        bonus: paymentOverride.bonus,
+        recoveredRevenue: paymentOverride.recoveredRevenue,
       })
       .from(paymentOverride)
       .leftJoin(paymentRole, eq(paymentRole.id, paymentOverride.roleId)),
@@ -61,7 +64,10 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
       roleName: o?.roleName ?? null,
       // Unassigned members default to paid-per-ticket (the ticket-handler group).
       paidPerTicket: o?.roleId ? o.paidPerTicket ?? false : true,
+      bonusEligible: o?.roleId ? o.bonusEligible ?? false : false,
       baseCompensation: o?.baseCompensation ?? 0,
+      bonus: o?.bonus ?? 0,
+      recoveredRevenue: o?.recoveredRevenue ?? 0,
     });
   }
 
@@ -78,6 +84,7 @@ export async function getPaymentRoles(): Promise<PaymentRole[]> {
       id: paymentRole.id,
       name: paymentRole.name,
       paidPerTicket: paymentRole.paidPerTicket,
+      bonusEligible: paymentRole.bonusEligible,
     })
     .from(paymentRole)
     .orderBy(asc(paymentRole.sortOrder), asc(paymentRole.name));

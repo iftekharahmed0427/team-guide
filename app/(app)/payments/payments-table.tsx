@@ -7,18 +7,27 @@ import Avatar from "@/app/components/avatar";
 import CustomSelect from "@/app/components/custom-select";
 import {
   formatUSD,
-  ticketPayout,
+  memberTotal,
   type PayableMember,
   type PaymentRole,
 } from "./constants";
 import { savePayments, type PaymentChange } from "./actions";
 
-type Draft = { roleId: string | null; overrideText: string; baseText: string };
+type Draft = {
+  roleId: string | null;
+  overrideText: string;
+  baseText: string;
+  bonusText: string;
+  recoveredText: string;
+};
 
+const moneyText = (n: number) => (n ? String(n) : "");
 const seedRow = (m: PayableMember): Draft => ({
   roleId: m.roleId,
   overrideText: m.override === null ? "" : String(m.override),
-  baseText: m.baseCompensation ? String(m.baseCompensation) : "",
+  baseText: moneyText(m.baseCompensation),
+  bonusText: moneyText(m.bonus),
+  recoveredText: moneyText(m.recoveredRevenue),
 });
 
 const parseOverride = (t: string): number | null => {
@@ -53,6 +62,7 @@ export default function PaymentsTable({
   const [pending, startTransition] = useTransition();
 
   const payByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.paidPerTicket])), [roles]);
+  const bonusByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.bonusEligible])), [roles]);
   const roleOptions = useMemo(
     () => [
       { value: "", label: "Unassigned" },
@@ -66,17 +76,33 @@ export default function PaymentsTable({
     const d = (editable && m.userId && draft[m.userId]) || seedRow(m);
     const override = parseOverride(d.overrideText);
     const base = parseBase(d.baseText);
+    const bonus = parseBase(d.bonusText);
+    const recovered = parseBase(d.recoveredText);
     const roleId = d.roleId;
     const paidPerTicket = roleId ? payByRole.get(roleId) ?? false : true;
+    const bonusEligible = roleId ? bonusByRole.get(roleId) ?? false : false;
     const eff = override ?? m.tickets;
-    const amount = (paidPerTicket ? ticketPayout(eff) : 0) + base;
-    return { override, base, roleId, paidPerTicket, eff, amount };
+    const amount = memberTotal({
+      tickets: m.tickets,
+      override,
+      paidPerTicket,
+      bonusEligible,
+      baseCompensation: base,
+      bonus,
+    });
+    return { override, base, bonus, recovered, roleId, paidPerTicket, bonusEligible, eff, amount };
   }
 
   function isChanged(m: PayableMember) {
     if (!m.userId) return false;
     const r = resolved(m);
-    return r.roleId !== m.roleId || r.override !== m.override || r.base !== m.baseCompensation;
+    return (
+      r.roleId !== m.roleId ||
+      r.override !== m.override ||
+      r.base !== m.baseCompensation ||
+      r.bonus !== m.bonus ||
+      r.recovered !== m.recoveredRevenue
+    );
   }
 
   const changedMembers = editable ? members.filter(isChanged) : [];
@@ -96,7 +122,7 @@ export default function PaymentsTable({
     setDraft((cur) => ({ ...cur, [userId]: { ...seedRowFallback(cur, userId), ...p } }));
   }
   function seedRowFallback(cur: Record<string, Draft>, userId: string): Draft {
-    return cur[userId] ?? { roleId: null, overrideText: "", baseText: "" };
+    return cur[userId] ?? { roleId: null, overrideText: "", baseText: "", bonusText: "", recoveredText: "" };
   }
 
   function save() {
@@ -107,6 +133,8 @@ export default function PaymentsTable({
         ticketOverride: r.override,
         roleId: r.roleId,
         baseCompensation: r.base,
+        bonus: r.bonus,
+        recoveredRevenue: r.recovered,
       };
     });
     startTransition(async () => {
@@ -121,10 +149,11 @@ export default function PaymentsTable({
       const r = resolved(m);
       acc.tickets += r.eff;
       acc.base += r.base;
+      acc.bonus += r.bonusEligible ? r.bonus : 0;
       acc.amount += r.amount;
       return acc;
     },
-    { tickets: 0, base: 0, amount: 0 },
+    { tickets: 0, base: 0, bonus: 0, amount: 0 },
   );
 
   const cell = "h-8 w-20 border border-border bg-surface-2 px-2 text-right text-sm tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60";
@@ -170,6 +199,7 @@ export default function PaymentsTable({
                 <th className="h-11 px-4 text-left align-middle font-medium">Role</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Base comp</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Tickets</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
               </tr>
             </thead>
@@ -244,6 +274,54 @@ export default function PaymentsTable({
                         r.eff
                       )}
                     </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {r.bonusEligible ? (
+                        linked ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-muted">$</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={d.bonusText}
+                                disabled={pending}
+                                placeholder="0"
+                                title="Bonus (adds to pay)"
+                                onChange={(e) =>
+                                  patch(m.userId as string, { bonusText: e.target.value.replace(/[^\d.]/g, "") })
+                                }
+                                className={cell}
+                              />
+                            </div>
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-[10px] uppercase tracking-wide text-muted">Rec.</span>
+                              <span className="text-muted">$</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={d.recoveredText}
+                                disabled={pending}
+                                placeholder="0"
+                                title="Recovered revenue (recorded only, not paid)"
+                                onChange={(e) =>
+                                  patch(m.userId as string, { recoveredText: e.target.value.replace(/[^\d.]/g, "") })
+                                }
+                                className="h-6 w-16 border border-border bg-surface-2 px-1.5 text-right text-xs tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-end leading-tight">
+                            <span>{formatUSD(m.bonus)}</span>
+                            <span className="text-[11px] text-muted">
+                              Rec. {formatUSD(m.recoveredRevenue)}
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
                     <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
                       {formatUSD(r.amount)}
                     </td>
@@ -257,6 +335,7 @@ export default function PaymentsTable({
                 <td className="h-12 px-4 align-middle" />
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.base)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{totals.tickets}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
               </tr>
             </tfoot>

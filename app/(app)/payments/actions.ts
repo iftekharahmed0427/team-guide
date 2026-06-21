@@ -16,6 +16,8 @@ export type PaymentChange = {
   ticketOverride: number | null; // null = track the live Reports count
   roleId: string | null; // null = unassigned
   baseCompensation: number;
+  bonus: number;
+  recoveredRevenue: number;
 };
 
 async function requireAdmin() {
@@ -50,15 +52,22 @@ export async function savePayments(changes: PaymentChange[]): Promise<Result> {
       ticketOverride = n;
     }
 
-    const baseCompensation = Math.round((Number(c.baseCompensation) || 0) * 100) / 100;
-    if (!Number.isFinite(baseCompensation) || baseCompensation < 0) {
-      return { error: "Base compensation must be a valid amount." };
+    const money = (v: unknown) => Math.round((Number(v) || 0) * 100) / 100;
+    const baseCompensation = money(c.baseCompensation);
+    const bonus = money(c.bonus);
+    const recoveredRevenue = money(c.recoveredRevenue);
+    if (
+      !Number.isFinite(baseCompensation) || baseCompensation < 0 ||
+      !Number.isFinite(bonus) || bonus < 0 ||
+      !Number.isFinite(recoveredRevenue) || recoveredRevenue < 0
+    ) {
+      return { error: "Amounts must be valid, non-negative numbers." };
     }
 
     const roleId = c.roleId || null;
     if (roleId && !validRoleIds.has(roleId)) return { error: "A selected role no longer exists." };
 
-    rows.push({ userId: c.userId, ticketOverride, roleId, baseCompensation });
+    rows.push({ userId: c.userId, ticketOverride, roleId, baseCompensation, bonus, recoveredRevenue });
   }
 
   for (const r of rows) {
@@ -71,6 +80,8 @@ export async function savePayments(changes: PaymentChange[]): Promise<Result> {
           ticketOverride: r.ticketOverride,
           roleId: r.roleId,
           baseCompensation: r.baseCompensation,
+          bonus: r.bonus,
+          recoveredRevenue: r.recoveredRevenue,
           updatedAt: new Date(),
         },
       });

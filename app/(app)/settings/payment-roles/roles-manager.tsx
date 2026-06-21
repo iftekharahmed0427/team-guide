@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, AlertCircle, Ticket } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Ticket, Gift } from "lucide-react";
 import type { PaymentRole } from "@/app/(app)/payments/constants";
-import { createRole, renameRole, deleteRole, setRolePayType } from "./actions";
+import { createRole, renameRole, deleteRole, setRolePayType, setRoleBonusEligible } from "./actions";
 
 type Result = { ok: true } | { error: string };
 
@@ -57,6 +57,10 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
 
   function togglePayType(id: string, next: boolean) {
     run(() => setRolePayType(id, next));
+  }
+
+  function toggleBonus(id: string, next: boolean) {
+    run(() => setRoleBonusEligible(id, next));
   }
 
   return (
@@ -128,6 +132,24 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
                 >
                   <Ticket size={13} strokeWidth={1.75} />
                   {r.paidPerTicket ? "Per ticket" : "Base only"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleBonus(r.id, !r.bonusEligible)}
+                  disabled={pending}
+                  title={
+                    r.bonusEligible
+                      ? "Has Bonus + Recovered revenue fields - click to remove"
+                      : "No bonus fields - click to add Bonus + Recovered revenue"
+                  }
+                  className={`flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                    r.bonusEligible
+                      ? "border-foreground/40 text-foreground"
+                      : "border-border text-muted hover:text-foreground"
+                  }`}
+                >
+                  <Gift size={13} strokeWidth={1.75} />
+                  Bonus
                 </button>
                 <button
                   type="button"
