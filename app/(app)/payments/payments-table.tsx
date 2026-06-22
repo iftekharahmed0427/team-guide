@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, Pencil, X } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import CustomSelect from "@/app/components/custom-select";
 import {
@@ -18,7 +18,6 @@ type Draft = {
   overrideText: string;
   baseText: string;
   bonusText: string;
-  recoveredText: string;
 };
 
 const moneyText = (n: number) => (n ? String(n) : "");
@@ -27,7 +26,6 @@ const seedRow = (m: PayableMember): Draft => ({
   overrideText: m.override === null ? "" : String(m.override),
   baseText: moneyText(m.baseCompensation),
   bonusText: moneyText(m.bonus),
-  recoveredText: moneyText(m.recoveredRevenue),
 });
 
 const parseOverride = (t: string): number | null => {
@@ -60,9 +58,11 @@ export default function PaymentsTable({
   const [draft, setDraft] = useState<Record<string, Draft>>(seed);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  // Admins start in read-only view and opt into editing; everyone else is always
+  // read-only. Inputs render only while editing.
+  const [editing, setEditing] = useState(false);
 
   const payByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.paidPerTicket])), [roles]);
-  const bonusByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.bonusEligible])), [roles]);
   const roleOptions = useMemo(
     () => [
       { value: "", label: "Unassigned" },
@@ -71,16 +71,18 @@ export default function PaymentsTable({
     [roles],
   );
 
-  // Resolve a row's effective values: the staged draft when editable, else saved.
+  // Resolve a row's effective values: the staged draft while editing, else saved.
   function resolved(m: PayableMember) {
-    const d = (editable && m.userId && draft[m.userId]) || seedRow(m);
+    const d = (editing && m.userId && draft[m.userId]) || seedRow(m);
     const override = parseOverride(d.overrideText);
     const base = parseBase(d.baseText);
     const bonus = parseBase(d.bonusText);
-    const recovered = parseBase(d.recoveredText);
     const roleId = d.roleId;
     const paidPerTicket = roleId ? payByRole.get(roleId) ?? false : true;
-    const bonusEligible = roleId ? bonusByRole.get(roleId) ?? false : false;
+    // The disputes amount + its 5% bonus are server-computed (from /disputes) and
+    // not editable here; the 5% adds to Amount on top of the manual bonus.
+    const disputeAmount = m.disputeAmount || 0;
+    const disputeBonus = m.disputeBonus || 0;
     const eff = override ?? m.tickets;
     const amount = memberTotal({
       tickets: m.tickets,
@@ -88,8 +90,9 @@ export default function PaymentsTable({
       paidPerTicket,
       baseCompensation: base,
       bonus,
+      disputeBonus,
     });
-    return { override, base, bonus, recovered, roleId, paidPerTicket, bonusEligible, eff, amount };
+    return { override, base, bonus, roleId, paidPerTicket, eff, amount, disputeAmount, disputeBonus };
   }
 
   function isChanged(m: PayableMember) {
@@ -99,15 +102,14 @@ export default function PaymentsTable({
       r.roleId !== m.roleId ||
       r.override !== m.override ||
       r.base !== m.baseCompensation ||
-      r.bonus !== m.bonus ||
-      r.recovered !== m.recoveredRevenue
+      r.bonus !== m.bonus
     );
   }
 
-  const changedMembers = editable ? members.filter(isChanged) : [];
+  const changedMembers = editing ? members.filter(isChanged) : [];
   const dirty = changedMembers.length > 0;
 
-  // Re-seed from the server only when there are no unsaved edits, so a live SSE
+  // Re-seed from the server only when there are no unsaved edits, so a live
   // refresh (or a just-completed save) syncs without clobbering work in progress.
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -121,7 +123,13 @@ export default function PaymentsTable({
     setDraft((cur) => ({ ...cur, [userId]: { ...seedRowFallback(cur, userId), ...p } }));
   }
   function seedRowFallback(cur: Record<string, Draft>, userId: string): Draft {
-    return cur[userId] ?? { roleId: null, overrideText: "", baseText: "", bonusText: "", recoveredText: "" };
+    return cur[userId] ?? { roleId: null, overrideText: "", baseText: "", bonusText: "" };
+  }
+
+  function cancel() {
+    setDraft(seed()); // discard unsaved edits
+    setError("");
+    setEditing(false);
   }
 
   function save() {
@@ -133,13 +141,15 @@ export default function PaymentsTable({
         roleId: r.roleId,
         baseCompensation: r.base,
         bonus: r.bonus,
-        recoveredRevenue: r.recovered,
       };
     });
     startTransition(async () => {
       const res = await savePayments(changes);
       if ("error" in res) setError(res.error);
-      else router.refresh();
+      else {
+        setEditing(false);
+        router.refresh();
+      }
     });
   }
 
@@ -148,7 +158,7 @@ export default function PaymentsTable({
       const r = resolved(m);
       acc.tickets += r.eff;
       acc.base += r.base;
-      acc.bonus += r.bonus;
+      acc.bonus += r.bonus + r.disputeBonus;
       acc.amount += r.amount;
       return acc;
     },
@@ -161,20 +171,47 @@ export default function PaymentsTable({
     <div className="flex flex-col gap-3">
       {editable ? (
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted">
-            {dirty
-              ? `${changedMembers.length} unsaved change${changedMembers.length === 1 ? "" : "s"}`
-              : "All changes saved"}
-          </p>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || pending}
-            className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted disabled:opacity-50"
-          >
-            <Save size={15} strokeWidth={1.75} />
-            Save changes
-          </button>
+          {editing ? (
+            <>
+              <p className="text-xs text-muted">
+                {dirty
+                  ? `${changedMembers.length} unsaved change${changedMembers.length === 1 ? "" : "s"}`
+                  : "All changes saved"}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={cancel}
+                  disabled={pending}
+                  className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  <X size={15} strokeWidth={1.75} />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={!dirty || pending}
+                  className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted disabled:opacity-50"
+                >
+                  <Save size={15} strokeWidth={1.75} />
+                  Save changes
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted">View only</p>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors"
+              >
+                <Pencil size={15} strokeWidth={1.75} />
+                Edit
+              </button>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -205,8 +242,8 @@ export default function PaymentsTable({
             <tbody>
               {members.map((m) => {
                 const r = resolved(m);
-                const linked = editable && !!m.userId;
-                const changed = isChanged(m);
+                const linked = editing && !!m.userId;
+                const changed = editing && isChanged(m);
                 const d = (m.userId && draft[m.userId]) || seedRow(m);
                 return (
                   <tr
@@ -291,31 +328,21 @@ export default function PaymentsTable({
                               className={cell}
                             />
                           </div>
-                          {r.bonusEligible ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <span className="text-[10px] uppercase tracking-wide text-muted">Rec.</span>
-                              <span className="text-muted">$</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={d.recoveredText}
-                                disabled={pending}
-                                placeholder="0"
-                                title="Recovered revenue (recorded only, not paid)"
-                                onChange={(e) =>
-                                  patch(m.userId as string, { recoveredText: e.target.value.replace(/[^\d.]/g, "") })
-                                }
-                                className="h-6 w-16 border border-border bg-surface-2 px-1.5 text-right text-xs tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60"
-                              />
-                            </div>
+                          {r.disputeAmount > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="5% of this period's disputes, added to the bonus"
+                            >
+                              Disputes {formatUSD(r.disputeAmount)} &rarr; +{formatUSD(r.disputeBonus)}
+                            </span>
                           ) : null}
                         </div>
                       ) : (
                         <div className="flex flex-col items-end leading-tight">
                           <span>{formatUSD(m.bonus)}</span>
-                          {m.bonusEligible ? (
+                          {m.disputeAmount > 0 ? (
                             <span className="text-[11px] text-muted">
-                              Rec. {formatUSD(m.recoveredRevenue)}
+                              Disputes {formatUSD(m.disputeAmount)} &rarr; +{formatUSD(m.disputeBonus)}
                             </span>
                           ) : null}
                         </div>

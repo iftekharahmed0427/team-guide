@@ -26,6 +26,8 @@ export type PayableMember = {
   baseCompensation: number; // flat $ paid on top of ticket pay
   bonus: number; // manual $ bonus (bonus-eligible roles); adds to Amount
   recoveredRevenue: number; // recorded only, not paid
+  disputeAmount: number; // summed disputed amount this period (from /disputes); the recovered total
+  disputeBonus: number; // 5% of disputeAmount, added to Amount on top of the manual bonus
 };
 
 // One assignable payment role from the admin-managed catalog. `paidPerTicket`
@@ -51,14 +53,16 @@ export function ticketPayout(tickets: number): number {
 
 // Total a member is owed: ticket pay (on the effective count) when their role is
 // paid-per-ticket, plus flat base compensation, plus a manual bonus (every member
-// can have one). Recovered revenue is recorded only, never paid.
+// can have one), plus the auto disputes bonus (5% of their disputes this period).
+// Recovered revenue is recorded only, never paid.
 export function memberTotal(m: {
   tickets: number;
   override: number | null;
   paidPerTicket: boolean;
   baseCompensation: number;
   bonus: number;
+  disputeBonus?: number;
 }): number {
   const ticketPart = m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0;
-  return ticketPart + (m.baseCompensation || 0) + (m.bonus || 0);
+  return ticketPart + (m.baseCompensation || 0) + (m.bonus || 0) + (m.disputeBonus || 0);
 }

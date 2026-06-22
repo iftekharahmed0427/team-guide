@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getRealSession, isViewingAsMember } from "@/lib/auth";
+import { getRealSession, getSession, isViewingAsMember } from "@/lib/auth";
+import { canAccessDisputes } from "@/lib/disputes";
 import Sidebar from "@/app/components/sidebar";
 import LiveRefresh from "@/app/components/live-refresh";
 import ViewAsBanner from "@/app/components/view-as-banner";
@@ -19,6 +20,10 @@ export default async function AppLayout({
   }
 
   const viewingAsMember = await isViewingAsMember();
+  // Gate the Disputes nav item to admins + Disputes-role members. Use the
+  // effective session (getSession applies the "view as member" downgrade) so the
+  // nav matches what the /disputes page itself allows.
+  const canSeeDisputes = await canAccessDisputes(await getSession());
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -31,6 +36,7 @@ export default async function AppLayout({
           role: session.user.role,
         }}
         viewingAsMember={viewingAsMember}
+        canSeeDisputes={canSeeDisputes}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
         {viewingAsMember ? <ViewAsBanner /> : null}

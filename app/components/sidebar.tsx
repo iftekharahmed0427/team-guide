@@ -12,6 +12,7 @@ import {
   BookOpen,
   Ticket,
   HandCoins,
+  Gavel,
   Wallet,
   Star,
   ClipboardCheck,
@@ -40,6 +41,7 @@ type NavItem = {
   href?: string;
   badge?: string;
   adminOnly?: boolean;
+  disputesOnly?: boolean; // only for admins + members with the Disputes role
 };
 
 const primaryNav: NavItem[] = [
@@ -50,6 +52,7 @@ const primaryNav: NavItem[] = [
   { label: "Reports", icon: Ticket, href: "/reports" },
   { label: "Reviews", icon: Star, href: "/reviews" },
   { label: "Commissions", icon: HandCoins, href: "/commissions" },
+  { label: "Disputes", icon: Gavel, href: "/disputes", disputesOnly: true },
   { label: "Payments", icon: Wallet, href: "/payments" },
   { label: "Audits", icon: ClipboardCheck, href: "/audits" },
   { label: "Specialists", icon: Gamepad2, href: "/specialties" },
@@ -98,9 +101,11 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
 export default function Sidebar({
   user,
   viewingAsMember,
+  canSeeDisputes,
 }: {
   user: SidebarUser;
   viewingAsMember: boolean;
+  canSeeDisputes: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -157,7 +162,7 @@ export default function Sidebar({
           Menu
         </p>
         {primaryNav
-          .filter((item) => !item.adminOnly || isAdmin)
+          .filter((item) => (!item.adminOnly || isAdmin) && (!item.disputesOnly || canSeeDisputes))
           .map((item) => (
             <NavRow key={item.label} item={item} active={isActive(item)} />
           ))}

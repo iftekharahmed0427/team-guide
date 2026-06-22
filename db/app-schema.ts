@@ -578,3 +578,35 @@ export const activityLog = pgTable("activity_log", {
   targetLabel: text("target_label").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ── Disputes ──────────────────────────────────────────────────────────────────
+
+// Admin-managed catalog of dispute categories shown in the /disputes form's
+// Category picker (seeded with "Fraudulent" the first time it is read). Mirrors
+// the payment_role / game_category catalogs; `sortOrder` controls display order.
+export const disputeCategory = pgTable("dispute_category", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// A payment dispute logged by a Disputes-role member (or an admin): the customer
+// email, a category (denormalized label, like guide.game), the disputed amount in
+// USD, and a screenshot (private-bucket object key, or an inline data URL when
+// storage is off, like reviews/audits). Submitter is denormalized (no FK). 5% of
+// each member's current-period dispute amounts is added to their /payments bonus
+// (see lib/disputes + lib/payments). Disputes share the report period: `periodId`
+// is null while current; "Reset all" stamps them with the archived period (like
+// reviews), so the recovered total and the 5% bonus reset each period.
+export const dispute = pgTable("dispute", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  category: text("category").notNull().default(""),
+  amount: doublePrecision("amount").notNull().default(0), // USD disputed / recovered
+  imageUrl: text("image_url").notNull(), // screenshot object key or data URL
+  submittedById: text("submitted_by_id"),
+  submittedByName: text("submitted_by_name").notNull().default(""),
+  periodId: text("period_id").references(() => reportPeriod.id, { onDelete: "cascade" }), // null = current period
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

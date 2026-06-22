@@ -9,10 +9,11 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
+  Star,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { newsPost, unavailability, shift, note, ticketCount } from "@/db/app-schema";
+import { newsPost, unavailability, shift, note, ticketCount, review } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import AvailabilityCalendar from "@/app/components/availability-calendar";
 import ShiftCheckin from "@/app/components/shift-checkin";
@@ -71,7 +72,7 @@ export default async function Home() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
 
-  const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes, ticketRows] =
+  const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes, ticketRows, reviewCounts] =
     await Promise.all([
       db.select().from(newsPost).orderBy(desc(newsPost.createdAt)).limit(5),
       db
@@ -95,6 +96,12 @@ export default async function Home() {
       db.select({ value: count() }).from(user),
       db.select().from(note).orderBy(desc(note.createdAt)).limit(5),
       db.select().from(ticketCount).where(eq(ticketCount.id, "singleton")).limit(1),
+      // Current-period reviews (periodId null), counted per source for the card.
+      db
+        .select({ source: review.source, n: count() })
+        .from(review)
+        .where(isNull(review.periodId))
+        .groupBy(review.source),
     ]);
 
   const totalMembers = memberCount[0]?.value ?? 0;
@@ -111,6 +118,11 @@ export default async function Home() {
     ticketDelta = `${pct >= 0 ? "+" : ""}${pct}% vs last period`;
   }
 
+  // Reviews logged this period (Reset all archives them), split by source.
+  const trustpilotReviews = reviewCounts.find((r) => r.source === "trustpilot")?.n ?? 0;
+  const googleReviews = reviewCounts.find((r) => r.source === "google")?.n ?? 0;
+  const totalReviews = reviewCounts.reduce((s, r) => s + r.n, 0);
+
   const stats: Stat[] = [
     {
       label: "Tickets solved",
@@ -124,6 +136,12 @@ export default async function Home() {
       value: `${activeShifts.length} / ${totalMembers}`,
       delta: "checked in",
       icon: UserCheck,
+    },
+    {
+      label: "Reviews",
+      value: totalReviews.toLocaleString(),
+      delta: `${trustpilotReviews} Trustpilot · ${googleReviews} Google`,
+      icon: Star,
     },
   ];
 
@@ -161,9 +179,10 @@ export default async function Home() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
           {/* Left column: stats + latest news */}
           <div className="fx-rise flex flex-col gap-4 lg:col-span-2">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatCard stat={stats[0]} />
               <StatCard stat={stats[1]} />
+              <StatCard stat={stats[2]} />
             </div>
 
             {/* Latest news */}

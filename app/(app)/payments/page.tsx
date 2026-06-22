@@ -8,16 +8,17 @@ import PaymentsTable from "./payments-table";
 const DAY_MS = 1000 * 60 * 60 * 24;
 
 // Temporary: while the payments tool is still being built, it is locked to
-// Conscience (iftekharahmed0427@gmail.com). Everyone else - members and other
-// admins - sees a "Work in progress" screen. Remove this gate to open it up.
-const PAYMENTS_OWNER_ID = "O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw";
+// Conscience (iftekharahmed0427@gmail.com) plus the local dev user. Everyone else
+// - members and other admins - sees a "Work in progress" screen. Remove this gate
+// to open it up.
+const PAYMENTS_OWNER_IDS = ["O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw", "dev-user"];
 
 export default async function PaymentsPage() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
   const isAdmin = session?.user.role === "admin";
 
-  if (currentUserId !== PAYMENTS_OWNER_ID) {
+  if (!PAYMENTS_OWNER_IDS.includes(currentUserId)) {
     return <WorkInProgress />;
   }
 

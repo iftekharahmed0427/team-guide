@@ -13,6 +13,7 @@ import {
   reportPeriodEntry,
   resetLog,
   review,
+  dispute,
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
@@ -239,15 +240,20 @@ export async function resetAllReportChannels(): Promise<Result> {
     })
     .from(reportChannel);
   const total = channels.reduce((sum, c) => sum + (c.count ?? 0), 0);
-  // Reviews share the report period: the current ones (periodId null) get stamped
-  // with the period we archive here.
+  // Reviews and disputes share the report period: the current ones (periodId
+  // null) get stamped with the period we archive here, so each new period starts
+  // clean (and the disputes 5% bonus resets).
   const currentReviews = await db
     .select({ id: review.id })
     .from(review)
     .where(isNull(review.periodId));
+  const currentDisputes = await db
+    .select({ id: dispute.id })
+    .from(dispute)
+    .where(isNull(dispute.periodId));
 
-  // Archive when there are tickets OR reviews to record for the period.
-  const archived = total > 0 || currentReviews.length > 0;
+  // Archive when there are tickets OR reviews OR disputes to record for the period.
+  const archived = total > 0 || currentReviews.length > 0 || currentDisputes.length > 0;
   let archivedPeriodId: string | null = null;
   if (archived) {
     const last = (
@@ -277,6 +283,9 @@ export async function resetAllReportChannels(): Promise<Result> {
     if (entries.length > 0) await db.insert(reportPeriodEntry).values(entries);
     if (currentReviews.length > 0) {
       await db.update(review).set({ periodId }).where(isNull(review.periodId));
+    }
+    if (currentDisputes.length > 0) {
+      await db.update(dispute).set({ periodId }).where(isNull(dispute.periodId));
     }
   }
 
@@ -311,6 +320,8 @@ export async function resetAllReportChannels(): Promise<Result> {
   revalidatePath("/reports");
   revalidatePath("/reports/history");
   revalidatePath("/reviews");
+  revalidatePath("/disputes");
+  revalidatePath("/payments");
   await notifyChange();
   return { ok: true };
 }
