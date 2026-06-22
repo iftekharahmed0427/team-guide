@@ -1,4 +1,4 @@
-import { CalendarRange, Ticket, Crown } from "lucide-react";
+import { CalendarRange, Ticket, Crown, Construction } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getPayableMembers, getCurrentPeriod, getPaymentRoles } from "@/lib/payments";
 import { formatDateShort } from "@/lib/datetime";
@@ -7,10 +7,19 @@ import PaymentsTable from "./payments-table";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
+// Temporary: while the payments tool is still being built, it is locked to
+// Conscience (iftekharahmed0427@gmail.com). Everyone else - members and other
+// admins - sees a "Work in progress" screen. Remove this gate to open it up.
+const PAYMENTS_OWNER_ID = "O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw";
+
 export default async function PaymentsPage() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
   const isAdmin = session?.user.role === "admin";
+
+  if (currentUserId !== PAYMENTS_OWNER_ID) {
+    return <WorkInProgress />;
+  }
 
   const [members, period, roles] = await Promise.all([
     getPayableMembers(),
@@ -81,6 +90,32 @@ export default async function PaymentsPage() {
           </div>
 
           <PaymentsTable members={rows} roles={roles} editable={isAdmin} />
+        </div>
+      </main>
+    </>
+  );
+}
+
+function WorkInProgress() {
+  return (
+    <>
+      <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-6">
+        <div>
+          <h1 className="text-base font-semibold tracking-tight">Payments</h1>
+          <p className="text-xs text-muted">Work in progress</p>
+        </div>
+      </header>
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="fx-rise mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-4 text-center">
+          <div className="flex h-14 w-14 items-center justify-center border border-border bg-surface">
+            <Construction size={26} strokeWidth={1.5} className="text-muted" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Work in progress</h2>
+            <p className="mt-1 text-sm text-muted">
+              The payments tool is still being built. It will be available here soon.
+            </p>
+          </div>
         </div>
       </main>
     </>
