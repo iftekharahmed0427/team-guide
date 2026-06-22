@@ -43,7 +43,7 @@ const ACTION_LABELS: Record<string, string> = {
   "payment.role_renamed": "renamed a payment role",
   "payment.role_deleted": "deleted a payment role",
   "payment.role_paytype": "changed a role's pay type",
-  "payment.role_bonus": "changed a role's bonus eligibility",
+  "payment.role_bonus": "changed a role's recovered-revenue field",
   "comp.period_created": "started a pay period",
   "comp.period_updated": "edited a pay period",
   "comp.period_deleted": "deleted a pay period",

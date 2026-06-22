@@ -86,7 +86,6 @@ export default function PaymentsTable({
       tickets: m.tickets,
       override,
       paidPerTicket,
-      bonusEligible,
       baseCompensation: base,
       bonus,
     });
@@ -149,7 +148,7 @@ export default function PaymentsTable({
       const r = resolved(m);
       acc.tickets += r.eff;
       acc.base += r.base;
-      acc.bonus += r.bonusEligible ? r.bonus : 0;
+      acc.bonus += r.bonus;
       acc.amount += r.amount;
       return acc;
     },
@@ -275,24 +274,24 @@ export default function PaymentsTable({
                       )}
                     </td>
                     <td className="h-12 px-4 text-right align-middle tabular-nums">
-                      {r.bonusEligible ? (
-                        linked ? (
-                          <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center justify-end gap-1">
-                              <span className="text-muted">$</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={d.bonusText}
-                                disabled={pending}
-                                placeholder="0"
-                                title="Bonus (adds to pay)"
-                                onChange={(e) =>
-                                  patch(m.userId as string, { bonusText: e.target.value.replace(/[^\d.]/g, "") })
-                                }
-                                className={cell}
-                              />
-                            </div>
+                      {linked ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-muted">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={d.bonusText}
+                              disabled={pending}
+                              placeholder="0"
+                              title="Bonus (adds to pay)"
+                              onChange={(e) =>
+                                patch(m.userId as string, { bonusText: e.target.value.replace(/[^\d.]/g, "") })
+                              }
+                              className={cell}
+                            />
+                          </div>
+                          {r.bonusEligible ? (
                             <div className="flex items-center justify-end gap-1">
                               <span className="text-[10px] uppercase tracking-wide text-muted">Rec.</span>
                               <span className="text-muted">$</span>
@@ -309,17 +308,17 @@ export default function PaymentsTable({
                                 className="h-6 w-16 border border-border bg-surface-2 px-1.5 text-right text-xs tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60"
                               />
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-end leading-tight">
-                            <span>{formatUSD(m.bonus)}</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-end leading-tight">
+                          <span>{formatUSD(m.bonus)}</span>
+                          {m.bonusEligible ? (
                             <span className="text-[11px] text-muted">
                               Rec. {formatUSD(m.recoveredRevenue)}
                             </span>
-                          </div>
-                        )
-                      ) : (
-                        <span className="text-muted">-</span>
+                          ) : null}
+                        </div>
                       )}
                     </td>
                     <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">

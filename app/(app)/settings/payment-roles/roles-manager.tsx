@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, AlertCircle, Ticket, Gift } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Ticket, RotateCcw } from "lucide-react";
 import type { PaymentRole } from "@/app/(app)/payments/constants";
 import { createRole, renameRole, deleteRole, setRolePayType, setRoleBonusEligible } from "./actions";
 
@@ -139,8 +139,8 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
                   disabled={pending}
                   title={
                     r.bonusEligible
-                      ? "Has Bonus + Recovered revenue fields - click to remove"
-                      : "No bonus fields - click to add Bonus + Recovered revenue"
+                      ? "Has the Recovered revenue field - click to remove"
+                      : "No Recovered revenue field - click to add it"
                   }
                   className={`flex h-8 shrink-0 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                     r.bonusEligible
@@ -148,8 +148,8 @@ export default function RolesManager({ roles }: { roles: PaymentRole[] }) {
                       : "border-border text-muted hover:text-foreground"
                   }`}
                 >
-                  <Gift size={13} strokeWidth={1.75} />
-                  Bonus
+                  <RotateCcw size={13} strokeWidth={1.75} />
+                  Recovered
                 </button>
                 <button
                   type="button"

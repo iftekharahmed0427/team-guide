@@ -49,18 +49,16 @@ export function ticketPayout(tickets: number): number {
   return tickets * TICKET_RATE;
 }
 
-// Total a member is owed, role-based: ticket pay (on the effective count) when
-// their role is paid-per-ticket, plus flat base compensation, plus a manual
-// bonus when their role is bonus-eligible. Recovered revenue is recorded only.
+// Total a member is owed: ticket pay (on the effective count) when their role is
+// paid-per-ticket, plus flat base compensation, plus a manual bonus (every member
+// can have one). Recovered revenue is recorded only, never paid.
 export function memberTotal(m: {
   tickets: number;
   override: number | null;
   paidPerTicket: boolean;
-  bonusEligible: boolean;
   baseCompensation: number;
   bonus: number;
 }): number {
   const ticketPart = m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0;
-  const bonusPart = m.bonusEligible ? m.bonus || 0 : 0;
-  return ticketPart + (m.baseCompensation || 0) + bonusPart;
+  return ticketPart + (m.baseCompensation || 0) + (m.bonus || 0);
 }

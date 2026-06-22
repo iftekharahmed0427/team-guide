@@ -417,8 +417,9 @@ export const paymentRole = pgTable("payment_role", {
   // flat base only. Drives the /payments Amount: paid-per-ticket roles earn
   // ticket pay + base; other roles earn base only.
   paidPerTicket: boolean("paid_per_ticket").notNull().default(false),
-  // Whether members in this role get the Bonus + Recovered revenue fields (the
-  // "Disputes" group). Bonus adds to Amount; recovered revenue is recorded only.
+  // Whether members in this role get the Recovered revenue field (the "Disputes"
+  // group). Recorded only, not paid. (Bonus itself is available to every member.)
+  // Column name kept as bonus_eligible to avoid a rename migration.
   bonusEligible: boolean("bonus_eligible").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
