@@ -53,6 +53,8 @@ import {
   unassignMember,
 } from "./actions";
 import Avatar from "@/app/components/avatar";
+import { supabase } from "@/lib/supabase-client";
+import { REALTIME_EVENT, REALTIME_TOPIC } from "@/lib/realtime-shared";
 
 type Columns = Record<string, Task[]>;
 
@@ -660,15 +662,19 @@ export default function KanbanBoard({
     }
   }, []);
 
-  // Subscribe to the app-wide realtime stream; refetch + reconcile on each
-  // change. (Board data only shows here, but the stream is shared app-wide.)
+  // Subscribe to the app-wide Supabase broadcast channel; refetch + reconcile on
+  // each change. (Board data only shows here, but the channel is shared app-wide.)
   useEffect(() => {
-    const source = new EventSource("/api/realtime");
-    source.onmessage = () => {
-      setRefreshKey((k) => k + 1);
-      void reconcile();
+    const channel = supabase
+      .channel(REALTIME_TOPIC)
+      .on("broadcast", { event: REALTIME_EVENT }, () => {
+        setRefreshKey((k) => k + 1);
+        void reconcile();
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
     };
-    return () => source.close();
   }, [reconcile]);
 
   const sensors = useSensors(
