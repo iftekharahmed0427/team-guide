@@ -84,7 +84,6 @@ export default function PaymentsTable({
     // top of the manual bonus.
     const disputeAmount = m.disputeAmount || 0;
     const disputeBonus = m.disputeBonus || 0;
-    const reviewCount = m.reviewCount || 0;
     const reviewBonus = m.reviewBonus || 0;
     const eff = override ?? m.tickets;
     const amount = memberTotal({
@@ -106,7 +105,6 @@ export default function PaymentsTable({
       amount,
       disputeAmount,
       disputeBonus,
-      reviewCount,
       reviewBonus,
     };
   }
@@ -354,12 +352,12 @@ export default function PaymentsTable({
                               Disputes {formatUSD(r.disputeAmount)} &rarr; +{formatUSD(r.disputeBonus)}
                             </span>
                           ) : null}
-                          {r.reviewCount > 0 ? (
+                          {r.reviewBonus > 0 ? (
                             <span
                               className="text-[10px] text-muted"
-                              title="Flat bonus once assigned reviews pass the threshold"
+                              title="Eligible for the review bonus this period"
                             >
-                              Reviews {r.reviewCount} &rarr; +{formatUSD(r.reviewBonus)}
+                              Review bonus &rarr; +{formatUSD(r.reviewBonus)}
                             </span>
                           ) : null}
                         </div>
@@ -371,9 +369,9 @@ export default function PaymentsTable({
                               Disputes {formatUSD(m.disputeAmount)} &rarr; +{formatUSD(m.disputeBonus)}
                             </span>
                           ) : null}
-                          {m.reviewCount > 0 ? (
+                          {m.reviewBonus > 0 ? (
                             <span className="text-[11px] text-muted">
-                              Reviews {m.reviewCount} &rarr; +{formatUSD(m.reviewBonus)}
+                              Review bonus &rarr; +{formatUSD(m.reviewBonus)}
                             </span>
                           ) : null}
                         </div>

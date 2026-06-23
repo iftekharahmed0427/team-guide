@@ -275,27 +275,33 @@ export const review = pgTable("review", {
   note: text("note").notNull().default(""),
   addedById: text("added_by_id"),
   addedByName: text("added_by_name").notNull().default(""),
-  // The member this review is credited to (set by admins on /reviews). Counts
-  // toward their review bonus this period; name denormalized so an archived row
-  // stays a stable snapshot if the user is later removed (FK set null).
-  assignedToId: text("assigned_to_id").references(() => user.id, { onDelete: "set null" }),
-  assignedToName: text("assigned_to_name").notNull().default(""),
   periodId: text("period_id").references(() => reportPeriod.id, { onDelete: "cascade" }), // null = current period
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Single-row (`id` = "singleton") config for the review bonus: a member assigned
-// `threshold` OR MORE reviews in the current period earns a flat `amount` USD
-// bonus, added to their /payments Amount. Edited inline on /reviews by admins;
-// seeded on first read (see lib/reviews.ts).
+// Single-row (`id` = "singleton") config for the review bonus: when the team's
+// total reviews this period reaches `threshold` OR MORE, every member marked
+// eligible (see review_bonus_member) earns a flat `amount` USD bonus on their
+// /payments Amount. Both editable inline on /reviews by admins; seeded on first
+// read (see lib/reviews.ts).
 export const reviewSetting = pgTable("review_setting", {
   id: text("id").primaryKey().default("singleton"),
-  threshold: integer("threshold").notNull().default(50),
-  amount: doublePrecision("amount").notNull().default(50),
+  threshold: integer("threshold").notNull().default(50), // team total reviews required
+  amount: doublePrecision("amount").notNull().default(50), // $ per eligible member
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+});
+
+// Members (non-admins) an admin has ticked as eligible for the review bonus on
+// /reviews. A row's presence = eligible; toggling the checkbox inserts/deletes
+// it. The bonus only pays out when the period's total reviews meet the threshold.
+export const reviewBonusMember = pgTable("review_bonus_member", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →

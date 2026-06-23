@@ -28,8 +28,7 @@ export type PayableMember = {
   recoveredRevenue: number; // recorded only, not paid
   disputeAmount: number; // summed disputed amount this period (from /disputes); the recovered total
   disputeBonus: number; // 5% of disputeAmount, added to Amount on top of the manual bonus
-  reviewCount: number; // reviews assigned to this member this period (from /reviews)
-  reviewBonus: number; // flat bonus when reviewCount passes the threshold; adds to Amount
+  reviewBonus: number; // flat review bonus (eligible member + team hit the period threshold); adds to Amount
 };
 
 // One assignable payment role from the admin-managed catalog. `paidPerTicket`

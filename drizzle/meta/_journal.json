@@ -288,6 +288,13 @@
       "when": 1782225985432,
       "tag": "0040_lumpy_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1782226799486,
+      "tag": "0041_thankful_black_knight",
+      "breakpoints": true
     }
   ]
 }

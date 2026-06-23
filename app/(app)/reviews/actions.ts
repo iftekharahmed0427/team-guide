@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { review, reviewSetting } from "@/db/app-schema";
+import { review, reviewSetting, reviewBonusMember } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
@@ -66,39 +66,38 @@ export async function addReview(input: {
   return { ok: true };
 }
 
-// Credit a review to a member (or clear it with a null userId). Admin only.
-// Stores the user id plus a denormalized name so an archived row stays readable
-// even if the member is later removed (the FK then nulls the id).
-export async function assignReview(reviewId: string, userId: string | null): Promise<Result> {
+// Toggle a member's review-bonus eligibility (admin only). A row in
+// review_bonus_member = eligible; the bonus only pays out when the period's
+// total reviews reach the threshold (see lib/reviews.getReviewBonusByUser).
+export async function setReviewEligibility(userId: string, eligible: boolean): Promise<Result> {
   const session = await requireAdmin();
-  if (!session) return { error: "Only admins can assign reviews." };
-  if (!reviewId) return { error: "Missing review." };
+  if (!session) return { error: "Only admins can change eligibility." };
+  if (!userId) return { error: "Missing member." };
 
-  let assignedToId: string | null = null;
-  let assignedToName = "";
-  if (userId) {
-    const u = (
-      await db
-        .select({ name: userTable.name, email: userTable.email })
-        .from(userTable)
-        .where(eq(userTable.id, userId))
-        .limit(1)
-    )[0];
-    if (!u) return { error: "That member no longer exists." };
-    assignedToId = userId;
-    assignedToName = u.name || u.email || "Member";
+  const u = (
+    await db
+      .select({ name: userTable.name, email: userTable.email })
+      .from(userTable)
+      .where(eq(userTable.id, userId))
+      .limit(1)
+  )[0];
+  if (!u) return { error: "That member no longer exists." };
+  const who = u.name || u.email || "Member";
+
+  if (eligible) {
+    await db.insert(reviewBonusMember).values({ userId }).onConflictDoNothing();
+  } else {
+    await db.delete(reviewBonusMember).where(eq(reviewBonusMember.userId, userId));
   }
-
-  await db.update(review).set({ assignedToId, assignedToName }).where(eq(review.id, reviewId));
-  await logActivity("review.assigned", assignedToName || "unassigned");
+  await logActivity("review.eligibility_set", `${who} ${eligible ? "eligible" : "not eligible"}`);
   revalidatePath(PAGE);
-  revalidatePath("/payments"); // the bonus this credit may earn shows there
+  revalidatePath("/payments"); // eligibility may change a member's bonus there
   await notifyChange();
   return { ok: true };
 }
 
-// Update the review-bonus rule: a member assigned more than `threshold` reviews
-// this period earns a flat `amount` USD bonus. Admin only.
+// Update the review-bonus rule: when the team's total reviews this period reach
+// `threshold`, each eligible member earns a flat `amount` USD. Admin only.
 export async function updateReviewBonus(input: {
   threshold: number;
   amount: number;
@@ -113,7 +112,7 @@ export async function updateReviewBonus(input: {
     .insert(reviewSetting)
     .values({ id: "singleton", threshold, amount })
     .onConflictDoUpdate({ target: reviewSetting.id, set: { threshold, amount } });
-  await logActivity("review.bonus_updated", `>${threshold} reviews -> ${amount}`);
+  await logActivity("review.bonus_updated", `${threshold}+ reviews -> ${amount}/member`);
   revalidatePath(PAGE);
   revalidatePath("/payments");
   await notifyChange();

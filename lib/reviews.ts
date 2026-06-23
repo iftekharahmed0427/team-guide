@@ -1,15 +1,17 @@
-import { eq, isNull } from "drizzle-orm";
+import { count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { review, reviewSetting } from "@/db/app-schema";
+import { review, reviewSetting, reviewBonusMember } from "@/db/app-schema";
 
 export type ReviewBonusSetting = { threshold: number; amount: number };
 
-// Defaults the singleton is seeded with: a member assigned 50 OR MORE reviews in
-// the current period earns a flat $50, both editable on /reviews.
+// Defaults the singleton is seeded with: when the team logs 50 OR MORE reviews in
+// the current period, each eligible member earns a flat $50. Both editable on
+// /reviews.
 export const REVIEW_BONUS_DEFAULTS: ReviewBonusSetting = { threshold: 50, amount: 50 };
 
 // The singleton review-bonus config, seeded with the defaults the first time it
 // is read (mirrors the dispute_category seed-on-read). Edited inline on /reviews.
+// `threshold` = team total reviews required; `amount` = $ per eligible member.
 export async function getReviewBonusSetting(): Promise<ReviewBonusSetting> {
   const read = () =>
     db
@@ -29,27 +31,30 @@ export async function getReviewBonusSetting(): Promise<ReviewBonusSetting> {
   return rows[0] ?? REVIEW_BONUS_DEFAULTS;
 }
 
-export type ReviewBonus = { count: number; bonus: number };
+// The number of reviews logged in the current period (periodId null) — the count
+// the bonus gate is measured against.
+export async function getCurrentReviewCount(): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(review).where(isNull(review.periodId));
+  return row?.n ?? 0;
+}
 
-// Per-member assigned-review counts for the CURRENT period (periodId null),
-// keyed by the assigned user id, with the flat bonus each earns: `amount` when
-// the count is `threshold` or more, else 0. /payments adds `bonus` to each
-// member's Amount, on top of the manual + disputes bonuses.
-export async function getReviewBonusByUser(): Promise<Map<string, ReviewBonus>> {
+// The set of member ids an admin has marked eligible for the review bonus.
+export async function getEligibleMemberIds(): Promise<Set<string>> {
+  const rows = await db.select({ userId: reviewBonusMember.userId }).from(reviewBonusMember);
+  return new Set(rows.map((r) => r.userId));
+}
+
+// Per-member review bonus for the CURRENT period, keyed by user id. The bonus
+// only applies when the team's total reviews this period reach the threshold; if
+// met, every eligible member earns `amount`, otherwise nobody does. /payments
+// adds this to each member's Amount, on top of the manual + disputes bonuses.
+export async function getReviewBonusByUser(): Promise<Map<string, number>> {
   const { threshold, amount } = await getReviewBonusSetting();
-  const rows = await db
-    .select({ userId: review.assignedToId })
-    .from(review)
-    .where(isNull(review.periodId));
+  const total = await getCurrentReviewCount();
+  const byUser = new Map<string, number>();
+  if (total < threshold) return byUser;
 
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    if (!r.userId) continue;
-    counts.set(r.userId, (counts.get(r.userId) ?? 0) + 1);
-  }
-  const byUser = new Map<string, ReviewBonus>();
-  for (const [userId, count] of counts) {
-    byUser.set(userId, { count, bonus: count >= threshold ? amount : 0 });
-  }
+  const eligible = await getEligibleMemberIds();
+  for (const userId of eligible) byUser.set(userId, amount);
   return byUser;
 }

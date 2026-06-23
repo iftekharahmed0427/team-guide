@@ -74,8 +74,7 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
       recoveredRevenue: o?.recoveredRevenue ?? 0,
       disputeAmount: r.userId ? disputeTotals.get(r.userId)?.amount ?? 0 : 0,
       disputeBonus: r.userId ? disputeTotals.get(r.userId)?.bonus ?? 0 : 0,
-      reviewCount: r.userId ? reviewTotals.get(r.userId)?.count ?? 0 : 0,
-      reviewBonus: r.userId ? reviewTotals.get(r.userId)?.bonus ?? 0 : 0,
+      reviewBonus: r.userId ? reviewTotals.get(r.userId) ?? 0 : 0,
     });
   }
 

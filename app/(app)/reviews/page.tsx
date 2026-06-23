@@ -7,12 +7,11 @@ import { review, reportPeriod } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import { signedGetUrl } from "@/lib/storage";
-import { getReviewBonusSetting, REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
+import { getReviewBonusSetting, REVIEW_BONUS_DEFAULTS, getEligibleMemberIds } from "@/lib/reviews";
 import ReviewForm from "./review-form";
 import ReviewDeleteButton from "./review-delete-button";
 import ReviewLightbox from "./review-lightbox";
 import ReviewBonusConfig from "./review-bonus-config";
-import ReviewAssign from "./review-assign";
 
 // A stored key needs a short-lived presigned URL; a legacy inline data URL is
 // already renderable as-is.
@@ -65,39 +64,34 @@ export default async function ReviewsPage() {
   const google = rows.filter((r) => r.source === "google").length;
   const total = rows.length;
 
-  // Admin extras: the member list for the assignment select, the editable bonus
-  // rule, and this period's per-member assigned-review standings.
-  let members: { id: string; name: string; image: string | null }[] = [];
+  // Admin extras: the editable bonus rule and the non-admin team roster with each
+  // member's current eligibility, for the checklist on the config card.
+  let members: { id: string; name: string; image: string | null; eligible: boolean }[] = [];
   let bonusSetting = REVIEW_BONUS_DEFAULTS;
-  let standings: { id: string; name: string; image: string | null; count: number }[] = [];
   if (isAdmin) {
-    const [memberRows, setting] = await Promise.all([
+    const [memberRows, setting, eligibleIds] = await Promise.all([
       db
         .select({
           id: userTable.id,
           name: userTable.name,
           email: userTable.email,
           image: userTable.image,
+          role: userTable.role,
         })
         .from(userTable)
         .orderBy(userTable.name),
       getReviewBonusSetting(),
+      getEligibleMemberIds(),
     ]);
-    members = memberRows.map((m) => ({ id: m.id, name: m.name || m.email, image: m.image }));
     bonusSetting = setting;
-
-    const counts = new Map<string, number>();
-    for (const r of rows) {
-      if (!r.assignedToId) continue;
-      counts.set(r.assignedToId, (counts.get(r.assignedToId) ?? 0) + 1);
-    }
-    const byId = new Map(members.map((m) => [m.id, m]));
-    standings = [...counts.entries()]
-      .map(([id, count]) => {
-        const m = byId.get(id);
-        return { id, name: m?.name ?? "Member", image: m?.image ?? null, count };
-      })
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    members = memberRows
+      .filter((m) => m.role !== "admin")
+      .map((m) => ({
+        id: m.id,
+        name: m.name || m.email,
+        image: m.image,
+        eligible: eligibleIds.has(m.id),
+      }));
   }
 
   const counters = [
@@ -143,7 +137,8 @@ export default async function ReviewsPage() {
             <ReviewBonusConfig
               threshold={bonusSetting.threshold}
               amount={bonusSetting.amount}
-              standings={standings}
+              totalReviews={total}
+              members={members}
             />
           ) : null}
 
@@ -179,22 +174,9 @@ export default async function ReviewsPage() {
                       {isAdmin ? <ReviewDeleteButton id={r.id} /> : null}
                     </div>
                     {r.note ? <p className="text-sm text-foreground">{r.note}</p> : null}
-                    <div className="mt-auto flex flex-col gap-2">
-                      <p className="text-xs text-muted">
-                        {r.addedByName || "Admin"} · {formatDateTime(r.createdAt)}
-                      </p>
-                      {isAdmin ? (
-                        <ReviewAssign
-                          reviewId={r.id}
-                          assignedToId={r.assignedToId}
-                          members={members}
-                        />
-                      ) : r.assignedToName ? (
-                        <p className="text-xs text-muted">
-                          Assigned: <span className="text-foreground">{r.assignedToName}</span>
-                        </p>
-                      ) : null}
-                    </div>
+                    <p className="mt-auto text-xs text-muted">
+                      {r.addedByName || "Admin"} · {formatDateTime(r.createdAt)}
+                    </p>
                   </div>
                 </div>
               ))}
