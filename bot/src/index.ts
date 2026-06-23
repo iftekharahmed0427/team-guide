@@ -31,10 +31,12 @@ const RUN_NOW = args.has("--now"); // one-shot report, then exit
 const DRY_RUN = args.has("--dry-run"); // count + log, never post
 
 const TICK_MS = 30_000;
-// The live dashboard count runs on its own faster cadence. It re-counts each
-// channel's window above its last manual reset every tick; recounting current
-// state is what lets deleted screenshots drop back out of the tally.
-const COUNT_TICK_MS = 5_000;
+// The live dashboard count re-counts each channel's window above its last manual
+// reset every tick (recounting current state is what lets deleted screenshots
+// drop back out of the tally). Each tick reads settings + channels from the DB,
+// so this cadence is a constant, 24/7 egress floor — keep it modest. 30s is
+// plenty fresh for a dashboard stat; the Discord topic has its own throttle.
+const COUNT_TICK_MS = 30_000;
 
 // How often each channel's Discord topic is refreshed with its ticket count.
 // Discord rate-limits topic edits to ~2 per 10 min per channel, so keep this at

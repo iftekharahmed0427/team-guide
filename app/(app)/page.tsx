@@ -74,7 +74,20 @@ export default async function Home() {
 
   const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes, ticketRows, reviewCounts] =
     await Promise.all([
-      db.select().from(newsPost).orderBy(desc(newsPost.createdAt)).limit(5),
+      // Only the columns the card renders — never the full `content` HTML (up to
+      // ~14 kB/row), which this page re-fetches on every live refresh.
+      db
+        .select({
+          id: newsPost.id,
+          slug: newsPost.slug,
+          title: newsPost.title,
+          authorName: newsPost.authorName,
+          createdAt: newsPost.createdAt,
+          tags: newsPost.tags,
+        })
+        .from(newsPost)
+        .orderBy(desc(newsPost.createdAt))
+        .limit(5),
       db
         .select({
           date: unavailability.date,
@@ -94,7 +107,16 @@ export default async function Home() {
         .where(isNull(shift.checkedOutAt))
         .orderBy(shift.checkedInAt),
       db.select({ value: count() }).from(user),
-      db.select().from(note).orderBy(desc(note.createdAt)).limit(5),
+      db
+        .select({
+          id: note.id,
+          body: note.body,
+          authorName: note.authorName,
+          createdAt: note.createdAt,
+        })
+        .from(note)
+        .orderBy(desc(note.createdAt))
+        .limit(5),
       db.select().from(ticketCount).where(eq(ticketCount.id, "singleton")).limit(1),
       // Current-period reviews (periodId null), counted per source for the card.
       db
