@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { desc } from "drizzle-orm";
-import { Gavel, Coins, HandCoins, Lock } from "lucide-react";
+import { Gavel, Coins, HandCoins, History, Lock } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportPeriod } from "@/db/app-schema";
@@ -73,9 +74,20 @@ export default async function DisputesPage() {
           <h1 className="text-base font-semibold tracking-tight">Disputes</h1>
           <p className="text-xs text-muted">{periodLabel}</p>
         </div>
-        <div className="hidden text-right leading-tight sm:block">
-          <p className="text-xs text-muted">This period</p>
-          <p className="text-lg font-semibold tabular-nums">{rows.length.toLocaleString()}</p>
+        <div className="flex items-center gap-4">
+          {isAdmin ? (
+            <Link
+              href="/disputes/history"
+              className="btn-wipe inline-flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground"
+            >
+              <History size={15} strokeWidth={1.75} />
+              History
+            </Link>
+          ) : null}
+          <div className="hidden text-right leading-tight sm:block">
+            <p className="text-xs text-muted">This period</p>
+            <p className="text-lg font-semibold tabular-nums">{rows.length.toLocaleString()}</p>
+          </div>
         </div>
       </header>
 

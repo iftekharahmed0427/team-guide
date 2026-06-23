@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { dispute, disputeCategory, paymentOverride, paymentRole } from "@/db/app-schema";
+import { dispute, disputeCategory, paymentOverride, paymentRole, reportPeriod } from "@/db/app-schema";
 
 // 5% of each member's current-period dispute amounts is added to their /payments
 // bonus, on top of the manual bonus (see lib/payments + the payments table).
@@ -33,6 +33,29 @@ export async function getDisputeCategories(): Promise<DisputeCategory[]> {
 // The current period's disputes (not yet archived), newest first.
 export async function getCurrentDisputes() {
   return db.select().from(dispute).where(isNull(dispute.periodId)).orderBy(desc(dispute.createdAt));
+}
+
+// Archived disputes joined with the report_period each was closed into (a
+// "Reset all" stamps the current disputes with the period it archives). The
+// inner join naturally excludes still-current rows (periodId null). Newest
+// period first, then newest dispute. Powers /disputes/history.
+export async function getArchivedDisputes() {
+  return db
+    .select({
+      id: dispute.id,
+      email: dispute.email,
+      category: dispute.category,
+      amount: dispute.amount,
+      imageUrl: dispute.imageUrl,
+      submittedByName: dispute.submittedByName,
+      createdAt: dispute.createdAt,
+      periodId: dispute.periodId,
+      startedAt: reportPeriod.startedAt,
+      endedAt: reportPeriod.endedAt,
+    })
+    .from(dispute)
+    .innerJoin(reportPeriod, eq(dispute.periodId, reportPeriod.id))
+    .orderBy(desc(reportPeriod.endedAt), desc(dispute.createdAt));
 }
 
 export type DisputeTotals = { amount: number; bonus: number };
