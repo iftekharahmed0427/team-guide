@@ -5,6 +5,7 @@ import { formatDate, formatDateTime } from "@/lib/datetime";
 import { signedGetUrl } from "@/lib/storage";
 import { formatUSD } from "@/app/(app)/payments/constants";
 import { getArchivedDisputes, DISPUTE_BONUS_RATE } from "@/lib/disputes";
+import { BONUS_OUTCOME, OUTCOME_LABEL, OUTCOME_BADGE } from "../constants";
 import DisputeShot from "../dispute-shot";
 
 // A stored key needs a short-lived presigned URL; a legacy inline data URL is
@@ -42,7 +43,8 @@ export default async function DisputeHistoryPage() {
       p = { id: it.periodId, startedAt: it.startedAt, endedAt: it.endedAt, amount: 0, items: [] };
       periods.set(it.periodId, p);
     }
-    p.amount += it.amount ?? 0;
+    // Recovered (and its bonus) counts won disputes only.
+    p.amount += it.outcome === BONUS_OUTCOME ? it.amount ?? 0 : 0;
     p.items.push(it);
   }
   const ordered = [...periods.values()];
@@ -97,6 +99,7 @@ export default async function DisputeHistoryPage() {
                           <th className="h-11 px-4 text-left align-middle font-medium">Shot</th>
                           <th className="h-11 px-4 text-left align-middle font-medium">Dispute</th>
                           <th className="h-11 px-4 text-left align-middle font-medium">Category</th>
+                          <th className="h-11 px-4 text-left align-middle font-medium">Outcome</th>
                           <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
                           <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
                           <th className="h-11 px-4 text-left align-middle font-medium">Logged by</th>
@@ -114,11 +117,20 @@ export default async function DisputeHistoryPage() {
                                 {d.category || "Uncategorized"}
                               </span>
                             </td>
+                            <td className="h-14 px-4 align-middle">
+                              <span
+                                className={`border px-2 py-0.5 text-[11px] uppercase tracking-wide ${OUTCOME_BADGE[d.outcome] ?? "border-border text-muted"}`}
+                              >
+                                {OUTCOME_LABEL[d.outcome] ?? d.outcome}
+                              </span>
+                            </td>
                             <td className="h-14 px-4 text-right align-middle tabular-nums">
                               {formatUSD(d.amount)}
                             </td>
                             <td className="h-14 px-4 text-right align-middle tabular-nums text-muted">
-                              +{formatUSD(Math.round(d.amount * DISPUTE_BONUS_RATE * 100) / 100)}
+                              {d.outcome === BONUS_OUTCOME
+                                ? `+${formatUSD(Math.round(d.amount * DISPUTE_BONUS_RATE * 100) / 100)}`
+                                : "-"}
                             </td>
                             <td className="h-14 px-4 align-middle text-muted">
                               <span className="text-foreground">{d.submittedByName || "Member"}</span>

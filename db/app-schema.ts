@@ -616,18 +616,20 @@ export const disputeCategory = pgTable("dispute_category", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// A payment dispute logged by a Disputes-role member (or an admin): the customer
-// email, a category (denormalized label, like guide.game), the disputed amount in
-// USD, and a screenshot (private-bucket object key, or an inline data URL when
-// storage is off, like reviews/audits). Submitter is denormalized (no FK). 5% of
-// each member's current-period dispute amounts is added to their /payments bonus
-// (see lib/disputes + lib/payments). Disputes share the report period: `periodId`
-// is null while current; "Reset all" stamps them with the archived period (like
-// reviews), so the recovered total and the 5% bonus reset each period.
+// A payment dispute logged by a Disputes-role member (or an admin): a free-text
+// reference, a category (denormalized label, like guide.game), an outcome
+// (won/lost/refunded), the disputed amount in USD, and a screenshot (private-bucket
+// object key, or an inline data URL when storage is off, like reviews/audits).
+// Submitter is denormalized (no FK). Only WON disputes count: 5% of each member's
+// current-period won amounts is added to their /payments bonus (see lib/disputes +
+// lib/payments). Disputes share the report period: `periodId` is null while
+// current; "Reset all" stamps them with the archived period (like reviews), so the
+// recovered total and the 5% bonus reset each period.
 export const dispute = pgTable("dispute", {
   id: text("id").primaryKey(),
   dispute: text("dispute").notNull().default(""), // free-text dispute reference / detail
   category: text("category").notNull().default(""),
+  outcome: text("outcome").notNull().default("won"), // 'won' | 'lost' | 'refunded'; only won earns the bonus
   amount: doublePrecision("amount").notNull().default(0), // USD disputed / recovered
   imageUrl: text("image_url").notNull(), // screenshot object key or data URL
   submittedById: text("submitted_by_id"),

@@ -7,6 +7,7 @@ import CustomSelect from "@/app/components/custom-select";
 import { imageToDataUrl, imageFilesFrom } from "@/app/components/editor-images";
 import { formatUSD } from "@/app/(app)/payments/constants";
 import { createDispute, deleteDispute } from "./actions";
+import { DISPUTE_OUTCOMES, BONUS_OUTCOME, OUTCOME_LABEL, OUTCOME_BADGE } from "./constants";
 
 // Keep in sync with DISPUTE_BONUS_RATE in lib/disputes.ts (that module is
 // server-only, so the rate is mirrored here for the live preview / column).
@@ -16,6 +17,7 @@ export type DisputeItem = {
   id: string;
   dispute: string;
   category: string;
+  outcome: string;
   amount: number;
   src: string; // resolved (presigned or inline) screenshot URL
   submittedById: string | null;
@@ -41,6 +43,7 @@ export default function DisputesClient({
   const router = useRouter();
   const [dispute, setDispute] = useState("");
   const [category, setCategory] = useState(categories[0]?.name ?? "");
+  const [outcome, setOutcome] = useState<string>(BONUS_OUTCOME);
   const [amount, setAmount] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +69,7 @@ export default function DisputesClient({
     if (!image) return setError("Attach a screenshot of the dispute first.");
     const amt = Math.round((Number(amount) || 0) * 100) / 100;
     startTransition(async () => {
-      const res = await createDispute({ dispute, category, amount: amt, imageUrl: image });
+      const res = await createDispute({ dispute, category, outcome, amount: amt, imageUrl: image });
       if ("error" in res) {
         setError(res.error);
         return;
@@ -90,7 +93,8 @@ export default function DisputesClient({
     });
   }
 
-  const previewBonus = Math.round((Number(amount) || 0) * BONUS_RATE * 100) / 100;
+  const earnsBonus = outcome === BONUS_OUTCOME;
+  const previewBonus = earnsBonus ? Math.round((Number(amount) || 0) * BONUS_RATE * 100) / 100 : 0;
 
   return (
     <>
@@ -107,8 +111,8 @@ export default function DisputesClient({
       >
         <p className="mb-3 text-sm font-medium">Log a dispute</p>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="sm:col-span-1">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
             <label className={labelCls}>Dispute</label>
             <input
               type="text"
@@ -130,6 +134,16 @@ export default function DisputesClient({
             />
           </div>
           <div>
+            <label className={labelCls}>Outcome</label>
+            <CustomSelect
+              name="outcome"
+              options={DISPUTE_OUTCOMES.map((o) => ({ value: o, label: OUTCOME_LABEL[o] }))}
+              defaultValue={outcome}
+              onChange={setOutcome}
+              className="w-full"
+            />
+          </div>
+          <div>
             <label className={labelCls}>Amount (USD)</label>
             <div className="flex items-center gap-1">
               <span className="text-muted">$</span>
@@ -143,7 +157,9 @@ export default function DisputesClient({
               />
             </div>
             <p className="mt-1 text-[11px] text-muted">
-              Adds {formatUSD(previewBonus)} (5%) to the bonus
+              {earnsBonus
+                ? `Adds ${formatUSD(previewBonus)} (5%) to the bonus`
+                : `${OUTCOME_LABEL[outcome] ?? "These"} disputes don't earn a bonus`}
             </p>
           </div>
         </div>
@@ -191,7 +207,7 @@ export default function DisputesClient({
               Dispute logged
             </span>
           ) : (
-            <span className="text-xs text-muted">5% of the amount is added to your bonus this period.</span>
+            <span className="text-xs text-muted">Only won disputes add 5% to your bonus this period.</span>
           )}
           <button
             type="button"
@@ -227,6 +243,7 @@ export default function DisputesClient({
                 <th className="h-11 px-4 text-left align-middle font-medium">Shot</th>
                 <th className="h-11 px-4 text-left align-middle font-medium">Dispute</th>
                 <th className="h-11 px-4 text-left align-middle font-medium">Category</th>
+                <th className="h-11 px-4 text-left align-middle font-medium">Outcome</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
                 <th className="h-11 px-4 text-left align-middle font-medium">Logged by</th>
@@ -259,9 +276,18 @@ export default function DisputesClient({
                         {d.category || "Uncategorized"}
                       </span>
                     </td>
+                    <td className="h-14 px-4 align-middle">
+                      <span
+                        className={`border px-2 py-0.5 text-[11px] uppercase tracking-wide ${OUTCOME_BADGE[d.outcome] ?? "border-border text-muted"}`}
+                      >
+                        {OUTCOME_LABEL[d.outcome] ?? d.outcome}
+                      </span>
+                    </td>
                     <td className="h-14 px-4 text-right align-middle tabular-nums">{formatUSD(d.amount)}</td>
                     <td className="h-14 px-4 text-right align-middle tabular-nums text-muted">
-                      +{formatUSD(Math.round(d.amount * BONUS_RATE * 100) / 100)}
+                      {d.outcome === BONUS_OUTCOME
+                        ? `+${formatUSD(Math.round(d.amount * BONUS_RATE * 100) / 100)}`
+                        : "-"}
                     </td>
                     <td className="h-14 px-4 align-middle text-muted">
                       <span className="text-foreground">{d.submittedByName || "Member"}</span>

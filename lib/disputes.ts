@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { dispute, disputeCategory, paymentOverride, paymentRole, reportPeriod } from "@/db/app-schema";
+import { BONUS_OUTCOME } from "@/app/(app)/disputes/constants";
 
 // 5% of each member's current-period dispute amounts is added to their /payments
 // bonus, on top of the manual bonus (see lib/payments + the payments table).
@@ -45,6 +46,7 @@ export async function getArchivedDisputes() {
       id: dispute.id,
       dispute: dispute.dispute,
       category: dispute.category,
+      outcome: dispute.outcome,
       amount: dispute.amount,
       imageUrl: dispute.imageUrl,
       submittedByName: dispute.submittedByName,
@@ -61,13 +63,14 @@ export async function getArchivedDisputes() {
 export type DisputeTotals = { amount: number; bonus: number };
 
 // Per-member totals for the CURRENT period (periodId null), keyed by the
-// submitter's user id: the summed disputed amount (the recovered total) and the
-// 5% bonus it earns. /payments adds `bonus` on top of each member's manual bonus.
+// submitter's user id: the summed WON disputed amount (the recovered total) and
+// the 5% bonus it earns. Lost/refunded disputes are excluded. /payments adds
+// `bonus` on top of each member's manual bonus.
 export async function getDisputeTotalsByUser(): Promise<Map<string, DisputeTotals>> {
   const rows = await db
     .select({ userId: dispute.submittedById, amount: dispute.amount })
     .from(dispute)
-    .where(isNull(dispute.periodId));
+    .where(and(isNull(dispute.periodId), eq(dispute.outcome, BONUS_OUTCOME)));
 
   const byUser = new Map<string, DisputeTotals>();
   for (const r of rows) {

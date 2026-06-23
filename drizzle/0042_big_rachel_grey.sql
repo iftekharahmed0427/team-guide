@@ -1,0 +1,1 @@
+ALTER TABLE "dispute" ADD COLUMN "outcome" text DEFAULT 'won' NOT NULL;

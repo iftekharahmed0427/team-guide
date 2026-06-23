@@ -13,6 +13,7 @@ import {
   DISPUTE_BONUS_RATE,
 } from "@/lib/disputes";
 import { formatUSD } from "@/app/(app)/payments/constants";
+import { BONUS_OUTCOME } from "./constants";
 import DisputesClient, { type DisputeItem } from "./disputes-client";
 
 // A stored key needs a short-lived presigned URL; a legacy inline data URL is
@@ -56,6 +57,7 @@ export default async function DisputesPage() {
       id: r.id,
       dispute: r.dispute,
       category: r.category,
+      outcome: r.outcome,
       amount: r.amount,
       src: await displayUrl(r.imageUrl),
       submittedById: r.submittedById,
@@ -64,8 +66,12 @@ export default async function DisputesPage() {
     })),
   );
 
-  const totalAmount = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
-  const bonusPool = Math.round(totalAmount * DISPUTE_BONUS_RATE * 100) / 100;
+  // Only won disputes count toward the recovered total and the bonus pool.
+  const wonAmount = rows.reduce(
+    (s, r) => s + (r.outcome === BONUS_OUTCOME ? r.amount ?? 0 : 0),
+    0,
+  );
+  const bonusPool = Math.round(wonAmount * DISPUTE_BONUS_RATE * 100) / 100;
 
   return (
     <>
@@ -95,12 +101,12 @@ export default async function DisputesPage() {
         <div className="fx-rise mx-auto flex w-full max-w-4xl flex-col gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card icon={Gavel} label="Disputes" value={String(rows.length)} sub="logged this period" />
-            <Card icon={Coins} label="Recovered" value={formatUSD(totalAmount)} sub="total disputed amount" />
+            <Card icon={Coins} label="Recovered" value={formatUSD(wonAmount)} sub="from won disputes" />
             <Card
               icon={HandCoins}
               label="Bonus pool"
               value={formatUSD(bonusPool)}
-              sub="5% across submitters"
+              sub="5% of won, across submitters"
             />
           </div>
 

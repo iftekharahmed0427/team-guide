@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { dispute, disputeCategory } from "@/db/app-schema";
 import { canAccessDisputes } from "@/lib/disputes";
+import { isDisputeOutcome } from "./constants";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
 import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
@@ -24,6 +25,7 @@ type Result = { ok: true } | { error: string };
 export async function createDispute(input: {
   dispute: string;
   category: string;
+  outcome: string;
   amount: number;
   imageUrl: string;
 }): Promise<Result> {
@@ -34,6 +36,8 @@ export async function createDispute(input: {
 
   const disputeText = input.dispute.trim().slice(0, 200);
   if (!disputeText) return { error: "Enter the dispute." };
+
+  if (!isDisputeOutcome(input.outcome)) return { error: "Pick an outcome." };
 
   const category = input.category.trim();
   const known = await db
@@ -67,6 +71,7 @@ export async function createDispute(input: {
     id: randomUUID(),
     dispute: disputeText,
     category,
+    outcome: input.outcome,
     amount,
     imageUrl,
     submittedById: session.user.id,
