@@ -55,6 +55,8 @@ const ACTION_LABELS: Record<string, string> = {
   "comp.tickets_synced": "synced ticket counts",
   "review.added": "logged a review",
   "review.deleted": "deleted a review",
+  "review.assigned": "credited a review to a member",
+  "review.bonus_updated": "updated the review bonus rule",
   "report_period.deleted": "deleted a report period",
   "bot.token_set": "set the bot token",
   "bot.token_cleared": "cleared the bot token",

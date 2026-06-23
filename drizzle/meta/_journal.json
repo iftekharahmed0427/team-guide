@@ -260,6 +260,13 @@
       "when": 1782136913929,
       "tag": "0036_breezy_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1782199536572,
+      "tag": "0037_yielding_glorian",
+      "breakpoints": true
     }
   ]
 }

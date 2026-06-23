@@ -4,11 +4,15 @@ import { Star, History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { review, reportPeriod } from "@/db/app-schema";
+import { user as userTable } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import { signedGetUrl } from "@/lib/storage";
+import { getReviewBonusSetting, REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
 import ReviewForm from "./review-form";
 import ReviewDeleteButton from "./review-delete-button";
 import ReviewLightbox from "./review-lightbox";
+import ReviewBonusConfig from "./review-bonus-config";
+import ReviewAssign from "./review-assign";
 
 // A stored key needs a short-lived presigned URL; a legacy inline data URL is
 // already renderable as-is.
@@ -61,6 +65,41 @@ export default async function ReviewsPage() {
   const google = rows.filter((r) => r.source === "google").length;
   const total = rows.length;
 
+  // Admin extras: the member list for the assignment select, the editable bonus
+  // rule, and this period's per-member assigned-review standings.
+  let members: { id: string; name: string; image: string | null }[] = [];
+  let bonusSetting = REVIEW_BONUS_DEFAULTS;
+  let standings: { id: string; name: string; image: string | null; count: number }[] = [];
+  if (isAdmin) {
+    const [memberRows, setting] = await Promise.all([
+      db
+        .select({
+          id: userTable.id,
+          name: userTable.name,
+          email: userTable.email,
+          image: userTable.image,
+        })
+        .from(userTable)
+        .orderBy(userTable.name),
+      getReviewBonusSetting(),
+    ]);
+    members = memberRows.map((m) => ({ id: m.id, name: m.name || m.email, image: m.image }));
+    bonusSetting = setting;
+
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.assignedToId) continue;
+      counts.set(r.assignedToId, (counts.get(r.assignedToId) ?? 0) + 1);
+    }
+    const byId = new Map(members.map((m) => [m.id, m]));
+    standings = [...counts.entries()]
+      .map(([id, count]) => {
+        const m = byId.get(id);
+        return { id, name: m?.name ?? "Member", image: m?.image ?? null, count };
+      })
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
   const counters = [
     { label: "Trustpilot", value: trustpilot, tone: "text-emerald-400" },
     { label: "Google", value: google, tone: "text-sky-400" },
@@ -100,6 +139,14 @@ export default async function ReviewsPage() {
             ))}
           </div>
 
+          {isAdmin ? (
+            <ReviewBonusConfig
+              threshold={bonusSetting.threshold}
+              amount={bonusSetting.amount}
+              standings={standings}
+            />
+          ) : null}
+
           {isAdmin ? <ReviewForm /> : null}
 
           <h2 className="px-1 pt-2 text-xs font-medium uppercase tracking-wider text-muted">
@@ -132,9 +179,22 @@ export default async function ReviewsPage() {
                       {isAdmin ? <ReviewDeleteButton id={r.id} /> : null}
                     </div>
                     {r.note ? <p className="text-sm text-foreground">{r.note}</p> : null}
-                    <p className="mt-auto text-xs text-muted">
-                      {r.addedByName || "Admin"} · {formatDateTime(r.createdAt)}
-                    </p>
+                    <div className="mt-auto flex flex-col gap-2">
+                      <p className="text-xs text-muted">
+                        {r.addedByName || "Admin"} · {formatDateTime(r.createdAt)}
+                      </p>
+                      {isAdmin ? (
+                        <ReviewAssign
+                          reviewId={r.id}
+                          assignedToId={r.assignedToId}
+                          members={members}
+                        />
+                      ) : r.assignedToName ? (
+                        <p className="text-xs text-muted">
+                          Assigned: <span className="text-foreground">{r.assignedToName}</span>
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}

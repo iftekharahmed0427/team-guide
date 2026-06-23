@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { review } from "@/db/app-schema";
+import { review, reviewSetting } from "@/db/app-schema";
+import { user as userTable } from "@/db/auth-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
 import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
@@ -61,6 +62,60 @@ export async function addReview(input: {
   });
   await logActivity("review.added", input.source);
   revalidatePath(PAGE);
+  await notifyChange();
+  return { ok: true };
+}
+
+// Credit a review to a member (or clear it with a null userId). Admin only.
+// Stores the user id plus a denormalized name so an archived row stays readable
+// even if the member is later removed (the FK then nulls the id).
+export async function assignReview(reviewId: string, userId: string | null): Promise<Result> {
+  const session = await requireAdmin();
+  if (!session) return { error: "Only admins can assign reviews." };
+  if (!reviewId) return { error: "Missing review." };
+
+  let assignedToId: string | null = null;
+  let assignedToName = "";
+  if (userId) {
+    const u = (
+      await db
+        .select({ name: userTable.name, email: userTable.email })
+        .from(userTable)
+        .where(eq(userTable.id, userId))
+        .limit(1)
+    )[0];
+    if (!u) return { error: "That member no longer exists." };
+    assignedToId = userId;
+    assignedToName = u.name || u.email || "Member";
+  }
+
+  await db.update(review).set({ assignedToId, assignedToName }).where(eq(review.id, reviewId));
+  await logActivity("review.assigned", assignedToName || "unassigned");
+  revalidatePath(PAGE);
+  revalidatePath("/payments"); // the bonus this credit may earn shows there
+  await notifyChange();
+  return { ok: true };
+}
+
+// Update the review-bonus rule: a member assigned more than `threshold` reviews
+// this period earns a flat `amount` USD bonus. Admin only.
+export async function updateReviewBonus(input: {
+  threshold: number;
+  amount: number;
+}): Promise<Result> {
+  const session = await requireAdmin();
+  if (!session) return { error: "Only admins can change the review bonus." };
+
+  const threshold = Math.max(0, Math.floor(Number(input.threshold) || 0));
+  const amount = Math.max(0, Math.round((Number(input.amount) || 0) * 100) / 100);
+
+  await db
+    .insert(reviewSetting)
+    .values({ id: "singleton", threshold, amount })
+    .onConflictDoUpdate({ target: reviewSetting.id, set: { threshold, amount } });
+  await logActivity("review.bonus_updated", `>${threshold} reviews -> ${amount}`);
+  revalidatePath(PAGE);
+  revalidatePath("/payments");
   await notifyChange();
   return { ok: true };
 }

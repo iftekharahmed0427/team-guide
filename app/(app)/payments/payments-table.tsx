@@ -79,10 +79,13 @@ export default function PaymentsTable({
     const bonus = parseBase(d.bonusText);
     const roleId = d.roleId;
     const paidPerTicket = roleId ? payByRole.get(roleId) ?? false : true;
-    // The disputes amount + its 5% bonus are server-computed (from /disputes) and
-    // not editable here; the 5% adds to Amount on top of the manual bonus.
+    // The disputes amount + its 5% bonus and the review bonus are server-computed
+    // (from /disputes and /reviews) and not editable here; both add to Amount on
+    // top of the manual bonus.
     const disputeAmount = m.disputeAmount || 0;
     const disputeBonus = m.disputeBonus || 0;
+    const reviewCount = m.reviewCount || 0;
+    const reviewBonus = m.reviewBonus || 0;
     const eff = override ?? m.tickets;
     const amount = memberTotal({
       tickets: m.tickets,
@@ -91,8 +94,21 @@ export default function PaymentsTable({
       baseCompensation: base,
       bonus,
       disputeBonus,
+      reviewBonus,
     });
-    return { override, base, bonus, roleId, paidPerTicket, eff, amount, disputeAmount, disputeBonus };
+    return {
+      override,
+      base,
+      bonus,
+      roleId,
+      paidPerTicket,
+      eff,
+      amount,
+      disputeAmount,
+      disputeBonus,
+      reviewCount,
+      reviewBonus,
+    };
   }
 
   function isChanged(m: PayableMember) {
@@ -158,7 +174,7 @@ export default function PaymentsTable({
       const r = resolved(m);
       acc.tickets += r.eff;
       acc.base += r.base;
-      acc.bonus += r.bonus + r.disputeBonus;
+      acc.bonus += r.bonus + r.disputeBonus + r.reviewBonus;
       acc.amount += r.amount;
       return acc;
     },
@@ -336,6 +352,14 @@ export default function PaymentsTable({
                               Disputes {formatUSD(r.disputeAmount)} &rarr; +{formatUSD(r.disputeBonus)}
                             </span>
                           ) : null}
+                          {r.reviewCount > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="Flat bonus once assigned reviews pass the threshold"
+                            >
+                              Reviews {r.reviewCount} &rarr; +{formatUSD(r.reviewBonus)}
+                            </span>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="flex flex-col items-end leading-tight">
@@ -343,6 +367,11 @@ export default function PaymentsTable({
                           {m.disputeAmount > 0 ? (
                             <span className="text-[11px] text-muted">
                               Disputes {formatUSD(m.disputeAmount)} &rarr; +{formatUSD(m.disputeBonus)}
+                            </span>
+                          ) : null}
+                          {m.reviewCount > 0 ? (
+                            <span className="text-[11px] text-muted">
+                              Reviews {m.reviewCount} &rarr; +{formatUSD(m.reviewBonus)}
                             </span>
                           ) : null}
                         </div>

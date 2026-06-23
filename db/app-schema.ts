@@ -275,8 +275,27 @@ export const review = pgTable("review", {
   note: text("note").notNull().default(""),
   addedById: text("added_by_id"),
   addedByName: text("added_by_name").notNull().default(""),
+  // The member this review is credited to (set by admins on /reviews). Counts
+  // toward their review bonus this period; name denormalized so an archived row
+  // stays a stable snapshot if the user is later removed (FK set null).
+  assignedToId: text("assigned_to_id").references(() => user.id, { onDelete: "set null" }),
+  assignedToName: text("assigned_to_name").notNull().default(""),
   periodId: text("period_id").references(() => reportPeriod.id, { onDelete: "cascade" }), // null = current period
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Single-row (`id` = "singleton") config for the review bonus: a member assigned
+// MORE THAN `threshold` reviews in the current period earns a flat `amount` USD
+// bonus, added to their /payments Amount. Edited inline on /reviews by admins;
+// seeded on first read (see lib/reviews.ts).
+export const reviewSetting = pgTable("review_setting", {
+  id: text("id").primaryKey().default("singleton"),
+  threshold: integer("threshold").notNull().default(10),
+  amount: doublePrecision("amount").notNull().default(50),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
 });
 
 // Single-row (`id` = "singleton") bot config, edited from the website Settings →
