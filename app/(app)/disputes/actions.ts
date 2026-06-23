@@ -13,7 +13,6 @@ import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
 
 const PAGE = "/disputes";
 const PAYMENTS = "/payments";
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // A downscaled JPEG data URL is well under this; the cap just blocks abuse.
 const MAX_IMAGE_CHARS = 4_000_000;
 
@@ -23,7 +22,7 @@ type Result = { ok: true } | { error: string };
 // downscaled data URL from the client (see editor-images.ts). 5% of the amount
 // flows into the submitter's /payments bonus for the current period.
 export async function createDispute(input: {
-  email: string;
+  dispute: string;
   category: string;
   amount: number;
   imageUrl: string;
@@ -33,8 +32,8 @@ export async function createDispute(input: {
     return { error: "You don't have access to disputes." };
   }
 
-  const email = input.email.trim().slice(0, 200);
-  if (!EMAIL.test(email)) return { error: "Enter a valid customer email." };
+  const disputeText = input.dispute.trim().slice(0, 200);
+  if (!disputeText) return { error: "Enter the dispute." };
 
   const category = input.category.trim();
   const known = await db
@@ -66,7 +65,7 @@ export async function createDispute(input: {
 
   await db.insert(dispute).values({
     id: randomUUID(),
-    email,
+    dispute: disputeText,
     category,
     amount,
     imageUrl,

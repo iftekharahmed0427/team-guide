@@ -14,7 +14,7 @@ const BONUS_RATE = 0.05;
 
 export type DisputeItem = {
   id: string;
-  email: string;
+  dispute: string;
   category: string;
   amount: number;
   src: string; // resolved (presigned or inline) screenshot URL
@@ -39,7 +39,7 @@ export default function DisputesClient({
   currentUserId: string;
 }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [dispute, setDispute] = useState("");
   const [category, setCategory] = useState(categories[0]?.name ?? "");
   const [amount, setAmount] = useState("");
   const [image, setImage] = useState<string | null>(null);
@@ -66,12 +66,12 @@ export default function DisputesClient({
     if (!image) return setError("Attach a screenshot of the dispute first.");
     const amt = Math.round((Number(amount) || 0) * 100) / 100;
     startTransition(async () => {
-      const res = await createDispute({ email, category, amount: amt, imageUrl: image });
+      const res = await createDispute({ dispute, category, amount: amt, imageUrl: image });
       if ("error" in res) {
         setError(res.error);
         return;
       }
-      setEmail("");
+      setDispute("");
       setAmount("");
       setImage(null);
       setDone(true);
@@ -109,12 +109,12 @@ export default function DisputesClient({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-1">
-            <label className={labelCls}>Customer email</label>
+            <label className={labelCls}>Dispute</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="customer@example.com"
+              type="text"
+              value={dispute}
+              onChange={(e) => setDispute(e.target.value)}
+              placeholder="Dispute reference or detail"
               className={inputCls}
             />
           </div>
@@ -225,7 +225,7 @@ export default function DisputesClient({
             <thead>
               <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted">
                 <th className="h-11 px-4 text-left align-middle font-medium">Shot</th>
-                <th className="h-11 px-4 text-left align-middle font-medium">Customer</th>
+                <th className="h-11 px-4 text-left align-middle font-medium">Dispute</th>
                 <th className="h-11 px-4 text-left align-middle font-medium">Category</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
@@ -253,7 +253,7 @@ export default function DisputesClient({
                         <span className="text-xs text-muted">-</span>
                       )}
                     </td>
-                    <td className="h-14 px-4 align-middle">{d.email}</td>
+                    <td className="h-14 px-4 align-middle">{d.dispute}</td>
                     <td className="h-14 px-4 align-middle">
                       <span className="border border-border px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted">
                         {d.category || "Uncategorized"}

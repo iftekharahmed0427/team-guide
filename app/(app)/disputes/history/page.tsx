@@ -17,7 +17,7 @@ async function displayUrl(imageUrl: string): Promise<string> {
 // Archived disputes grouped by the report period they were closed into (a
 // "Reset all" stamps the current disputes with the report_period it archives).
 // Admin-only: unlike the live /disputes tool (Disputes role + admins), past
-// periods of customer emails and amounts are kept to admins.
+// periods of dispute details and amounts are kept to admins.
 export default async function DisputeHistoryPage() {
   const session = await getSession();
   if (session?.user.role !== "admin") return <NoAccess />;
@@ -95,7 +95,7 @@ export default async function DisputeHistoryPage() {
                       <thead>
                         <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted">
                           <th className="h-11 px-4 text-left align-middle font-medium">Shot</th>
-                          <th className="h-11 px-4 text-left align-middle font-medium">Customer</th>
+                          <th className="h-11 px-4 text-left align-middle font-medium">Dispute</th>
                           <th className="h-11 px-4 text-left align-middle font-medium">Category</th>
                           <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
                           <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
@@ -108,7 +108,7 @@ export default async function DisputeHistoryPage() {
                             <td className="h-14 px-4 align-middle">
                               <DisputeShot src={d.src} />
                             </td>
-                            <td className="h-14 px-4 align-middle">{d.email}</td>
+                            <td className="h-14 px-4 align-middle">{d.dispute}</td>
                             <td className="h-14 px-4 align-middle">
                               <span className="border border-border px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted">
                                 {d.category || "Uncategorized"}

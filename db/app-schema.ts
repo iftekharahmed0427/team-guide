@@ -620,7 +620,7 @@ export const disputeCategory = pgTable("dispute_category", {
 // reviews), so the recovered total and the 5% bonus reset each period.
 export const dispute = pgTable("dispute", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
+  dispute: text("dispute").notNull().default(""), // free-text dispute reference / detail
   category: text("category").notNull().default(""),
   amount: doublePrecision("amount").notNull().default(0), // USD disputed / recovered
   imageUrl: text("image_url").notNull(), // screenshot object key or data URL

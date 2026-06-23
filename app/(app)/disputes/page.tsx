@@ -23,7 +23,7 @@ async function displayUrl(imageUrl: string): Promise<string> {
 }
 
 // Payment disputes logged by the Disputes role (and admins). Each carries a
-// customer email, category, disputed amount, and screenshot; 5% of the period's
+// dispute reference, category, disputed amount, and screenshot; 5% of the period's
 // amounts feeds each submitter's /payments bonus. Disputes reset into history
 // when an admin runs "Reset all" (they share the report period). Live via the
 // app_event realtime bus.
@@ -54,7 +54,7 @@ export default async function DisputesPage() {
   const items: DisputeItem[] = await Promise.all(
     rows.map(async (r) => ({
       id: r.id,
-      email: r.email,
+      dispute: r.dispute,
       category: r.category,
       amount: r.amount,
       src: await displayUrl(r.imageUrl),

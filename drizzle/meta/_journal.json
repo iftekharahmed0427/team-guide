@@ -267,6 +267,20 @@
       "when": 1782199536572,
       "tag": "0037_yielding_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1782225141106,
+      "tag": "0038_oval_secret_warriors",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1782225151295,
+      "tag": "0039_chunky_maximus",
+      "breakpoints": true
     }
   ]
 }

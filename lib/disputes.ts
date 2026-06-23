@@ -43,7 +43,7 @@ export async function getArchivedDisputes() {
   return db
     .select({
       id: dispute.id,
-      email: dispute.email,
+      dispute: dispute.dispute,
       category: dispute.category,
       amount: dispute.amount,
       imageUrl: dispute.imageUrl,
