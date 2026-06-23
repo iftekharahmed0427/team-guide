@@ -285,12 +285,12 @@ export const review = pgTable("review", {
 });
 
 // Single-row (`id` = "singleton") config for the review bonus: a member assigned
-// MORE THAN `threshold` reviews in the current period earns a flat `amount` USD
+// `threshold` OR MORE reviews in the current period earns a flat `amount` USD
 // bonus, added to their /payments Amount. Edited inline on /reviews by admins;
 // seeded on first read (see lib/reviews.ts).
 export const reviewSetting = pgTable("review_setting", {
   id: text("id").primaryKey().default("singleton"),
-  threshold: integer("threshold").notNull().default(10),
+  threshold: integer("threshold").notNull().default(50),
   amount: doublePrecision("amount").notNull().default(50),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -47,7 +47,7 @@ export default function ReviewBonusConfig({
 
   // Preview against the draft (not the saved) values so the admin sees the effect
   // of an edit before saving.
-  const earning = standings.filter((s) => s.count > draftThreshold).length;
+  const earning = standings.filter((s) => s.count >= draftThreshold).length;
 
   return (
     <div className="border border-border bg-surface p-4">
@@ -56,13 +56,13 @@ export default function ReviewBonusConfig({
         Review bonus
       </div>
       <p className="mt-1 text-xs text-muted">
-        A member assigned more than {draftThreshold} review{draftThreshold === 1 ? "" : "s"} this
-        period earns {formatUSD(draftAmount)}, added to their Payments amount.
+        A member assigned {draftThreshold} or more reviews this period earns{" "}
+        {formatUSD(draftAmount)}, added to their Payments amount.
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <div>
-          <label className={labelCls}>More than (reviews)</label>
+          <label className={labelCls}>At least (reviews)</label>
           <input
             type="text"
             inputMode="numeric"
@@ -110,8 +110,8 @@ export default function ReviewBonusConfig({
           </p>
           <div className="flex flex-col gap-1">
             {standings.map((s) => {
-              const earns = s.count > draftThreshold;
-              const toGo = Math.max(0, draftThreshold + 1 - s.count);
+              const earns = s.count >= draftThreshold;
+              const toGo = Math.max(0, draftThreshold - s.count);
               return (
                 <div
                   key={s.id}

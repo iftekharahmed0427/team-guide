@@ -4,9 +4,9 @@ import { review, reviewSetting } from "@/db/app-schema";
 
 export type ReviewBonusSetting = { threshold: number; amount: number };
 
-// Defaults the singleton is seeded with: a member assigned MORE THAN 10 reviews
-// in the current period earns a flat $50, both editable on /reviews.
-export const REVIEW_BONUS_DEFAULTS: ReviewBonusSetting = { threshold: 10, amount: 50 };
+// Defaults the singleton is seeded with: a member assigned 50 OR MORE reviews in
+// the current period earns a flat $50, both editable on /reviews.
+export const REVIEW_BONUS_DEFAULTS: ReviewBonusSetting = { threshold: 50, amount: 50 };
 
 // The singleton review-bonus config, seeded with the defaults the first time it
 // is read (mirrors the dispute_category seed-on-read). Edited inline on /reviews.
@@ -33,8 +33,8 @@ export type ReviewBonus = { count: number; bonus: number };
 
 // Per-member assigned-review counts for the CURRENT period (periodId null),
 // keyed by the assigned user id, with the flat bonus each earns: `amount` when
-// the count is strictly greater than `threshold`, else 0. /payments adds `bonus`
-// to each member's Amount, on top of the manual + disputes bonuses.
+// the count is `threshold` or more, else 0. /payments adds `bonus` to each
+// member's Amount, on top of the manual + disputes bonuses.
 export async function getReviewBonusByUser(): Promise<Map<string, ReviewBonus>> {
   const { threshold, amount } = await getReviewBonusSetting();
   const rows = await db
@@ -49,7 +49,7 @@ export async function getReviewBonusByUser(): Promise<Map<string, ReviewBonus>> 
   }
   const byUser = new Map<string, ReviewBonus>();
   for (const [userId, count] of counts) {
-    byUser.set(userId, { count, bonus: count > threshold ? amount : 0 });
+    byUser.set(userId, { count, bonus: count >= threshold ? amount : 0 });
   }
   return byUser;
 }
