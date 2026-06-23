@@ -376,6 +376,10 @@ export const commission = pgTable("commission", {
   // Reviewer (admin) for visibility.
   reviewedByName: text("reviewed_by_name").notNull().default(""),
   reviewedAt: timestamp("reviewed_at"),
+  // Commissions share the report period (like reviews + disputes): null while the
+  // commission is in the live period, stamped with the archived report_period on
+  // "Reset all" so each pay period's commission payouts start fresh in /payments.
+  periodId: text("period_id").references(() => reportPeriod.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -462,6 +466,7 @@ export const paymentOverride = pgTable("payment_override", {
   roleId: text("role_id").references(() => paymentRole.id, { onDelete: "set null" }),
   baseCompensation: doublePrecision("base_compensation").notNull().default(0), // flat $ on top of ticket pay
   bonus: doublePrecision("bonus").notNull().default(0), // manual $ bonus (bonus-eligible roles); adds to Amount
+  commissionOverride: doublePrecision("commission_override"), // null = track the computed approved-commission total
   recoveredRevenue: doublePrecision("recovered_revenue").notNull().default(0), // recorded only, not paid
   updatedAt: timestamp("updated_at")
     .defaultNow()

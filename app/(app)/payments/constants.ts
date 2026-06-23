@@ -29,6 +29,8 @@ export type PayableMember = {
   disputeAmount: number; // summed disputed amount this period (from /disputes); the recovered total
   disputeBonus: number; // 5% of disputeAmount, added to Amount on top of the manual bonus
   reviewBonus: number; // flat review bonus (eligible member + team hit the period threshold); adds to Amount
+  commission: number; // summed approved commission payouts this period (from /commissions); the computed default
+  commissionOverride: number | null; // admin's fixed commission $; null = track the computed value
 };
 
 // One assignable payment role from the admin-managed catalog. `paidPerTicket`
@@ -47,6 +49,15 @@ export function effectiveTickets(m: { tickets: number; override: number | null }
   return m.override ?? m.tickets;
 }
 
+// The commission a member is actually paid: the admin override when set, otherwise
+// the computed approved-commission total this period.
+export function effectiveCommission(m: {
+  commission: number;
+  commissionOverride: number | null;
+}): number {
+  return m.commissionOverride ?? m.commission;
+}
+
 // Payout for a ticket count at the flat per-ticket rate.
 export function ticketPayout(tickets: number): number {
   return tickets * TICKET_RATE;
@@ -54,9 +65,10 @@ export function ticketPayout(tickets: number): number {
 
 // Total a member is owed: ticket pay (on the effective count) when their role is
 // paid-per-ticket, plus flat base compensation, plus a manual bonus (every member
-// can have one), plus the auto disputes bonus (5% of their disputes this period)
-// and the review bonus (flat, once their assigned reviews pass the threshold).
-// Recovered revenue is recorded only, never paid.
+// can have one), plus the auto disputes bonus (5% of their disputes this period),
+// the review bonus (flat, once their assigned reviews pass the threshold), and
+// their approved commission payouts this period. Recovered revenue is recorded
+// only, never paid.
 export function memberTotal(m: {
   tickets: number;
   override: number | null;
@@ -65,6 +77,7 @@ export function memberTotal(m: {
   bonus: number;
   disputeBonus?: number;
   reviewBonus?: number;
+  commission?: number;
 }): number {
   const ticketPart = m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0;
   return (
@@ -72,6 +85,7 @@ export function memberTotal(m: {
     (m.baseCompensation || 0) +
     (m.bonus || 0) +
     (m.disputeBonus || 0) +
-    (m.reviewBonus || 0)
+    (m.reviewBonus || 0) +
+    (m.commission || 0)
   );
 }

@@ -5,6 +5,7 @@ import { user as userTable, account } from "@/db/auth-schema";
 import { effectiveTickets, type PayableMember, type PaymentRole } from "@/app/(app)/payments/constants";
 import { getDisputeTotalsByUser } from "@/lib/disputes";
 import { getReviewBonusByUser } from "@/lib/reviews";
+import { getCommissionTotalsByUser } from "@/lib/commissions";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -13,7 +14,7 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 // from multiple channels owned by the same member are merged. Channels not
 // linked to a user are excluded.
 export async function getPayableMembers(): Promise<PayableMember[]> {
-  const [rows, overrides, disputeTotals, reviewTotals] = await Promise.all([
+  const [rows, overrides, disputeTotals, reviewTotals, commissionTotals] = await Promise.all([
     db
       .select({
         channelId: reportChannel.id,
@@ -41,12 +42,14 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
         bonusEligible: paymentRole.bonusEligible,
         baseCompensation: paymentOverride.baseCompensation,
         bonus: paymentOverride.bonus,
+        commissionOverride: paymentOverride.commissionOverride,
         recoveredRevenue: paymentOverride.recoveredRevenue,
       })
       .from(paymentOverride)
       .leftJoin(paymentRole, eq(paymentRole.id, paymentOverride.roleId)),
     getDisputeTotalsByUser(),
     getReviewBonusByUser(),
+    getCommissionTotalsByUser(),
   ]);
 
   const ovById = new Map(overrides.map((o) => [o.userId, o]));
@@ -75,6 +78,8 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
       disputeAmount: r.userId ? disputeTotals.get(r.userId)?.amount ?? 0 : 0,
       disputeBonus: r.userId ? disputeTotals.get(r.userId)?.bonus ?? 0 : 0,
       reviewBonus: r.userId ? reviewTotals.get(r.userId) ?? 0 : 0,
+      commission: r.userId ? commissionTotals.get(r.userId) ?? 0 : 0,
+      commissionOverride: o?.commissionOverride ?? null,
     });
   }
 

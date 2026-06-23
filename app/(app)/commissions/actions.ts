@@ -101,6 +101,9 @@ export async function reviewCommission(input: {
   await logActivity("commission.reviewed", input.decision);
   await notifyChange();
   revalidatePath(PAGE);
+  // Approving/denying changes a member's current-period commission payout, which
+  // feeds the /payments Commissions column.
+  revalidatePath("/payments");
   return { ok: true };
 }
 
@@ -113,4 +116,6 @@ export async function deleteCommission(formData: FormData) {
   await logActivity("commission.deleted");
   await notifyChange();
   revalidatePath(PAGE);
+  // Deleting an approved commission changes its submitter's /payments total.
+  revalidatePath("/payments");
 }

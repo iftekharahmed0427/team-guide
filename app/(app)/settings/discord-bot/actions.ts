@@ -14,6 +14,7 @@ import {
   resetLog,
   review,
   dispute,
+  commission,
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
@@ -240,9 +241,9 @@ export async function resetAllReportChannels(): Promise<Result> {
     })
     .from(reportChannel);
   const total = channels.reduce((sum, c) => sum + (c.count ?? 0), 0);
-  // Reviews and disputes share the report period: the current ones (periodId
-  // null) get stamped with the period we archive here, so each new period starts
-  // clean (and the disputes 5% bonus resets).
+  // Reviews, disputes and commissions share the report period: the current ones
+  // (periodId null) get stamped with the period we archive here, so each new period
+  // starts clean (the disputes 5% bonus resets, and commission payouts reset).
   const currentReviews = await db
     .select({ id: review.id })
     .from(review)
@@ -251,9 +252,17 @@ export async function resetAllReportChannels(): Promise<Result> {
     .select({ id: dispute.id })
     .from(dispute)
     .where(isNull(dispute.periodId));
+  const currentCommissions = await db
+    .select({ id: commission.id })
+    .from(commission)
+    .where(isNull(commission.periodId));
 
-  // Archive when there are tickets OR reviews OR disputes to record for the period.
-  const archived = total > 0 || currentReviews.length > 0 || currentDisputes.length > 0;
+  // Archive when there are tickets OR reviews OR disputes OR commissions to record.
+  const archived =
+    total > 0 ||
+    currentReviews.length > 0 ||
+    currentDisputes.length > 0 ||
+    currentCommissions.length > 0;
   let archivedPeriodId: string | null = null;
   if (archived) {
     const last = (
@@ -286,6 +295,9 @@ export async function resetAllReportChannels(): Promise<Result> {
     }
     if (currentDisputes.length > 0) {
       await db.update(dispute).set({ periodId }).where(isNull(dispute.periodId));
+    }
+    if (currentCommissions.length > 0) {
+      await db.update(commission).set({ periodId }).where(isNull(commission.periodId));
     }
   }
 
@@ -321,6 +333,7 @@ export async function resetAllReportChannels(): Promise<Result> {
   revalidatePath("/reports/history");
   revalidatePath("/reviews");
   revalidatePath("/disputes");
+  revalidatePath("/commissions");
   revalidatePath("/payments");
   await notifyChange();
   return { ok: true };

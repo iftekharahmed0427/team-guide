@@ -18,6 +18,7 @@ type Draft = {
   overrideText: string;
   baseText: string;
   bonusText: string;
+  commissionText: string;
 };
 
 const moneyText = (n: number) => (n ? String(n) : "");
@@ -26,7 +27,16 @@ const seedRow = (m: PayableMember): Draft => ({
   overrideText: m.override === null ? "" : String(m.override),
   baseText: moneyText(m.baseCompensation),
   bonusText: moneyText(m.bonus),
+  commissionText: m.commissionOverride === null ? "" : String(m.commissionOverride),
 });
+
+const EMPTY_DRAFT: Draft = {
+  roleId: null,
+  overrideText: "",
+  baseText: "",
+  bonusText: "",
+  commissionText: "",
+};
 
 const parseOverride = (t: string): number | null => {
   const s = t.trim();
@@ -37,6 +47,13 @@ const parseOverride = (t: string): number | null => {
 const parseBase = (t: string): number => {
   const n = Math.round((Number(t.trim()) || 0) * 100) / 100;
   return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+// Money override: blank = track the computed value (null); a number = a fixed amount.
+const parseMoneyOverride = (t: string): number | null => {
+  const s = t.trim();
+  if (s === "") return null;
+  const n = Math.round((Number(s) || 0) * 100) / 100;
+  return Number.isFinite(n) && n >= 0 ? n : null;
 };
 
 export default function PaymentsTable({
@@ -80,11 +97,14 @@ export default function PaymentsTable({
     const roleId = d.roleId;
     const paidPerTicket = roleId ? payByRole.get(roleId) ?? false : true;
     // The disputes amount + its 5% bonus and the review bonus are server-computed
-    // (from /disputes and /reviews) and not editable here; both add to Amount on
-    // top of the manual bonus.
+    // (from /disputes and /reviews) and not editable here. Commissions default to
+    // the computed approved-commission total but an admin can override it (blank =
+    // track the computed value); each adds to Amount on top of the manual bonus.
     const disputeAmount = m.disputeAmount || 0;
     const disputeBonus = m.disputeBonus || 0;
     const reviewBonus = m.reviewBonus || 0;
+    const commissionOverride = parseMoneyOverride(d.commissionText);
+    const commission = commissionOverride ?? m.commission;
     const eff = override ?? m.tickets;
     const amount = memberTotal({
       tickets: m.tickets,
@@ -94,6 +114,7 @@ export default function PaymentsTable({
       bonus,
       disputeBonus,
       reviewBonus,
+      commission,
     });
     return {
       override,
@@ -106,6 +127,8 @@ export default function PaymentsTable({
       disputeAmount,
       disputeBonus,
       reviewBonus,
+      commission,
+      commissionOverride,
     };
   }
 
@@ -116,7 +139,8 @@ export default function PaymentsTable({
       r.roleId !== m.roleId ||
       r.override !== m.override ||
       r.base !== m.baseCompensation ||
-      r.bonus !== m.bonus
+      r.bonus !== m.bonus ||
+      r.commissionOverride !== m.commissionOverride
     );
   }
 
@@ -139,7 +163,7 @@ export default function PaymentsTable({
     setDraft((cur) => ({ ...cur, [userId]: { ...seedRowFallback(cur, userId), ...p } }));
   }
   function seedRowFallback(cur: Record<string, Draft>, userId: string): Draft {
-    return cur[userId] ?? { roleId: null, overrideText: "", baseText: "", bonusText: "" };
+    return cur[userId] ?? EMPTY_DRAFT;
   }
 
   function cancel() {
@@ -157,6 +181,7 @@ export default function PaymentsTable({
         roleId: r.roleId,
         baseCompensation: r.base,
         bonus: r.bonus,
+        commissionOverride: r.commissionOverride,
       };
     });
     startTransition(async () => {
@@ -175,10 +200,11 @@ export default function PaymentsTable({
       acc.tickets += r.eff;
       acc.base += r.base;
       acc.bonus += r.bonus + r.disputeBonus + r.reviewBonus;
+      acc.commission += r.commission;
       acc.amount += r.amount;
       return acc;
     },
-    { tickets: 0, base: 0, bonus: 0, amount: 0 },
+    { tickets: 0, base: 0, bonus: 0, commission: 0, amount: 0 },
   );
 
   const cell = "h-8 w-20 border border-border bg-surface-2 px-2 text-right text-sm tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60";
@@ -252,6 +278,7 @@ export default function PaymentsTable({
                 <th className="h-11 px-4 text-right align-middle font-medium">Base comp</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Tickets</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Commissions</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
               </tr>
             </thead>
@@ -377,6 +404,39 @@ export default function PaymentsTable({
                         </div>
                       )}
                     </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-muted">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={d.commissionText}
+                              disabled={pending}
+                              placeholder={moneyText(m.commission) || "0"}
+                              title={`Approved commissions: ${formatUSD(m.commission)}. Leave blank to track them.`}
+                              onChange={(e) =>
+                                patch(m.userId as string, { commissionText: e.target.value.replace(/[^\d.]/g, "") })
+                              }
+                              className={cell}
+                            />
+                          </div>
+                          {r.commissionOverride !== null && m.commission > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="Overriding the computed approved-commission total"
+                            >
+                              Computed {formatUSD(m.commission)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className={r.commission > 0 ? "text-foreground" : "text-muted"}>
+                          {formatUSD(r.commission)}
+                        </span>
+                      )}
+                    </td>
                     <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
                       {formatUSD(r.amount)}
                     </td>
@@ -391,6 +451,7 @@ export default function PaymentsTable({
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.base)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{totals.tickets}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.commission)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
               </tr>
             </tfoot>

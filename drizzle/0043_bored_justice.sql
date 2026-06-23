@@ -1,0 +1,2 @@
+ALTER TABLE "commission" ADD COLUMN "period_id" text;--> statement-breakpoint
+ALTER TABLE "commission" ADD CONSTRAINT "commission_period_id_report_period_id_fk" FOREIGN KEY ("period_id") REFERENCES "public"."report_period"("id") ON DELETE cascade ON UPDATE no action;

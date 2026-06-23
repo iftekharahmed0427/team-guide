@@ -1,0 +1,1 @@
+ALTER TABLE "payment_override" ADD COLUMN "commission_override" double precision;
