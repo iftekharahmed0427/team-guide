@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 // A clickable review thumbnail that opens the full screenshot in a popup
-// (backdrop click, the X, or Escape closes it).
+// (backdrop click, the X, or Escape closes it). The overlay is portaled to
+// <body> so its `fixed` positioning is viewport-relative: the page content sits
+// inside an `.fx-rise` element whose retained transform would otherwise become
+// the containing block, anchoring the popup to the top of the list.
 export default function ReviewLightbox({ src, alt }: { src: string; alt: string }) {
   const [open, setOpen] = useState(false);
 
@@ -29,30 +33,33 @@ export default function ReviewLightbox({ src, alt }: { src: string; alt: string 
         <img src={src} alt={alt} className="aspect-video w-full object-cover" />
       </button>
 
-      {open ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setOpen(false)}
-          className="fx-fade fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="Close"
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center border border-border bg-surface text-muted transition-colors hover:text-foreground"
-          >
-            <X size={18} strokeWidth={2} />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[90vw] border border-border object-contain"
-          />
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setOpen(false)}
+              className="fx-fade fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            >
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center border border-border bg-surface text-muted transition-colors hover:text-foreground"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={alt}
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[90vh] max-w-[90vw] border border-border object-contain"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

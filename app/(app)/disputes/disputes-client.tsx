@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Check, ImageUp, X, Trash2, Gavel } from "lucide-react";
 import CustomSelect from "@/app/components/custom-select";
@@ -314,29 +315,33 @@ export default function DisputesClient({
         </div>
       )}
 
-      {/* Screenshot lightbox */}
-      {lightbox ? (
-        <div
-          className="fx-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-          onClick={() => setLightbox(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightbox}
-            alt="Dispute screenshot"
-            className="max-h-[85vh] max-w-[90vw] border border-border"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setLightbox(null)}
-            aria-label="Close"
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center border border-border bg-surface text-muted transition-colors hover:text-foreground"
-          >
-            <X size={16} strokeWidth={2} />
-          </button>
-        </div>
-      ) : null}
+      {/* Screenshot lightbox — portaled to <body> so its `fixed` positioning is
+          viewport-relative despite the `.fx-rise` ancestor's retained transform. */}
+      {lightbox
+        ? createPortal(
+            <div
+              className="fx-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+              onClick={() => setLightbox(null)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightbox}
+                alt="Dispute screenshot"
+                className="max-h-[85vh] max-w-[90vw] border border-border"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                type="button"
+                onClick={() => setLightbox(null)}
+                aria-label="Close"
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center border border-border bg-surface text-muted transition-colors hover:text-foreground"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
