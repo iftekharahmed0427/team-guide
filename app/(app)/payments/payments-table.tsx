@@ -127,9 +127,11 @@ export default function PaymentsTable({
 
   // Re-seed from the server only when there are no unsaved edits, so a live
   // refresh (or a just-completed save) syncs without clobbering work in progress.
+  // The ref holds the latest `dirty` so the effect can read it without re-running
+  // on every edit; it is written inside the effect to avoid a render-time ref write.
   const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
   useEffect(() => {
+    dirtyRef.current = dirty;
     if (!dirtyRef.current) setDraft(seed());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members]);
