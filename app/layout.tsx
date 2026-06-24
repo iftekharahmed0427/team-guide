@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Team Guide",
+  title: "Team Guide | GH",
   description: "Team workspace for managing the team, news, and availability",
 };
 
