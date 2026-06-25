@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save, AlertCircle, Pencil, X } from "lucide-react";
+import { Save, AlertCircle, Pencil, X, EyeOff, RotateCcw } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import CustomSelect from "@/app/components/custom-select";
 import {
@@ -11,7 +11,7 @@ import {
   type PayableMember,
   type PaymentRole,
 } from "./constants";
-import { savePayments, type PaymentChange } from "./actions";
+import { savePayments, setMemberHidden, type PaymentChange } from "./actions";
 
 type Draft = {
   roleId: string | null;
@@ -58,10 +58,12 @@ const parseMoneyOverride = (t: string): number | null => {
 
 export default function PaymentsTable({
   members,
+  hiddenMembers = [],
   roles,
   editable,
 }: {
   members: PayableMember[];
+  hiddenMembers?: PayableMember[];
   roles: PaymentRole[];
   editable: boolean;
 }) {
@@ -78,6 +80,21 @@ export default function PaymentsTable({
   // Admins start in read-only view and opt into editing; everyone else is always
   // read-only. Inputs render only while editing.
   const [editing, setEditing] = useState(false);
+  // Hiding/restoring a member is an immediate action (not staged like the field
+  // edits); `busyId` tracks the row in flight so only its button shows pending.
+  const [hidePending, startHide] = useTransition();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function toggleHidden(userId: string, hidden: boolean) {
+    setError("");
+    setBusyId(userId);
+    startHide(async () => {
+      const res = await setMemberHidden(userId, hidden);
+      setBusyId(null);
+      if ("error" in res) setError(res.error);
+      else router.refresh();
+    });
+  }
 
   const payByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.paidPerTicket])), [roles]);
   const roleOptions = useMemo(
@@ -280,6 +297,7 @@ export default function PaymentsTable({
                 <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Commissions</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
+                {editable ? <th className="h-11 w-10 px-2" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -440,6 +458,22 @@ export default function PaymentsTable({
                     <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
                       {formatUSD(r.amount)}
                     </td>
+                    {editable ? (
+                      <td className="h-12 w-10 px-2 align-middle">
+                        {editing && m.userId ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleHidden(m.userId as string, true)}
+                            disabled={hidePending}
+                            aria-label={`Hide ${m.name} from payments`}
+                            title="Hide from payments"
+                            className="flex h-7 w-7 items-center justify-center border border-transparent text-muted transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
+                          >
+                            <EyeOff size={14} strokeWidth={1.75} />
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
@@ -453,11 +487,44 @@ export default function PaymentsTable({
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.commission)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
+                {editable ? <td className="h-12 w-10 px-2" /> : null}
               </tr>
             </tfoot>
           </table>
         )}
       </div>
+
+      {editable && hiddenMembers.length > 0 ? (
+        <div className="border border-border bg-surface">
+          <p className="border-b border-border px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted">
+            Hidden from payments ({hiddenMembers.length})
+          </p>
+          <ul>
+            {hiddenMembers.map((m) => (
+              <li
+                key={m.userId ?? m.channelId}
+                className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 last:border-b-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={m.name} image={m.image} size={24} />
+                  <span className="text-sm text-muted">{m.name}</span>
+                </div>
+                {m.userId ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleHidden(m.userId as string, false)}
+                    disabled={hidePending && busyId === m.userId}
+                    className="btn-wipe flex h-8 shrink-0 items-center gap-1.5 border border-border px-2.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                  >
+                    <RotateCcw size={13} strokeWidth={1.75} />
+                    Restore
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

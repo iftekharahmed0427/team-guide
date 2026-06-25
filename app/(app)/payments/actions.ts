@@ -99,3 +99,29 @@ export async function savePayments(changes: PaymentChange[]): Promise<Result> {
   revalidatePath(PAGE);
   return { ok: true };
 }
+
+// Hide a member from the /payments list, or restore them. Reversible: the member
+// stays in Reports and keeps any saved figures, they're just excluded from the
+// payout sheet and its totals/cards. Upserts so a member with no saved row yet can
+// still be hidden.
+export async function setMemberHidden(userId: string, hidden: boolean): Promise<Result> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: "Only admins can edit payments." };
+  }
+  if (!userId) return { error: "Missing member." };
+
+  await db
+    .insert(paymentOverride)
+    .values({ userId, hidden })
+    .onConflictDoUpdate({
+      target: paymentOverride.userId,
+      set: { hidden, updatedAt: new Date() },
+    });
+
+  await logActivity(hidden ? "payment.member_hidden" : "payment.member_shown");
+  await notifyChange();
+  revalidatePath(PAGE);
+  return { ok: true };
+}

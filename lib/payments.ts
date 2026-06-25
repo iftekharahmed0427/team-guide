@@ -43,6 +43,7 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
         baseCompensation: paymentOverride.baseCompensation,
         bonus: paymentOverride.bonus,
         commissionOverride: paymentOverride.commissionOverride,
+        hidden: paymentOverride.hidden,
         recoveredRevenue: paymentOverride.recoveredRevenue,
       })
       .from(paymentOverride)
@@ -80,6 +81,7 @@ export async function getPayableMembers(): Promise<PayableMember[]> {
       reviewBonus: r.userId ? reviewTotals.get(r.userId) ?? 0 : 0,
       commission: r.userId ? commissionTotals.get(r.userId) ?? 0 : 0,
       commissionOverride: o?.commissionOverride ?? null,
+      hidden: o?.hidden ?? false,
     });
   }
 

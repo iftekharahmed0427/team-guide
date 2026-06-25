@@ -31,6 +31,7 @@ export type PayableMember = {
   reviewBonus: number; // flat review bonus (eligible member + team hit the period threshold); adds to Amount
   commission: number; // summed approved commission payouts this period (from /commissions); the computed default
   commissionOverride: number | null; // admin's fixed commission $; null = track the computed value
+  hidden: boolean; // admin-excluded from the payments list (still in Reports); unhideable
 };
 
 // One assignable payment role from the admin-managed catalog. `paidPerTicket`

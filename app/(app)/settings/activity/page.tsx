@@ -40,6 +40,8 @@ const ACTION_LABELS: Record<string, string> = {
   "payment.ineligible": "marked a member ineligible for payment",
   "payment.payout_updated": "updated a member payout",
   "payment.saved": "saved payment changes",
+  "payment.member_hidden": "hid a member from payments",
+  "payment.member_shown": "restored a member to payments",
   "payment.tickets_updated": "edited a member's ticket count",
   "payment.tickets_reset": "reset a member's ticket count to live",
   "payment.base_updated": "edited a member's base compensation",

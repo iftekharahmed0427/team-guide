@@ -467,6 +467,7 @@ export const paymentOverride = pgTable("payment_override", {
   baseCompensation: doublePrecision("base_compensation").notNull().default(0), // flat $ on top of ticket pay
   bonus: doublePrecision("bonus").notNull().default(0), // manual $ bonus (bonus-eligible roles); adds to Amount
   commissionOverride: doublePrecision("commission_override"), // null = track the computed approved-commission total
+  hidden: boolean("hidden").notNull().default(false), // excluded from the /payments list (admin can unhide)
   recoveredRevenue: doublePrecision("recovered_revenue").notNull().default(0), // recorded only, not paid
   updatedAt: timestamp("updated_at")
     .defaultNow()

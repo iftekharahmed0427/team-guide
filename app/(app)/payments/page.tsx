@@ -28,9 +28,13 @@ export default async function PaymentsPage() {
     getPaymentRoles(),
   ]);
   // Admins see everyone; a member sees only their own row.
-  const rows = isAdmin
+  const scoped = isAdmin
     ? members
     : members.filter((m) => m.userId && m.userId === currentUserId);
+  // Hidden members are dropped from the list, its totals, and the cards, but kept
+  // aside so an admin can restore them.
+  const rows = scoped.filter((m) => !m.hidden);
+  const hiddenMembers = isAdmin ? members.filter((m) => m.hidden) : [];
 
   const totalTickets = rows.reduce((s, m) => s + effectiveTickets(m), 0);
   // Ticket money is only earned by paid-per-ticket roles.
@@ -90,7 +94,12 @@ export default async function PaymentsPage() {
             />
           </div>
 
-          <PaymentsTable members={rows} roles={roles} editable={isAdmin} />
+          <PaymentsTable
+            members={rows}
+            hiddenMembers={hiddenMembers}
+            roles={roles}
+            editable={isAdmin}
+          />
         </div>
       </main>
     </>
