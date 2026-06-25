@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Gamepad2, Plus, X, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Gamepad2, Plus, X, Trash2, AlertCircle } from "lucide-react";
 import Avatar from "@/app/components/avatar";
-import { addSpecialty, removeSpecialty } from "./actions";
+import {
+  addSpecialty,
+  removeSpecialty,
+  addGame,
+  renameGame,
+  deleteGame,
+} from "./actions";
 
 type Member = { id: string; name: string; image: string | null };
 type Game = { id: string; name: string; memberIds: string[] };
+type Result = { ok: true } | { error: string };
 
 export default function SpecialtiesBoard({
   isAdmin,
@@ -26,9 +34,52 @@ export default function SpecialtiesBoard({
   const [openGame, setOpenGame] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const router = useRouter();
+  // Local game-name edit state for inline rename, plus the new-game draft. Game
+  // add/rename/delete are not optimistic - they re-fetch on success.
+  const [gameNames, setGameNames] = useState<Record<string, string>>(() =>
+    Object.fromEntries(games.map((g) => [g.id, g.name])),
+  );
+  const [newGame, setNewGame] = useState("");
+  const [gamePending, startGameTransition] = useTransition();
+
   useEffect(() => {
     setAssigned(Object.fromEntries(games.map((g) => [g.id, g.memberIds])));
+    setGameNames(Object.fromEntries(games.map((g) => [g.id, g.name])));
   }, [games]);
+
+  function runGame(fn: () => Promise<Result>, after?: () => void) {
+    setError("");
+    startGameTransition(async () => {
+      const res = await fn();
+      if ("error" in res) setError(res.error);
+      else {
+        after?.();
+        router.refresh();
+      }
+    });
+  }
+
+  function createGame() {
+    const name = newGame.trim();
+    if (!name) return;
+    runGame(() => addGame(name), () => setNewGame(""));
+  }
+
+  function rename(gameId: string) {
+    const name = (gameNames[gameId] ?? "").trim();
+    const original = games.find((g) => g.id === gameId)?.name ?? "";
+    if (!name || name === original) {
+      setGameNames((s) => ({ ...s, [gameId]: original })); // revert blank / unchanged
+      return;
+    }
+    runGame(() => renameGame(gameId, name));
+  }
+
+  function removeGame(gameId: string, name: string) {
+    if (!window.confirm(`Delete "${name}"? Everyone assigned to it will be unassigned.`)) return;
+    runGame(() => deleteGame(gameId));
+  }
 
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -65,6 +116,31 @@ export default function SpecialtiesBoard({
         <p className="text-xs text-muted">The people to reach out to for each game.</p>
       </div>
 
+      {isAdmin ? (
+        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+          <input
+            value={newGame}
+            disabled={gamePending}
+            onChange={(e) => setNewGame(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createGame();
+            }}
+            placeholder="Add a game"
+            maxLength={60}
+            className="h-9 flex-1 border border-border bg-surface-2 px-3 text-sm text-foreground outline-none focus:border-muted"
+          />
+          <button
+            type="button"
+            onClick={createGame}
+            disabled={gamePending || newGame.trim() === ""}
+            className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            <Plus size={15} strokeWidth={1.75} />
+            Add game
+          </button>
+        </div>
+      ) : null}
+
       {error ? (
         <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-5 py-2.5 text-xs text-red-400">
           <AlertCircle size={13} strokeWidth={2} />
@@ -74,7 +150,7 @@ export default function SpecialtiesBoard({
 
       {games.length === 0 ? (
         <p className="px-5 py-6 text-sm text-muted">
-          No games yet. Add games from the guide editor first.
+          {isAdmin ? "No games yet. Add one above." : "No games yet."}
         </p>
       ) : (
         <ul>
@@ -93,9 +169,36 @@ export default function SpecialtiesBoard({
                 key={g.id}
                 className="flex flex-col gap-3 border-b border-border px-5 py-4 last:border-0 sm:flex-row sm:items-start sm:justify-between"
               >
-                <div className="flex items-center gap-2.5 sm:w-48 sm:shrink-0">
-                  <Gamepad2 size={15} strokeWidth={1.75} className="text-muted" />
-                  <span className="text-sm font-medium">{g.name}</span>
+                <div className="flex items-center gap-2 sm:w-60 sm:shrink-0">
+                  <Gamepad2 size={15} strokeWidth={1.75} className="shrink-0 text-muted" />
+                  {isAdmin ? (
+                    <>
+                      <input
+                        value={gameNames[g.id] ?? ""}
+                        disabled={gamePending}
+                        onChange={(e) => setGameNames((s) => ({ ...s, [g.id]: e.target.value }))}
+                        onBlur={() => rename(g.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
+                        maxLength={60}
+                        aria-label={`Rename ${g.name}`}
+                        className="h-8 min-w-0 flex-1 border border-transparent bg-transparent px-2 text-sm font-medium text-foreground outline-none hover:border-border focus:border-muted focus:bg-surface-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeGame(g.id, g.name)}
+                        disabled={gamePending}
+                        aria-label={`Delete ${g.name}`}
+                        title="Delete game"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-red-400 disabled:opacity-50"
+                      >
+                        <Trash2 size={14} strokeWidth={1.75} />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-sm font-medium">{g.name}</span>
+                  )}
                 </div>
 
                 <div className="flex flex-1 flex-wrap items-center gap-2">
