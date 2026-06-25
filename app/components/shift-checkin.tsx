@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LogIn, LogOut, Loader2 } from "lucide-react";
 import { toggleShift } from "@/lib/shift-actions";
@@ -30,11 +30,11 @@ export default function ShiftCheckin({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  // Poll for other members' check-ins so the list stays current.
-  useEffect(() => {
-    const id = setInterval(() => router.refresh(), 8000);
-    return () => clearInterval(id);
-  }, [router]);
+  // No polling here: the dashboard is a "live" page, so the layout's LiveRefresh
+  // already re-renders it whenever anyone checks in/out (toggleShift calls
+  // notifyChange). A blind setInterval(router.refresh) here re-ran all the
+  // dashboard's queries every few seconds on every open tab - ~10.8k Vercel
+  // invocations/day per always-open dashboard - which blew through the free tier.
 
   const meActive = active.some((a) => a.userId === currentUserId);
 

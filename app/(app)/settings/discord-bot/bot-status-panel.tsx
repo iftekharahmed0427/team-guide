@@ -20,9 +20,13 @@ function ago(iso: string | null): string {
 export default function BotStatusPanel({ initial }: { initial: BotStatusPayload }) {
   const [status, setStatus] = useState(initial);
 
-  // Poll so online/offline + errors stay live without reloading the page.
+  // Poll so online/offline + errors stay live without reloading the page. Only
+  // while the tab is VISIBLE - a hidden/background tab pauses the poll so it stops
+  // hitting /api/bot-status (and the DB behind it) for a panel nobody is looking
+  // at. Becoming visible again does one immediate catch-up fetch.
   useEffect(() => {
     let active = true;
+    let id: ReturnType<typeof setInterval> | undefined;
     const tick = async () => {
       try {
         const r = await fetch("/api/bot-status", { cache: "no-store" });
@@ -31,10 +35,23 @@ export default function BotStatusPanel({ initial }: { initial: BotStatusPayload 
         // transient; next tick retries
       }
     };
-    const id = setInterval(tick, 15000);
+    const start = () => {
+      if (id || document.hidden) return;
+      void tick(); // catch up immediately, then on an interval
+      id = setInterval(tick, 15000);
+    };
+    const stop = () => {
+      if (id) clearInterval(id);
+      id = undefined;
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+
+    document.addEventListener("visibilitychange", onVisibility);
+    start();
     return () => {
       active = false;
-      clearInterval(id);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

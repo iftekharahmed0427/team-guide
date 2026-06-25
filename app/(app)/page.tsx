@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { count, desc, eq, isNull } from "drizzle-orm";
+import { count, desc, eq, gte, isNull } from "drizzle-orm";
 import {
   Bell,
   Plus,
@@ -72,6 +72,13 @@ export default async function Home() {
   const session = await getSession();
   const currentUserId = session?.user.id ?? "";
 
+  // Only fetch unavailability from the start of the current month onward. The
+  // calendar defaults to this month and past days off aren't actionable, so this
+  // caps a query that would otherwise grow unbounded (every member, every date,
+  // forever) and re-fetch in full on each dashboard render.
+  const now = new Date();
+  const monthStart = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+
   const [latestNews, availabilityRows, activeShifts, memberCount, recentNotes, ticketRows, reviewCounts] =
     await Promise.all([
       // Only the columns the card renders — never the full `content` HTML (up to
@@ -95,7 +102,8 @@ export default async function Home() {
           userName: user.name,
         })
         .from(unavailability)
-        .innerJoin(user, eq(unavailability.userId, user.id)),
+        .innerJoin(user, eq(unavailability.userId, user.id))
+        .where(gte(unavailability.date, monthStart)),
       db
         .select({
           userId: shift.userId,
