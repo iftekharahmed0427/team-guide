@@ -3,10 +3,6 @@
 
 export const TICKET_RATE = 1; // US dollars paid per ticket
 
-// While the payments tool is WIP it is locked to these ids (Conscience + the local
-// dev user). Shared by /payments and /payments/history. Remove to open it up.
-export const PAYMENTS_OWNER_IDS = ["O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw", "dev-user"];
-
 export function formatUSD(n: number): string {
   return (Number.isFinite(n) ? n : 0).toLocaleString("en-US", {
     style: "currency",

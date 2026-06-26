@@ -7,15 +7,13 @@ import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { getPaymentHistory } from "@/lib/payment-history";
 import { getPayableMembers, getPaymentRoles } from "@/lib/payments";
-import { PAYMENTS_OWNER_IDS } from "../constants";
 import HistoryManager from "./history-manager";
 
 export default async function PaymentHistoryPage() {
   const session = await getSession();
-  const currentUserId = session?.user.id ?? "";
   const isAdmin = session?.user.role === "admin";
-  // Same gate as the payments tool itself (owner-locked while WIP).
-  if (!isAdmin || !PAYMENTS_OWNER_IDS.includes(currentUserId)) redirect("/payments");
+  // Admin-only, matching the payments tool.
+  if (!isAdmin) redirect("/payments");
 
   const [periods, roles, members, payable] = await Promise.all([
     getPaymentHistory(),

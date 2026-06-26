@@ -3,13 +3,7 @@ import { CalendarRange, Ticket, Crown, Construction, History } from "lucide-reac
 import { getSession } from "@/lib/auth";
 import { getPayableMembers, getCurrentPeriod, getPaymentRoles } from "@/lib/payments";
 import { formatDateShort } from "@/lib/datetime";
-import {
-  formatUSD,
-  TICKET_RATE,
-  ticketPayout,
-  effectiveTickets,
-  PAYMENTS_OWNER_IDS,
-} from "./constants";
+import { formatUSD, TICKET_RATE, ticketPayout, effectiveTickets } from "./constants";
 import PaymentsTable from "./payments-table";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -19,7 +13,8 @@ export default async function PaymentsPage() {
   const currentUserId = session?.user.id ?? "";
   const isAdmin = session?.user.role === "admin";
 
-  if (!PAYMENTS_OWNER_IDS.includes(currentUserId)) {
+  // Admin-only for now; members get the placeholder until it opens to everyone.
+  if (!isAdmin) {
     return <WorkInProgress />;
   }
 
