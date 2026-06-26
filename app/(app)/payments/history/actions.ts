@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { paymentPeriod, paymentPeriodRow } from "@/db/app-schema";
@@ -139,6 +139,57 @@ export async function savePeriod(input: SavePeriodInput): Promise<Result> {
   await notifyChange();
   revalidatePath(PAGE);
   return { ok: true };
+}
+
+// Copy a period and all its rows into a new one (labeled "(copy)"), so a similar
+// period can be created without re-entering everyone. The copy is always manual.
+export async function duplicatePeriod(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const period = (
+    await db.select().from(paymentPeriod).where(eq(paymentPeriod.id, id)).limit(1)
+  )[0];
+  if (!period) return;
+
+  const rows = await db
+    .select()
+    .from(paymentPeriodRow)
+    .where(eq(paymentPeriodRow.periodId, id))
+    .orderBy(asc(paymentPeriodRow.position));
+
+  const newId = randomUUID();
+  await db.insert(paymentPeriod).values({
+    id: newId,
+    label: (period.label ? `${period.label} (copy)` : "Copy").slice(0, 120),
+    startDate: period.startDate,
+    endDate: period.endDate,
+    ticketRate: period.ticketRate,
+    source: "manual",
+  });
+  if (rows.length > 0) {
+    await db.insert(paymentPeriodRow).values(
+      rows.map((r, i) => ({
+        id: randomUUID(),
+        periodId: newId,
+        memberId: r.memberId,
+        memberName: r.memberName,
+        roleName: r.roleName,
+        paidPerTicket: r.paidPerTicket,
+        tickets: r.tickets,
+        baseCompensation: r.baseCompensation,
+        bonus: r.bonus,
+        commission: r.commission,
+        amountOverride: r.amountOverride,
+        position: i,
+      })),
+    );
+  }
+
+  await logActivity("payment.period_duplicated", period.label || "period");
+  await notifyChange();
+  revalidatePath(PAGE);
 }
 
 // Delete a historical period (its rows cascade away with it).

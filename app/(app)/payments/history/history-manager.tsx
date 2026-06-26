@@ -19,10 +19,10 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Trash2, Pencil, X, Save, AlertCircle, History, UserPlus, GripVertical } from "lucide-react";
+import { Plus, Trash2, Pencil, Copy, X, Save, AlertCircle, History, UserPlus, GripVertical } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import { formatUSD, historyRowAmount } from "../constants";
-import { savePeriod, deletePeriod, type PeriodRowInput } from "./actions";
+import { savePeriod, deletePeriod, duplicatePeriod, type PeriodRowInput } from "./actions";
 
 // ── Types (plain data passed from the server page) ───────────────────────────
 type Row = {
@@ -810,6 +810,17 @@ export default function HistoryManager({
                   <Pencil size={13} strokeWidth={1.75} />
                   Edit
                 </button>
+                <form action={duplicatePeriod}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button
+                    type="submit"
+                    title="Duplicate period"
+                    className="btn-wipe flex h-8 items-center gap-1.5 border border-border px-2.5 text-xs text-muted transition-colors hover:text-foreground"
+                  >
+                    <Copy size={13} strokeWidth={1.75} />
+                    Duplicate
+                  </button>
+                </form>
                 <form
                   action={deletePeriod}
                   onSubmit={(e) => {

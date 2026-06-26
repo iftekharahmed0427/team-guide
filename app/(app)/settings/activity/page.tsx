@@ -47,6 +47,7 @@ const ACTION_LABELS: Record<string, string> = {
   "payment.member_shown": "restored a member to payments",
   "payment.period_added": "added a payment history period",
   "payment.period_updated": "edited a payment history period",
+  "payment.period_duplicated": "duplicated a payment history period",
   "payment.period_deleted": "deleted a payment history period",
   "payment.tickets_updated": "edited a member's ticket count",
   "payment.tickets_reset": "reset a member's ticket count to live",
