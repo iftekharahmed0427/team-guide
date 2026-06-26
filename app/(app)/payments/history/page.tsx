@@ -6,7 +6,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { getPaymentHistory } from "@/lib/payment-history";
-import { getPaymentRoles } from "@/lib/payments";
+import { getPayableMembers, getPaymentRoles } from "@/lib/payments";
 import { PAYMENTS_OWNER_IDS } from "../constants";
 import HistoryManager from "./history-manager";
 
@@ -17,14 +17,27 @@ export default async function PaymentHistoryPage() {
   // Same gate as the payments tool itself (owner-locked while WIP).
   if (!isAdmin || !PAYMENTS_OWNER_IDS.includes(currentUserId)) redirect("/payments");
 
-  const [periods, roles, members] = await Promise.all([
+  const [periods, roles, members, payable] = await Promise.all([
     getPaymentHistory(),
     getPaymentRoles(),
     db.select({ name: userTable.name }).from(userTable).orderBy(asc(userTable.name)),
+    getPayableMembers(),
   ]);
 
   const memberNames = members.map((m) => m.name).filter((n): n is string => !!n);
   const roleOptions = roles.map((r) => ({ name: r.name, paidPerTicket: r.paidPerTicket }));
+  // Current members pre-fill a new period's rows (with their current role as a
+  // sensible default); the admin then removes whoever was not around and adds any
+  // departed members by name.
+  const currentMembers = payable
+    .filter((m) => !m.hidden)
+    .map((m) => ({
+      memberId: m.userId,
+      name: m.name,
+      image: m.image,
+      roleName: m.roleName ?? "",
+      paidPerTicket: m.paidPerTicket,
+    }));
 
   return (
     <>
@@ -46,7 +59,12 @@ export default async function PaymentHistoryPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto w-full max-w-5xl">
-          <HistoryManager periods={periods} memberNames={memberNames} roles={roleOptions} />
+          <HistoryManager
+            periods={periods}
+            memberNames={memberNames}
+            roles={roleOptions}
+            currentMembers={currentMembers}
+          />
         </div>
       </main>
     </>

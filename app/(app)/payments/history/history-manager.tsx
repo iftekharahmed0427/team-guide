@@ -31,6 +31,13 @@ type Period = {
   rows: Row[];
 };
 type RoleOption = { name: string; paidPerTicket: boolean };
+type CurrentMember = {
+  memberId: string | null;
+  name: string;
+  image: string | null;
+  roleName: string;
+  paidPerTicket: boolean;
+};
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -155,6 +162,7 @@ type Draft = {
   key: string;
   memberName: string;
   memberId: string | null;
+  image: string | null;
   roleName: string;
   paidPerTicket: boolean;
   ticketsText: string;
@@ -170,6 +178,7 @@ const emptyDraft = (): Draft => ({
   key: newKey(),
   memberName: "",
   memberId: null,
+  image: null,
   roleName: "",
   paidPerTicket: true,
   ticketsText: "",
@@ -182,6 +191,7 @@ const draftFromRow = (r: Row): Draft => ({
   key: r.id || newKey(),
   memberName: r.memberName,
   memberId: r.memberId,
+  image: r.memberImage,
   roleName: r.roleName,
   paidPerTicket: r.paidPerTicket,
   ticketsText: intText(r.tickets),
@@ -189,6 +199,21 @@ const draftFromRow = (r: Row): Draft => ({
   bonusText: moneyText(r.bonus),
   commissionText: moneyText(r.commission),
   overrideText: r.amountOverride === null ? "" : String(r.amountOverride),
+});
+// A fresh row for a current member: their identity + current role as the default,
+// zeros for the period's figures (the admin fills in the historical numbers).
+const draftFromMember = (m: CurrentMember): Draft => ({
+  key: newKey(),
+  memberName: m.name,
+  memberId: m.memberId,
+  image: m.image,
+  roleName: m.roleName,
+  paidPerTicket: m.paidPerTicket,
+  ticketsText: "",
+  baseText: "",
+  bonusText: "",
+  commissionText: "",
+  overrideText: "",
 });
 
 const draftAmount = (d: Draft, rate: number) =>
@@ -210,11 +235,13 @@ const inp =
 function PeriodEditor({
   period,
   roles,
+  currentMembers,
   onClose,
   onSaved,
 }: {
   period: Period | null;
   roles: RoleOption[];
+  currentMembers: CurrentMember[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -222,23 +249,32 @@ function PeriodEditor({
   const [startDate, setStartDate] = useState(period?.startDate ?? "");
   const [endDate, setEndDate] = useState(period?.endDate ?? "");
   const [rateText, setRateText] = useState(period ? String(period.ticketRate) : "1");
-  const [drafts, setDrafts] = useState<Draft[]>(() =>
-    period && period.rows.length ? period.rows.map(draftFromRow) : [emptyDraft()],
-  );
+  // New period: pre-fill every current member. Editing: load the saved rows.
+  const [drafts, setDrafts] = useState<Draft[]>(() => {
+    if (period) return period.rows.length ? period.rows.map(draftFromRow) : [emptyDraft()];
+    return currentMembers.length ? currentMembers.map(draftFromMember) : [emptyDraft()];
+  });
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
   const rate = parseMoney0(rateText);
   const total = drafts.reduce((s, d) => s + draftAmount(d, rate), 0);
+  const roleMap = new Map(roles.map((r) => [r.name, r.paidPerTicket]));
 
   const patch = (key: string, p: Partial<Draft>) =>
     setDrafts((ds) => ds.map((d) => (d.key === key ? { ...d, ...p } : d)));
   const addRow = () => setDrafts((ds) => [...ds, emptyDraft()]);
   const removeRow = (key: string) => setDrafts((ds) => ds.filter((d) => d.key !== key));
-  const onRole = (key: string, name: string) => {
-    const match = roles.find((r) => r.name.toLowerCase() === name.trim().toLowerCase());
-    patch(key, { roleName: name, ...(match ? { paidPerTicket: match.paidPerTicket } : {}) });
-  };
+  // Role comes from the fetched catalog; selecting one also sets paid-per-ticket.
+  // A removed/old role (not in the catalog) keeps its stored paid-per-ticket.
+  const onRole = (key: string, name: string) =>
+    setDrafts((ds) =>
+      ds.map((d) => {
+        if (d.key !== key) return d;
+        const paidPerTicket = name === "" ? true : roleMap.get(name) ?? d.paidPerTicket;
+        return { ...d, roleName: name, paidPerTicket };
+      }),
+    );
 
   function save() {
     setError("");
@@ -354,12 +390,14 @@ function PeriodEditor({
               <tr key={d.key} className="border-b border-border last:border-0 align-top">
                 <td className="px-2 py-2">
                   <div className="flex items-center gap-2">
-                    <Avatar name={d.memberName || "?"} image={null} size={22} />
+                    <Avatar name={d.memberName || "?"} image={d.image} size={22} />
                     <input
                       list="ph-members"
                       value={d.memberName}
                       disabled={pending}
-                      onChange={(e) => patch(d.key, { memberName: e.target.value, memberId: null })}
+                      onChange={(e) =>
+                        patch(d.key, { memberName: e.target.value, memberId: null, image: null })
+                      }
                       placeholder="Name"
                       maxLength={80}
                       className={`${inp} w-40`}
@@ -367,26 +405,23 @@ function PeriodEditor({
                   </div>
                 </td>
                 <td className="px-2 py-2">
-                  <div className="flex flex-col gap-1">
-                    <input
-                      list="ph-roles"
-                      value={d.roleName}
-                      disabled={pending}
-                      onChange={(e) => onRole(d.key, e.target.value)}
-                      placeholder="Role"
-                      maxLength={60}
-                      className={`${inp} w-36`}
-                    />
-                    <label className="flex items-center gap-1 text-[11px] text-muted">
-                      <input
-                        type="checkbox"
-                        checked={d.paidPerTicket}
-                        disabled={pending}
-                        onChange={(e) => patch(d.key, { paidPerTicket: e.target.checked })}
-                      />
-                      Paid per ticket
-                    </label>
-                  </div>
+                  <select
+                    value={d.roleName}
+                    disabled={pending}
+                    onChange={(e) => onRole(d.key, e.target.value)}
+                    className={`${inp} w-40 [color-scheme:dark]`}
+                    title={d.paidPerTicket ? "Paid per ticket" : "Base only"}
+                  >
+                    <option value="">Unassigned</option>
+                    {roles.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.name}
+                      </option>
+                    ))}
+                    {d.roleName && !roleMap.has(d.roleName) ? (
+                      <option value={d.roleName}>{d.roleName} (removed)</option>
+                    ) : null}
+                  </select>
                 </td>
                 <td className="px-2 py-2 text-right">
                   <input
@@ -514,10 +549,12 @@ export default function HistoryManager({
   periods,
   memberNames,
   roles,
+  currentMembers,
 }: {
   periods: Period[];
   memberNames: string[];
   roles: RoleOption[];
+  currentMembers: CurrentMember[];
 }) {
   const router = useRouter();
   // null = list view; { period: null } = creating; { period } = editing that one.
@@ -535,16 +572,12 @@ export default function HistoryManager({
           <option key={n} value={n} />
         ))}
       </datalist>
-      <datalist id="ph-roles">
-        {roles.map((r) => (
-          <option key={r.name} value={r.name} />
-        ))}
-      </datalist>
 
       {editing ? (
         <PeriodEditor
           period={editing.period}
           roles={roles}
+          currentMembers={currentMembers}
           onClose={() => setEditing(null)}
           onSaved={onSaved}
         />
