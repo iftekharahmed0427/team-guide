@@ -2,7 +2,24 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Pencil, X, Save, AlertCircle, History, UserPlus } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Plus, Trash2, Pencil, X, Save, AlertCircle, History, UserPlus, GripVertical } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import { formatUSD, historyRowAmount } from "../constants";
 import { savePeriod, deletePeriod, type PeriodRowInput } from "./actions";
@@ -316,6 +333,153 @@ function MemberAddMenu({
   );
 }
 
+// One draggable editor row (the drag handle carries the listeners, so the inputs
+// stay fully usable).
+function SortableRow({
+  d,
+  rate,
+  pending,
+  roles,
+  roleMap,
+  onPatch,
+  onRole,
+  onRemove,
+}: {
+  d: Draft;
+  rate: number;
+  pending: boolean;
+  roles: RoleOption[];
+  roleMap: Map<string, boolean>;
+  onPatch: (key: string, p: Partial<Draft>) => void;
+  onRole: (key: string, name: string) => void;
+  onRemove: (key: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: d.key,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`border-b border-border align-top last:border-0 ${isDragging ? "relative z-10 bg-surface-2 opacity-80" : ""}`}
+    >
+      <td className="px-1 py-2 align-middle">
+        <button
+          type="button"
+          aria-label="Drag to reorder"
+          className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-muted transition-colors hover:text-foreground active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={14} strokeWidth={1.75} />
+        </button>
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-2">
+          <Avatar name={d.memberName || "?"} image={d.image} size={22} />
+          <input
+            list="ph-members"
+            value={d.memberName}
+            disabled={pending}
+            onChange={(e) => onPatch(d.key, { memberName: e.target.value, memberId: null, image: null })}
+            placeholder="Name"
+            maxLength={80}
+            className={`${inp} w-40`}
+          />
+        </div>
+      </td>
+      <td className="px-2 py-2">
+        <select
+          value={d.roleName}
+          disabled={pending}
+          onChange={(e) => onRole(d.key, e.target.value)}
+          className={`${inp} w-40 [color-scheme:dark]`}
+          title={d.paidPerTicket ? "Paid per ticket" : "Base only"}
+        >
+          <option value="">Unassigned</option>
+          {roles.map((r) => (
+            <option key={r.name} value={r.name}>
+              {r.name}
+            </option>
+          ))}
+          {d.roleName && !roleMap.has(d.roleName) ? (
+            <option value={d.roleName}>{d.roleName} (removed)</option>
+          ) : null}
+        </select>
+      </td>
+      <td className="px-2 py-2 text-right">
+        <input
+          inputMode="numeric"
+          value={d.ticketsText}
+          disabled={pending}
+          onChange={(e) => onPatch(d.key, { ticketsText: e.target.value.replace(/[^\d]/g, "") })}
+          placeholder="0"
+          className={`${inp} w-16 text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2 text-right">
+        <input
+          inputMode="decimal"
+          value={d.baseText}
+          disabled={pending}
+          onChange={(e) => onPatch(d.key, { baseText: e.target.value.replace(/[^\d.]/g, "") })}
+          placeholder="0"
+          className={`${inp} w-20 text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2 text-right">
+        <input
+          inputMode="decimal"
+          value={d.bonusText}
+          disabled={pending}
+          onChange={(e) => onPatch(d.key, { bonusText: e.target.value.replace(/[^\d.]/g, "") })}
+          placeholder="0"
+          className={`${inp} w-20 text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2 text-right">
+        <input
+          inputMode="decimal"
+          value={d.commissionText}
+          disabled={pending}
+          onChange={(e) => onPatch(d.key, { commissionText: e.target.value.replace(/[^\d.]/g, "") })}
+          placeholder="0"
+          className={`${inp} w-20 text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2 text-right">
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="font-medium tabular-nums">{formatUSD(draftAmount(d, rate))}</span>
+          <input
+            inputMode="decimal"
+            value={d.overrideText}
+            disabled={pending}
+            onChange={(e) => onPatch(d.key, { overrideText: e.target.value.replace(/[^\d.]/g, "") })}
+            placeholder="override"
+            title="Override the computed amount"
+            className={`${inp} w-20 text-right tabular-nums`}
+          />
+        </div>
+      </td>
+      <td className="px-2 py-2 text-right">
+        <button
+          type="button"
+          onClick={() => onRemove(d.key)}
+          disabled={pending}
+          aria-label="Remove row"
+          className="flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-red-400 disabled:opacity-50"
+        >
+          <Trash2 size={14} strokeWidth={1.75} />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 function PeriodEditor({
   period,
   roles,
@@ -368,6 +532,20 @@ function PeriodEditor({
         return { ...d, roleName: name, paidPerTicket };
       }),
     );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setDrafts((ds) => {
+      const from = ds.findIndex((d) => d.key === active.id);
+      const to = ds.findIndex((d) => d.key === over.id);
+      return from < 0 || to < 0 ? ds : arrayMove(ds, from, to);
+    });
+  }
 
   function save() {
     setError("");
@@ -464,137 +642,51 @@ function PeriodEditor({
         </label>
       </div>
 
-      <div className="overflow-x-auto border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted">
-              <th className="h-9 px-2 text-left font-medium">Member</th>
-              <th className="h-9 px-2 text-left font-medium">Role</th>
-              <th className="h-9 px-2 text-right font-medium">Tickets</th>
-              <th className="h-9 px-2 text-right font-medium">Base</th>
-              <th className="h-9 px-2 text-right font-medium">Bonus</th>
-              <th className="h-9 px-2 text-right font-medium">Commissions</th>
-              <th className="h-9 px-2 text-right font-medium">Amount</th>
-              <th className="h-9 w-8 px-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {drafts.map((d) => (
-              <tr key={d.key} className="border-b border-border last:border-0 align-top">
-                <td className="px-2 py-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar name={d.memberName || "?"} image={d.image} size={22} />
-                    <input
-                      list="ph-members"
-                      value={d.memberName}
-                      disabled={pending}
-                      onChange={(e) =>
-                        patch(d.key, { memberName: e.target.value, memberId: null, image: null })
-                      }
-                      placeholder="Name"
-                      maxLength={80}
-                      className={`${inp} w-40`}
-                    />
-                  </div>
-                </td>
-                <td className="px-2 py-2">
-                  <select
-                    value={d.roleName}
-                    disabled={pending}
-                    onChange={(e) => onRole(d.key, e.target.value)}
-                    className={`${inp} w-40 [color-scheme:dark]`}
-                    title={d.paidPerTicket ? "Paid per ticket" : "Base only"}
-                  >
-                    <option value="">Unassigned</option>
-                    {roles.map((r) => (
-                      <option key={r.name} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
-                    {d.roleName && !roleMap.has(d.roleName) ? (
-                      <option value={d.roleName}>{d.roleName} (removed)</option>
-                    ) : null}
-                  </select>
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <input
-                    inputMode="numeric"
-                    value={d.ticketsText}
-                    disabled={pending}
-                    onChange={(e) => patch(d.key, { ticketsText: e.target.value.replace(/[^\d]/g, "") })}
-                    placeholder="0"
-                    className={`${inp} w-16 text-right tabular-nums`}
-                  />
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <input
-                    inputMode="decimal"
-                    value={d.baseText}
-                    disabled={pending}
-                    onChange={(e) => patch(d.key, { baseText: e.target.value.replace(/[^\d.]/g, "") })}
-                    placeholder="0"
-                    className={`${inp} w-20 text-right tabular-nums`}
-                  />
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <input
-                    inputMode="decimal"
-                    value={d.bonusText}
-                    disabled={pending}
-                    onChange={(e) => patch(d.key, { bonusText: e.target.value.replace(/[^\d.]/g, "") })}
-                    placeholder="0"
-                    className={`${inp} w-20 text-right tabular-nums`}
-                  />
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <input
-                    inputMode="decimal"
-                    value={d.commissionText}
-                    disabled={pending}
-                    onChange={(e) => patch(d.key, { commissionText: e.target.value.replace(/[^\d.]/g, "") })}
-                    placeholder="0"
-                    className={`${inp} w-20 text-right tabular-nums`}
-                  />
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <div className="flex flex-col items-end gap-0.5">
-                    <span className="font-medium tabular-nums">{formatUSD(draftAmount(d, rate))}</span>
-                    <input
-                      inputMode="decimal"
-                      value={d.overrideText}
-                      disabled={pending}
-                      onChange={(e) => patch(d.key, { overrideText: e.target.value.replace(/[^\d.]/g, "") })}
-                      placeholder="override"
-                      title="Override the computed amount"
-                      className={`${inp} w-20 text-right tabular-nums`}
-                    />
-                  </div>
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => removeRow(d.key)}
-                    disabled={pending}
-                    aria-label="Remove row"
-                    className="flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-red-400 disabled:opacity-50"
-                  >
-                    <Trash2 size={14} strokeWidth={1.75} />
-                  </button>
-                </td>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <div className="overflow-x-auto border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted">
+                <th className="h-9 w-7 px-1" />
+                <th className="h-9 px-2 text-left font-medium">Member</th>
+                <th className="h-9 px-2 text-left font-medium">Role</th>
+                <th className="h-9 px-2 text-right font-medium">Tickets</th>
+                <th className="h-9 px-2 text-right font-medium">Base</th>
+                <th className="h-9 px-2 text-right font-medium">Bonus</th>
+                <th className="h-9 px-2 text-right font-medium">Commissions</th>
+                <th className="h-9 px-2 text-right font-medium">Amount</th>
+                <th className="h-9 w-8 px-2" />
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border font-semibold">
-              <td className="px-2 py-2" colSpan={6}>
-                Total
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums">{formatUSD(total)}</td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              <SortableContext items={drafts.map((d) => d.key)} strategy={verticalListSortingStrategy}>
+                {drafts.map((d) => (
+                  <SortableRow
+                    key={d.key}
+                    d={d}
+                    rate={rate}
+                    pending={pending}
+                    roles={roles}
+                    roleMap={roleMap}
+                    onPatch={patch}
+                    onRole={onRole}
+                    onRemove={removeRow}
+                  />
+                ))}
+              </SortableContext>
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border font-semibold">
+                <td className="px-2 py-2" colSpan={7}>
+                  Total
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums">{formatUSD(total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </DndContext>
 
       <div className="flex items-center justify-between gap-3">
         <MemberAddMenu
