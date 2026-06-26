@@ -755,9 +755,11 @@ export default function HistoryManager({
         ))}
       </datalist>
 
-      {editing ? (
+      {/* Creating a new period shows the editor here at the top; editing an
+          existing one opens it inline in that period's place (see the list below). */}
+      {editing && editing.period === null ? (
         <PeriodEditor
-          period={editing.period}
+          period={null}
           roles={roles}
           currentMembers={currentMembers}
           onClose={() => setEditing(null)}
@@ -785,9 +787,19 @@ export default function HistoryManager({
           </p>
         </div>
       ) : (
-        periods.map((p) => (
-          <section key={p.id} className="border border-border bg-surface">
-            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+        periods.map((p) =>
+          editing?.period?.id === p.id ? (
+            <PeriodEditor
+              key={p.id}
+              period={p}
+              roles={roles}
+              currentMembers={currentMembers}
+              onClose={() => setEditing(null)}
+              onSaved={onSaved}
+            />
+          ) : (
+            <section key={p.id} className="border border-border bg-surface">
+              <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
               <div className="leading-tight">
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold tracking-tight">
@@ -839,8 +851,9 @@ export default function HistoryManager({
               </div>
             </div>
             <PeriodTable period={p} />
-          </section>
-        ))
+            </section>
+          ),
+        )
       )}
     </div>
   );
