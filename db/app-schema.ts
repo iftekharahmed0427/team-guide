@@ -475,6 +475,45 @@ export const paymentOverride = pgTable("payment_override", {
     .notNull(),
 });
 
+// A historical pay period for /payments/history: either hand-entered to back-fill
+// old data, or auto-snapshotted when an admin runs "Reset all". Each period owns
+// its rows (payment_period_row); the full payments table is rebuilt from them, so
+// it never depends on members or roles that no longer exist. `ticketRate` is the
+// $/ticket for that period (today's is $1, but old ones may differ).
+export const paymentPeriod = pgTable("payment_period", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull().default(""),
+  startDate: date("start_date", { mode: "string" }),
+  endDate: date("end_date", { mode: "string" }),
+  ticketRate: doublePrecision("ticket_rate").notNull().default(1),
+  source: text("source").notNull().default("manual"), // manual | reset
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// One member's row within a historical pay period, mirroring the live payments
+// columns. `memberName` is the snapshot label (free text, so departed members are
+// fine); `memberId` links to a current user only so their avatar can show (null =
+// letter avatar). `paidPerTicket` is stored so the amount math is self-contained.
+// Amount is computed on read: (paidPerTicket ? tickets * period.ticketRate : 0) +
+// base + bonus + commission, unless `amountOverride` is set.
+export const paymentPeriodRow = pgTable("payment_period_row", {
+  id: text("id").primaryKey(),
+  periodId: text("period_id")
+    .notNull()
+    .references(() => paymentPeriod.id, { onDelete: "cascade" }),
+  memberId: text("member_id"), // current user id for the avatar; null = letter avatar
+  memberName: text("member_name").notNull().default(""),
+  roleName: text("role_name").notNull().default(""),
+  paidPerTicket: boolean("paid_per_ticket").notNull().default(true),
+  tickets: integer("tickets").notNull().default(0),
+  baseCompensation: doublePrecision("base_compensation").notNull().default(0),
+  bonus: doublePrecision("bonus").notNull().default(0),
+  commission: doublePrecision("commission").notNull().default(0),
+  amountOverride: doublePrecision("amount_override"), // null = use the computed amount
+  position: doublePrecision("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // A compensation period for the team payout sheet (/payments). Biweekly,
 // numbered, with a date-range label. Auto-created from the Reports cycle but
 // every field is editable. `reviewBonus*` capture the period-level Trust Pilot /

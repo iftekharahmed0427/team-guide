@@ -1,17 +1,18 @@
-import { CalendarRange, Ticket, Crown, Construction } from "lucide-react";
+import Link from "next/link";
+import { CalendarRange, Ticket, Crown, Construction, History } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getPayableMembers, getCurrentPeriod, getPaymentRoles } from "@/lib/payments";
 import { formatDateShort } from "@/lib/datetime";
-import { formatUSD, TICKET_RATE, ticketPayout, effectiveTickets } from "./constants";
+import {
+  formatUSD,
+  TICKET_RATE,
+  ticketPayout,
+  effectiveTickets,
+  PAYMENTS_OWNER_IDS,
+} from "./constants";
 import PaymentsTable from "./payments-table";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
-
-// Temporary: while the payments tool is still being built, it is locked to
-// Conscience (iftekharahmed0427@gmail.com) plus the local dev user. Everyone else
-// - members and other admins - sees a "Work in progress" screen. Remove this gate
-// to open it up.
-const PAYMENTS_OWNER_IDS = ["O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw", "dev-user"];
 
 export default async function PaymentsPage() {
   const session = await getSession();
@@ -50,13 +51,20 @@ export default async function PaymentsPage() {
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-6">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-6">
         <div>
           <h1 className="text-base font-semibold tracking-tight">Payments</h1>
           <p className="text-xs text-muted">
             {formatUSD(TICKET_RATE)} per ticket (live from Reports)
           </p>
         </div>
+        <Link
+          href="/payments/history"
+          className="btn-wipe inline-flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground"
+        >
+          <History size={15} strokeWidth={1.75} />
+          History
+        </Link>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">

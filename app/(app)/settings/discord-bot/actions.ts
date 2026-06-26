@@ -18,6 +18,7 @@ import {
 } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
+import { snapshotPaymentsPeriod } from "@/lib/payment-history";
 
 const PAGE = "/settings/discord-bot";
 const SNOWFLAKE = /^\d{5,25}$/;
@@ -280,6 +281,10 @@ export async function resetAllReportChannels(): Promise<Result> {
       endedAt: now,
       total,
     });
+    // Snapshot the full payments table into /payments/history BEFORE counts are
+    // zeroed and before reviews/disputes/commissions are stamped below, so the
+    // closing period's live totals are captured. Best-effort: never block the reset.
+    await snapshotPaymentsPeriod(last?.endedAt ?? null, now).catch(() => {});
     const entries = channels
       .filter((c) => (c.count ?? 0) > 0)
       .map((c) => ({
@@ -335,6 +340,7 @@ export async function resetAllReportChannels(): Promise<Result> {
   revalidatePath("/disputes");
   revalidatePath("/commissions");
   revalidatePath("/payments");
+  revalidatePath("/payments/history");
   await notifyChange();
   return { ok: true };
 }

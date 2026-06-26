@@ -3,6 +3,10 @@
 
 export const TICKET_RATE = 1; // US dollars paid per ticket
 
+// While the payments tool is WIP it is locked to these ids (Conscience + the local
+// dev user). Shared by /payments and /payments/history. Remove to open it up.
+export const PAYMENTS_OWNER_IDS = ["O4lT5kzRhdEXYDQUFb3EmKPKWtd5qtBw", "dev-user"];
+
 export function formatUSD(n: number): string {
   return (Number.isFinite(n) ? n : 0).toLocaleString("en-US", {
     style: "currency",
@@ -89,4 +93,23 @@ export function memberTotal(m: {
     (m.reviewBonus || 0) +
     (m.commission || 0)
   );
+}
+
+// One row in a historical pay period (/payments/history). Bonus is a single number
+// (the total that was paid that period), not split into manual/disputes/review.
+export type HistoryRowInput = {
+  paidPerTicket: boolean;
+  tickets: number;
+  baseCompensation: number;
+  bonus: number;
+  commission: number;
+  amountOverride: number | null; // null = use the computed amount
+};
+
+// A history row's Amount, mirroring memberTotal but with a per-period ticket rate
+// and a flat bonus. The admin override wins when set.
+export function historyRowAmount(r: HistoryRowInput, ticketRate: number): number {
+  if (r.amountOverride !== null) return r.amountOverride;
+  const ticketPart = r.paidPerTicket ? r.tickets * ticketRate : 0;
+  return ticketPart + (r.baseCompensation || 0) + (r.bonus || 0) + (r.commission || 0);
 }
