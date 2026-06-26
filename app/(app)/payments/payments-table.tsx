@@ -7,6 +7,7 @@ import Avatar from "@/app/components/avatar";
 import CustomSelect from "@/app/components/custom-select";
 import {
   formatUSD,
+  formatAdjustment,
   memberTotal,
   type PayableMember,
   type PaymentRole,
@@ -19,6 +20,7 @@ type Draft = {
   baseText: string;
   bonusText: string;
   commissionText: string;
+  adjustmentText: string;
 };
 
 const moneyText = (n: number) => (n ? String(n) : "");
@@ -28,6 +30,7 @@ const seedRow = (m: PayableMember): Draft => ({
   baseText: moneyText(m.baseCompensation),
   bonusText: moneyText(m.bonus),
   commissionText: m.commissionOverride === null ? "" : String(m.commissionOverride),
+  adjustmentText: m.adjustment ? String(m.adjustment) : "",
 });
 
 const EMPTY_DRAFT: Draft = {
@@ -36,6 +39,7 @@ const EMPTY_DRAFT: Draft = {
   baseText: "",
   bonusText: "",
   commissionText: "",
+  adjustmentText: "",
 };
 
 const parseOverride = (t: string): number | null => {
@@ -54,6 +58,16 @@ const parseMoneyOverride = (t: string): number | null => {
   if (s === "") return null;
   const n = Math.round((Number(s) || 0) * 100) / 100;
   return Number.isFinite(n) && n >= 0 ? n : null;
+};
+// Signed money: may be negative (a deduction); blank = 0.
+const parseSigned = (t: string): number => {
+  const n = Math.round((Number(t.trim()) || 0) * 100) / 100;
+  return Number.isFinite(n) ? n : 0;
+};
+// Keep only digits, one dot, and a leading minus while typing.
+const sanitizeSigned = (v: string) => {
+  const neg = v.trim().startsWith("-");
+  return (neg ? "-" : "") + v.replace(/[^\d.]/g, "");
 };
 
 export default function PaymentsTable({
@@ -122,6 +136,8 @@ export default function PaymentsTable({
     const reviewBonus = m.reviewBonus || 0;
     const commissionOverride = parseMoneyOverride(d.commissionText);
     const commission = commissionOverride ?? m.commission;
+    // Adjustment is a signed +/- correction (may be negative); folds into Amount.
+    const adjustment = parseSigned(d.adjustmentText);
     const eff = override ?? m.tickets;
     const amount = memberTotal({
       tickets: m.tickets,
@@ -132,6 +148,7 @@ export default function PaymentsTable({
       disputeBonus,
       reviewBonus,
       commission,
+      adjustment,
     });
     return {
       override,
@@ -146,6 +163,7 @@ export default function PaymentsTable({
       reviewBonus,
       commission,
       commissionOverride,
+      adjustment,
     };
   }
 
@@ -157,7 +175,8 @@ export default function PaymentsTable({
       r.override !== m.override ||
       r.base !== m.baseCompensation ||
       r.bonus !== m.bonus ||
-      r.commissionOverride !== m.commissionOverride
+      r.commissionOverride !== m.commissionOverride ||
+      r.adjustment !== m.adjustment
     );
   }
 
@@ -199,6 +218,7 @@ export default function PaymentsTable({
         baseCompensation: r.base,
         bonus: r.bonus,
         commissionOverride: r.commissionOverride,
+        adjustment: r.adjustment,
       };
     });
     startTransition(async () => {
@@ -218,10 +238,11 @@ export default function PaymentsTable({
       acc.base += r.base;
       acc.bonus += r.bonus + r.disputeBonus + r.reviewBonus;
       acc.commission += r.commission;
+      acc.adjustment += r.adjustment;
       acc.amount += r.amount;
       return acc;
     },
-    { tickets: 0, base: 0, bonus: 0, commission: 0, amount: 0 },
+    { tickets: 0, base: 0, bonus: 0, commission: 0, adjustment: 0, amount: 0 },
   );
 
   const cell = "h-8 w-20 border border-border bg-surface-2 px-2 text-right text-sm tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60";
@@ -296,6 +317,7 @@ export default function PaymentsTable({
                 <th className="h-11 px-4 text-right align-middle font-medium">Tickets</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Commissions</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Adjustment</th>
                 <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
                 {editable ? <th className="h-11 w-10 px-2" /> : null}
               </tr>
@@ -455,6 +477,34 @@ export default function PaymentsTable({
                         </span>
                       )}
                     </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <input
+                          type="text"
+                          inputMode="text"
+                          value={d.adjustmentText}
+                          disabled={pending}
+                          placeholder="0"
+                          title="Adjustment: use a minus for a deduction, e.g. -50"
+                          onChange={(e) =>
+                            patch(m.userId as string, { adjustmentText: sanitizeSigned(e.target.value) })
+                          }
+                          className={`${cell} ml-auto`}
+                        />
+                      ) : (
+                        <span
+                          className={
+                            r.adjustment === 0
+                              ? "text-muted"
+                              : r.adjustment < 0
+                                ? "text-red-400"
+                                : "text-foreground"
+                          }
+                        >
+                          {formatAdjustment(r.adjustment)}
+                        </span>
+                      )}
+                    </td>
                     <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
                       {formatUSD(r.amount)}
                     </td>
@@ -486,6 +536,7 @@ export default function PaymentsTable({
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{totals.tickets}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.commission)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatAdjustment(totals.adjustment)}</td>
                 <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
                 {editable ? <td className="h-12 w-10 px-2" /> : null}
               </tr>

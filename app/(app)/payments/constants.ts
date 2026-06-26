@@ -10,6 +10,12 @@ export function formatUSD(n: number): string {
   });
 }
 
+// A signed adjustment, e.g. +$50.00 / -$20.00. (formatUSD already prefixes the
+// minus; this adds the + for positives so the direction is obvious.)
+export function formatAdjustment(n: number): string {
+  return n > 0 ? `+${formatUSD(n)}` : formatUSD(n);
+}
+
 // One payable member: their live current-period ticket count from Reports, plus
 // an optional admin override of that count.
 export type PayableMember = {
@@ -31,6 +37,7 @@ export type PayableMember = {
   reviewBonus: number; // flat review bonus (eligible member + team hit the period threshold); adds to Amount
   commission: number; // summed approved commission payouts this period (from /commissions); the computed default
   commissionOverride: number | null; // admin's fixed commission $; null = track the computed value
+  adjustment: number; // signed +/- correction folded into Amount (can be negative)
   hidden: boolean; // admin-excluded from the payments list (still in Reports); unhideable
 };
 
@@ -79,6 +86,7 @@ export function memberTotal(m: {
   disputeBonus?: number;
   reviewBonus?: number;
   commission?: number;
+  adjustment?: number;
 }): number {
   const ticketPart = m.paidPerTicket ? ticketPayout(effectiveTickets(m)) : 0;
   return (
@@ -87,7 +95,8 @@ export function memberTotal(m: {
     (m.bonus || 0) +
     (m.disputeBonus || 0) +
     (m.reviewBonus || 0) +
-    (m.commission || 0)
+    (m.commission || 0) +
+    (m.adjustment || 0)
   );
 }
 
@@ -99,13 +108,20 @@ export type HistoryRowInput = {
   baseCompensation: number;
   bonus: number;
   commission: number;
+  adjustment: number; // signed +/- correction
   amountOverride: number | null; // null = use the computed amount
 };
 
 // A history row's Amount, mirroring memberTotal but with a per-period ticket rate
-// and a flat bonus. The admin override wins when set.
+// and a flat bonus. The admin override replaces the computed base; the signed
+// adjustment is then applied on top either way.
 export function historyRowAmount(r: HistoryRowInput, ticketRate: number): number {
-  if (r.amountOverride !== null) return r.amountOverride;
-  const ticketPart = r.paidPerTicket ? r.tickets * ticketRate : 0;
-  return ticketPart + (r.baseCompensation || 0) + (r.bonus || 0) + (r.commission || 0);
+  const base =
+    r.amountOverride !== null
+      ? r.amountOverride
+      : (r.paidPerTicket ? r.tickets * ticketRate : 0) +
+        (r.baseCompensation || 0) +
+        (r.bonus || 0) +
+        (r.commission || 0);
+  return base + (r.adjustment || 0);
 }

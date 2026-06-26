@@ -23,6 +23,7 @@ export type PeriodRowInput = {
   baseCompensation: number;
   bonus: number;
   commission: number;
+  adjustment: number; // signed +/- correction
   amountOverride: number | null;
 };
 
@@ -73,6 +74,7 @@ export async function savePeriod(input: SavePeriodInput): Promise<Result> {
       baseCompensation: money(r.baseCompensation),
       bonus: money(r.bonus),
       commission: money(r.commission),
+      adjustment: money(r.adjustment), // signed; may be negative
       amountOverride:
         r.amountOverride === null || r.amountOverride === undefined ? null : money(r.amountOverride),
     }))
@@ -130,6 +132,7 @@ export async function savePeriod(input: SavePeriodInput): Promise<Result> {
       baseCompensation: r.baseCompensation,
       bonus: r.bonus,
       commission: r.commission,
+      adjustment: r.adjustment,
       amountOverride: r.amountOverride,
       position: i,
     })),
@@ -181,6 +184,7 @@ export async function duplicatePeriod(formData: FormData) {
         baseCompensation: r.baseCompensation,
         bonus: r.bonus,
         commission: r.commission,
+        adjustment: r.adjustment,
         amountOverride: r.amountOverride,
         position: i,
       })),

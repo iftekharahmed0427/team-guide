@@ -21,6 +21,7 @@ export type PaymentHistoryRow = {
   baseCompensation: number;
   bonus: number;
   commission: number;
+  adjustment: number;
   amountOverride: number | null;
 };
 
@@ -75,6 +76,7 @@ export async function getPaymentHistory(): Promise<PaymentHistoryPeriod[]> {
       baseCompensation: r.baseCompensation,
       bonus: r.bonus,
       commission: r.commission,
+      adjustment: r.adjustment,
       amountOverride: r.amountOverride,
     });
     byPeriod.set(r.periodId, list);
@@ -115,8 +117,16 @@ export async function snapshotPaymentsPeriod(
       baseCompensation: m.baseCompensation || 0,
       bonus: (m.bonus || 0) + (m.disputeBonus || 0) + (m.reviewBonus || 0),
       commission: effectiveCommission(m),
+      adjustment: m.adjustment || 0,
     }))
-    .filter((r) => r.tickets > 0 || r.baseCompensation > 0 || r.bonus > 0 || r.commission > 0);
+    .filter(
+      (r) =>
+        r.tickets > 0 ||
+        r.baseCompensation > 0 ||
+        r.bonus > 0 ||
+        r.commission > 0 ||
+        r.adjustment !== 0,
+    );
 
   if (rows.length === 0) return null;
 
@@ -141,6 +151,7 @@ export async function snapshotPaymentsPeriod(
       baseCompensation: r.baseCompensation,
       bonus: r.bonus,
       commission: r.commission,
+      adjustment: r.adjustment,
       amountOverride: null,
       position: i,
     })),

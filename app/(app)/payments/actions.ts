@@ -18,6 +18,7 @@ export type PaymentChange = {
   baseCompensation: number;
   bonus: number;
   commissionOverride: number | null; // null = track the computed approved-commission total
+  adjustment: number; // signed +/- correction (may be negative)
 };
 
 async function requireAdmin() {
@@ -71,10 +72,14 @@ export async function savePayments(changes: PaymentChange[]): Promise<Result> {
       commissionOverride = n;
     }
 
+    // Adjustment is signed: it may be negative (a deduction), so no >= 0 check.
+    const adjustment = money(c.adjustment);
+    if (!Number.isFinite(adjustment)) return { error: "Adjustment must be a valid number." };
+
     const roleId = c.roleId || null;
     if (roleId && !validRoleIds.has(roleId)) return { error: "A selected role no longer exists." };
 
-    rows.push({ userId: c.userId, ticketOverride, roleId, baseCompensation, bonus, commissionOverride });
+    rows.push({ userId: c.userId, ticketOverride, roleId, baseCompensation, bonus, commissionOverride, adjustment });
   }
 
   for (const r of rows) {
@@ -89,6 +94,7 @@ export async function savePayments(changes: PaymentChange[]): Promise<Result> {
           baseCompensation: r.baseCompensation,
           bonus: r.bonus,
           commissionOverride: r.commissionOverride,
+          adjustment: r.adjustment,
           updatedAt: new Date(),
         },
       });

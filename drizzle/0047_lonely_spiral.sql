@@ -1,0 +1,2 @@
+ALTER TABLE "payment_override" ADD COLUMN "adjustment" double precision DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "payment_period_row" ADD COLUMN "adjustment" double precision DEFAULT 0 NOT NULL;

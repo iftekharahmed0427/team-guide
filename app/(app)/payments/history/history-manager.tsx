@@ -21,7 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, Trash2, Pencil, Copy, X, Save, AlertCircle, History, UserPlus, GripVertical } from "lucide-react";
 import Avatar from "@/app/components/avatar";
-import { formatUSD, historyRowAmount } from "../constants";
+import { formatUSD, formatAdjustment, historyRowAmount } from "../constants";
 import { savePeriod, deletePeriod, duplicatePeriod, type PeriodRowInput } from "./actions";
 
 // ── Types (plain data passed from the server page) ───────────────────────────
@@ -36,6 +36,7 @@ type Row = {
   baseCompensation: number;
   bonus: number;
   commission: number;
+  adjustment: number;
   amountOverride: number | null;
 };
 type Period = {
@@ -88,6 +89,15 @@ const parseMoneyOrNull = (t: string): number | null => {
   const n = Math.round((Number(s) || 0) * 100) / 100;
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
+// Signed money: may be negative (a deduction); blank = 0.
+const parseSigned = (t: string) => {
+  const n = Math.round((Number(t.trim()) || 0) * 100) / 100;
+  return Number.isFinite(n) ? n : 0;
+};
+const sanitizeSigned = (v: string) => {
+  const neg = v.trim().startsWith("-");
+  return (neg ? "-" : "") + v.replace(/[^\d.]/g, "");
+};
 
 const amountOf = (r: {
   paidPerTicket: boolean;
@@ -95,6 +105,7 @@ const amountOf = (r: {
   baseCompensation: number;
   bonus: number;
   commission: number;
+  adjustment: number;
   amountOverride: number | null;
 }, rate: number) => historyRowAmount(r, rate);
 
@@ -106,10 +117,11 @@ function PeriodTable({ period }: { period: Period }) {
       acc.tickets += r.tickets;
       acc.bonus += r.bonus;
       acc.commission += r.commission;
+      acc.adjustment += r.adjustment;
       acc.amount += amountOf(r, period.ticketRate);
       return acc;
     },
-    { base: 0, tickets: 0, bonus: 0, commission: 0, amount: 0 },
+    { base: 0, tickets: 0, bonus: 0, commission: 0, adjustment: 0, amount: 0 },
   );
 
   if (period.rows.length === 0) {
@@ -127,6 +139,7 @@ function PeriodTable({ period }: { period: Period }) {
             <th className="h-11 px-4 text-right align-middle font-medium">Tickets</th>
             <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
             <th className="h-11 px-4 text-right align-middle font-medium">Commissions</th>
+            <th className="h-11 px-4 text-right align-middle font-medium">Adjustment</th>
             <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
           </tr>
         </thead>
@@ -152,6 +165,19 @@ function PeriodTable({ period }: { period: Period }) {
                   {formatUSD(r.commission)}
                 </span>
               </td>
+              <td className="h-12 px-4 text-right align-middle tabular-nums">
+                <span
+                  className={
+                    r.adjustment === 0
+                      ? "text-muted"
+                      : r.adjustment < 0
+                        ? "text-red-400"
+                        : "text-foreground"
+                  }
+                >
+                  {formatAdjustment(r.adjustment)}
+                </span>
+              </td>
               <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
                 {formatUSD(amountOf(r, period.ticketRate))}
               </td>
@@ -166,6 +192,7 @@ function PeriodTable({ period }: { period: Period }) {
             <td className="h-12 px-4 text-right align-middle tabular-nums">{totals.tickets}</td>
             <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
             <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.commission)}</td>
+            <td className="h-12 px-4 text-right align-middle tabular-nums">{formatAdjustment(totals.adjustment)}</td>
             <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
           </tr>
         </tfoot>
@@ -186,6 +213,7 @@ type Draft = {
   baseText: string;
   bonusText: string;
   commissionText: string;
+  adjustmentText: string;
   overrideText: string;
 };
 
@@ -202,6 +230,7 @@ const emptyDraft = (): Draft => ({
   baseText: "",
   bonusText: "",
   commissionText: "",
+  adjustmentText: "",
   overrideText: "",
 });
 const draftFromRow = (r: Row): Draft => ({
@@ -215,6 +244,7 @@ const draftFromRow = (r: Row): Draft => ({
   baseText: moneyText(r.baseCompensation),
   bonusText: moneyText(r.bonus),
   commissionText: moneyText(r.commission),
+  adjustmentText: r.adjustment ? String(r.adjustment) : "",
   overrideText: r.amountOverride === null ? "" : String(r.amountOverride),
 });
 // A fresh row for a current member: their identity + current role as the default,
@@ -230,6 +260,7 @@ const draftFromMember = (m: CurrentMember): Draft => ({
   baseText: "",
   bonusText: "",
   commissionText: "",
+  adjustmentText: "",
   overrideText: "",
 });
 
@@ -241,6 +272,7 @@ const draftAmount = (d: Draft, rate: number) =>
       baseCompensation: parseMoney0(d.baseText),
       bonus: parseMoney0(d.bonusText),
       commission: parseMoney0(d.commissionText),
+      adjustment: parseSigned(d.adjustmentText),
       amountOverride: parseMoneyOrNull(d.overrideText),
     },
     rate,
@@ -452,6 +484,17 @@ function SortableRow({
         />
       </td>
       <td className="px-2 py-2 text-right">
+        <input
+          inputMode="text"
+          value={d.adjustmentText}
+          disabled={pending}
+          onChange={(e) => onPatch(d.key, { adjustmentText: sanitizeSigned(e.target.value) })}
+          placeholder="0"
+          title="Adjustment: use a minus for a deduction, e.g. -50"
+          className={`${inp} w-20 text-right tabular-nums`}
+        />
+      </td>
+      <td className="px-2 py-2 text-right">
         <div className="flex flex-col items-end gap-0.5">
           <span className="font-medium tabular-nums">{formatUSD(draftAmount(d, rate))}</span>
           <input
@@ -560,6 +603,7 @@ function PeriodEditor({
         baseCompensation: parseMoney0(d.baseText),
         bonus: parseMoney0(d.bonusText),
         commission: parseMoney0(d.commissionText),
+        adjustment: parseSigned(d.adjustmentText),
         amountOverride: parseMoneyOrNull(d.overrideText),
       }));
     if (rows.length === 0) {
@@ -654,6 +698,7 @@ function PeriodEditor({
                 <th className="h-9 px-2 text-right font-medium">Base</th>
                 <th className="h-9 px-2 text-right font-medium">Bonus</th>
                 <th className="h-9 px-2 text-right font-medium">Commissions</th>
+                <th className="h-9 px-2 text-right font-medium">Adjustment</th>
                 <th className="h-9 px-2 text-right font-medium">Amount</th>
                 <th className="h-9 w-8 px-2" />
               </tr>
@@ -677,7 +722,7 @@ function PeriodEditor({
             </tbody>
             <tfoot>
               <tr className="border-t border-border font-semibold">
-                <td className="px-2 py-2" colSpan={7}>
+                <td className="px-2 py-2" colSpan={8}>
                   Total
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums">{formatUSD(total)}</td>
