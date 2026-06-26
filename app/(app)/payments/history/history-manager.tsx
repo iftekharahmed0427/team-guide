@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Pencil, X, Save, AlertCircle, History } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Save, AlertCircle, History, UserPlus } from "lucide-react";
 import Avatar from "@/app/components/avatar";
 import { formatUSD, historyRowAmount } from "../constants";
 import { savePeriod, deletePeriod, type PeriodRowInput } from "./actions";
@@ -232,6 +232,90 @@ const draftAmount = (d: Draft, rate: number) =>
 const inp =
   "h-8 border border-border bg-surface-2 px-2 text-sm text-foreground outline-none focus:border-foreground/40 disabled:opacity-60";
 
+// "Add member" menu: pick a current member (added with their avatar + role), or
+// start a blank row for someone who has left (typed by name -> letter avatar).
+function MemberAddMenu({
+  available,
+  onPickMember,
+  onAddNew,
+  disabled,
+}: {
+  available: CurrentMember[];
+  onPickMember: (m: CurrentMember) => void;
+  onAddNew: () => void;
+  disabled: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        className="btn-wipe flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
+      >
+        <Plus size={15} strokeWidth={1.75} />
+        Add member
+      </button>
+      {open ? (
+        <div className="fx-menu absolute bottom-11 left-0 z-20 max-h-72 w-60 overflow-y-auto border border-border bg-surface shadow-lg shadow-black/40">
+          {available.length > 0 ? (
+            <>
+              <p className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-wide text-muted">
+                From the team
+              </p>
+              {available.map((m) => (
+                <button
+                  key={m.memberId ?? m.name}
+                  type="button"
+                  onClick={() => {
+                    onPickMember(m);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-surface-2"
+                >
+                  <Avatar name={m.name} image={m.image} size={20} />
+                  <span className="truncate">{m.name}</span>
+                </button>
+              ))}
+              <div className="my-1 border-t border-border" />
+            </>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              onAddNew();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+          >
+            <UserPlus size={15} strokeWidth={1.75} />
+            Add a new name
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PeriodEditor({
   period,
   roles,
@@ -260,6 +344,15 @@ function PeriodEditor({
   const rate = parseMoney0(rateText);
   const total = drafts.reduce((s, d) => s + draftAmount(d, rate), 0);
   const roleMap = new Map(roles.map((r) => [r.name, r.paidPerTicket]));
+
+  // Current members not already in the table, offered in the Add member menu.
+  const usedIds = new Set(drafts.map((d) => d.memberId).filter((x): x is string => !!x));
+  const usedNames = new Set(
+    drafts.map((d) => d.memberName.trim().toLowerCase()).filter((n) => n !== ""),
+  );
+  const availableMembers = currentMembers.filter(
+    (m) => !(m.memberId && usedIds.has(m.memberId)) && !usedNames.has(m.name.trim().toLowerCase()),
+  );
 
   const patch = (key: string, p: Partial<Draft>) =>
     setDrafts((ds) => ds.map((d) => (d.key === key ? { ...d, ...p } : d)));
@@ -504,15 +597,12 @@ function PeriodEditor({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={addRow}
+        <MemberAddMenu
+          available={availableMembers}
+          onPickMember={(m) => setDrafts((ds) => [...ds, draftFromMember(m)])}
+          onAddNew={addRow}
           disabled={pending}
-          className="btn-wipe flex h-9 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          <Plus size={15} strokeWidth={1.75} />
-          Add member
-        </button>
+        />
         <div className="flex items-center gap-2">
           <button
             type="button"
