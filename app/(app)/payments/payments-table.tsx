@@ -429,19 +429,17 @@ export default function PaymentsTable({
                           ) : null}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-end leading-tight">
-                          <span>{formatUSD(m.bonus)}</span>
-                          {m.disputeAmount > 0 ? (
-                            <span className="text-[11px] text-muted">
-                              Disputes {formatUSD(m.disputeAmount)} &rarr; +{formatUSD(m.disputeBonus)}
-                            </span>
-                          ) : null}
-                          {m.reviewBonus > 0 ? (
-                            <span className="text-[11px] text-muted">
-                              Review bonus &rarr; +{formatUSD(m.reviewBonus)}
-                            </span>
-                          ) : null}
-                        </div>
+                        <span
+                          title={
+                            r.disputeBonus > 0 || r.reviewBonus > 0
+                              ? `Manual ${formatUSD(r.bonus)}${
+                                  r.reviewBonus > 0 ? ` · review +${formatUSD(r.reviewBonus)}` : ""
+                                }${r.disputeBonus > 0 ? ` · disputes +${formatUSD(r.disputeBonus)}` : ""}`
+                              : undefined
+                          }
+                        >
+                          {formatUSD(r.bonus + r.disputeBonus + r.reviewBonus)}
+                        </span>
                       )}
                     </td>
                     <td className="h-12 px-4 text-right align-middle tabular-nums">
