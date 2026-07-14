@@ -7,7 +7,12 @@ import { review, reportPeriod } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import { signedGetUrl } from "@/lib/storage";
-import { getReviewBonusSetting, REVIEW_BONUS_DEFAULTS, getEligibleMemberIds } from "@/lib/reviews";
+import {
+  getReviewBonusSetting,
+  REVIEW_BONUS_DEFAULTS,
+  getEligibleMemberIds,
+  getReviewSources,
+} from "@/lib/reviews";
 import ReviewForm from "./review-form";
 import ReviewDeleteButton from "./review-delete-button";
 import ReviewLightbox from "./review-lightbox";
@@ -20,14 +25,25 @@ async function displayUrl(imageUrl: string): Promise<string> {
   return (await signedGetUrl(imageUrl)) ?? "";
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  trustpilot: "Trustpilot",
-  google: "Google",
-};
-const SOURCE_BADGE: Record<string, string> = {
-  trustpilot: "border-emerald-500/40 text-emerald-400",
-  google: "border-sky-500/40 text-sky-400",
-};
+// Badge/counter colors assigned by the source's position in the catalog, so
+// Trustpilot + Google keep their original emerald/sky and any new source still
+// gets a distinct color. Unknown ids (e.g. a deleted source) fall back to neutral.
+const SOURCE_TONES = [
+  "text-emerald-400",
+  "text-sky-400",
+  "text-amber-400",
+  "text-violet-400",
+  "text-rose-400",
+  "text-cyan-400",
+];
+const SOURCE_BADGES = [
+  "border-emerald-500/40 text-emerald-400",
+  "border-sky-500/40 text-sky-400",
+  "border-amber-500/40 text-amber-400",
+  "border-violet-500/40 text-violet-400",
+  "border-rose-500/40 text-rose-400",
+  "border-cyan-500/40 text-cyan-400",
+];
 
 // Manual Trustpilot/Google review counter. Admins log each review with a
 // screenshot; everyone can see the counts and the evidence for the current
@@ -60,8 +76,12 @@ export default async function ReviewsPage() {
     rows.map(async (r) => ({ ...r, src: await displayUrl(r.imageUrl) })),
   );
 
-  const trustpilot = rows.filter((r) => r.source === "trustpilot").length;
-  const google = rows.filter((r) => r.source === "google").length;
+  const sources = await getReviewSources();
+  const nameOf = (id: string) => sources.find((s) => s.id === id)?.name ?? id;
+  const badgeOf = (id: string) => {
+    const i = sources.findIndex((s) => s.id === id);
+    return i < 0 ? "border-border text-muted" : SOURCE_BADGES[i % SOURCE_BADGES.length];
+  };
   const total = rows.length;
 
   // Admin extras: the editable bonus rule and the non-admin team roster with each
@@ -95,8 +115,11 @@ export default async function ReviewsPage() {
   }
 
   const counters = [
-    { label: "Trustpilot", value: trustpilot, tone: "text-emerald-400" },
-    { label: "Google", value: google, tone: "text-sky-400" },
+    ...sources.map((s, i) => ({
+      label: s.name,
+      value: rows.filter((r) => r.source === s.id).length,
+      tone: SOURCE_TONES[i % SOURCE_TONES.length],
+    })),
     { label: "Total", value: total, tone: "text-foreground" },
   ];
 
@@ -124,7 +147,7 @@ export default async function ReviewsPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="fx-rise mx-auto flex w-full max-w-3xl flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {counters.map((c) => (
               <div key={c.label} className="border border-border bg-surface p-4 text-center">
                 <p className={`text-3xl font-semibold tabular-nums ${c.tone}`}>{c.value}</p>
@@ -142,7 +165,7 @@ export default async function ReviewsPage() {
             />
           ) : null}
 
-          {isAdmin ? <ReviewForm /> : null}
+          {isAdmin ? <ReviewForm sources={sources} /> : null}
 
           <h2 className="px-1 pt-2 text-xs font-medium uppercase tracking-wider text-muted">
             This period&apos;s reviews
@@ -160,16 +183,13 @@ export default async function ReviewsPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((r) => (
                 <div key={r.id} className="flex flex-col border border-border bg-surface">
-                  <ReviewLightbox
-                    src={r.src}
-                    alt={`${SOURCE_LABEL[r.source] ?? "Review"} screenshot`}
-                  />
+                  <ReviewLightbox src={r.src} alt={`${nameOf(r.source)} screenshot`} />
                   <div className="flex flex-1 flex-col gap-2 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span
-                        className={`border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${SOURCE_BADGE[r.source] ?? "border-border text-muted"}`}
+                        className={`border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${badgeOf(r.source)}`}
                       >
-                        {SOURCE_LABEL[r.source] ?? r.source}
+                        {nameOf(r.source)}
                       </span>
                       {isAdmin ? <ReviewDeleteButton id={r.id} /> : null}
                     </div>

@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportPeriod, reportPeriodEntry, resetLog, review } from "@/db/app-schema";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from "@/lib/datetime";
+import { getReviewSources } from "@/lib/reviews";
 import DeletePeriodButton from "./delete-period-button";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -40,12 +41,12 @@ export default async function ReportHistoryPage() {
         .from(review)
         .where(inArray(review.periodId, ids))
     : [];
-  const reviewsByPeriod = new Map<string, { trustpilot: number; google: number }>();
+  const sources = await getReviewSources();
+  const reviewsByPeriod = new Map<string, Map<string, number>>();
   for (const r of reviewRows) {
     if (!r.periodId) continue;
-    const c = reviewsByPeriod.get(r.periodId) ?? { trustpilot: 0, google: 0 };
-    if (r.source === "trustpilot") c.trustpilot++;
-    else if (r.source === "google") c.google++;
+    const c = reviewsByPeriod.get(r.periodId) ?? new Map<string, number>();
+    c.set(r.source, (c.get(r.source) ?? 0) + 1);
     reviewsByPeriod.set(r.periodId, c);
   }
 
@@ -133,9 +134,13 @@ export default async function ReportHistoryPage() {
                       <p className="text-xs text-muted">
                         Reset {fmtDateTime(p.endedAt)} · Total tickets done: {p.total}
                       </p>
-                      {rev ? (
+                      {rev && rev.size > 0 ? (
                         <p className="text-xs text-muted">
-                          Reviews: {rev.trustpilot} Trustpilot · {rev.google} Google
+                          Reviews:{" "}
+                          {sources
+                            .filter((s) => (rev.get(s.id) ?? 0) > 0)
+                            .map((s) => `${rev.get(s.id)} ${s.name}`)
+                            .join(" · ")}
                         </p>
                       ) : null}
                     </div>

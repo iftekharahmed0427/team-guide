@@ -11,9 +11,9 @@ const labelCls = "mb-1 block text-xs text-muted";
 const inputCls =
   "h-9 w-full border border-border bg-surface-2 px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-foreground/40";
 
-export default function ReviewForm() {
+export default function ReviewForm({ sources }: { sources: { id: string; name: string }[] }) {
   const router = useRouter();
-  const [source, setSource] = useState("trustpilot");
+  const [source, setSource] = useState(sources[0]?.id ?? "");
   const [note, setNote] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,12 +68,10 @@ export default function ReviewForm() {
         <div>
           <label className={labelCls}>Source</label>
           <CustomSelect
+            key={sources.map((s) => s.id).join(",")}
             name="source"
-            options={[
-              { value: "trustpilot", label: "Trustpilot" },
-              { value: "google", label: "Google" },
-            ]}
-            defaultValue="trustpilot"
+            options={sources.map((s) => ({ value: s.id, label: s.name }))}
+            defaultValue={sources[0]?.id ?? ""}
             onChange={setSource}
             className="w-full"
           />

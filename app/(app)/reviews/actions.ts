@@ -5,14 +5,13 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { review, reviewSetting, reviewBonusMember } from "@/db/app-schema";
+import { review, reviewSetting, reviewBonusMember, reviewSource } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
 import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
 
 const PAGE = "/reviews";
-const SOURCES = new Set(["trustpilot", "google"]);
 // A downscaled JPEG data URL is well under this; the cap just blocks abuse.
 const MAX_IMAGE_CHARS = 4_000_000;
 
@@ -34,7 +33,13 @@ export async function addReview(input: {
   const session = await requireAdmin();
   if (!session) return { error: "Only admins can add reviews." };
 
-  if (!SOURCES.has(input.source)) return { error: "Pick a review source." };
+  const known = await db
+    .select({ id: reviewSource.id })
+    .from(reviewSource)
+    .where(eq(reviewSource.id, input.source))
+    .limit(1);
+  if (known.length === 0) return { error: "Pick a review source." };
+
   const dataUrl = input.imageUrl.trim();
   if (!dataUrl.startsWith("data:image/")) return { error: "Attach a screenshot of the review." };
   if (dataUrl.length > MAX_IMAGE_CHARS) {

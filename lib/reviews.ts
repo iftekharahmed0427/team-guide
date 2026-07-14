@@ -1,6 +1,34 @@
-import { count, eq, isNull } from "drizzle-orm";
+import { asc, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { review, reviewSetting, reviewBonusMember } from "@/db/app-schema";
+import { review, reviewSetting, reviewBonusMember, reviewSource } from "@/db/app-schema";
+
+export type ReviewSource = { id: string; name: string };
+
+// The default sources seeded the first time the catalog is read. The ids are the
+// legacy source keys already stored on existing reviews, so no data migration is
+// needed. Managed at /settings/review-sources.
+const REVIEW_SOURCE_SEED = [
+  { id: "trustpilot", name: "Trustpilot", sortOrder: 0 },
+  { id: "google", name: "Google", sortOrder: 1 },
+];
+
+// The admin-managed review-source catalog, in display order. Seeded on first read
+// (mirrors the review-bonus + dispute-category seed-on-read). `review.source`
+// stores the source id; look names up through this list.
+export async function getReviewSources(): Promise<ReviewSource[]> {
+  const read = () =>
+    db
+      .select({ id: reviewSource.id, name: reviewSource.name })
+      .from(reviewSource)
+      .orderBy(asc(reviewSource.sortOrder), asc(reviewSource.name));
+
+  let rows = await read();
+  if (rows.length === 0) {
+    await db.insert(reviewSource).values(REVIEW_SOURCE_SEED).onConflictDoNothing();
+    rows = await read();
+  }
+  return rows;
+}
 
 export type ReviewBonusSetting = { threshold: number; amount: number };
 

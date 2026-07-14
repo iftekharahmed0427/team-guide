@@ -15,6 +15,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { newsPost, unavailability, shift, note, ticketCount, review } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
+import { getReviewSources } from "@/lib/reviews";
 import AvailabilityCalendar from "@/app/components/availability-calendar";
 import ShiftCheckin from "@/app/components/shift-checkin";
 import DashboardSearch from "@/app/components/dashboard-search";
@@ -148,10 +149,15 @@ export default async function Home() {
     ticketDelta = `${pct >= 0 ? "+" : ""}${pct}% vs last period`;
   }
 
-  // Reviews logged this period (Reset all archives them), split by source.
-  const trustpilotReviews = reviewCounts.find((r) => r.source === "trustpilot")?.n ?? 0;
-  const googleReviews = reviewCounts.find((r) => r.source === "google")?.n ?? 0;
+  // Reviews logged this period (Reset all archives them), broken down by source
+  // using the admin-managed catalog (see /settings/review-sources).
+  const reviewSources = await getReviewSources();
   const totalReviews = reviewCounts.reduce((s, r) => s + r.n, 0);
+  const reviewBreakdown = reviewSources
+    .map((s) => ({ name: s.name, n: reviewCounts.find((r) => r.source === s.id)?.n ?? 0 }))
+    .filter((c) => c.n > 0)
+    .map((c) => `${c.n} ${c.name}`)
+    .join(" · ");
 
   const stats: Stat[] = [
     {
@@ -170,7 +176,7 @@ export default async function Home() {
     {
       label: "Reviews",
       value: totalReviews.toLocaleString(),
-      delta: `${trustpilotReviews} Trustpilot · ${googleReviews} Google`,
+      delta: reviewBreakdown || "none this period",
       icon: Star,
     },
   ];

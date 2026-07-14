@@ -270,7 +270,7 @@ export const resetLog = pgTable("reset_log", {
 // archives, so reviews share the same period boundaries as the ticket counts.
 export const review = pgTable("review", {
   id: text("id").primaryKey(),
-  source: text("source").notNull(), // 'trustpilot' | 'google'
+  source: text("source").notNull(), // review_source id (seeds: 'trustpilot' | 'google')
   imageUrl: text("image_url").notNull(), // screenshot data URL
   note: text("note").notNull().default(""),
   addedById: text("added_by_id"),
@@ -301,6 +301,19 @@ export const reviewBonusMember = pgTable("review_bonus_member", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Admin-managed catalog of review sources (Trustpilot, Google, ...) shown in the
+// /reviews form's Source picker and managed at /settings/review-sources. Seeded
+// with Trustpilot + Google on first read. `review.source` stores the source id;
+// the seed ids ARE the legacy "trustpilot"/"google" keys, so existing reviews
+// keep working with no data migration, and renaming a source updates its label
+// everywhere without touching stored reviews. `sortOrder` controls display order.
+export const reviewSource = pgTable("review_source", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
