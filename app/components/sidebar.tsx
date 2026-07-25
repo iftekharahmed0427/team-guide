@@ -17,6 +17,9 @@ import {
   Star,
   ClipboardCheck,
   Gamepad2,
+  Server,
+  CircleUser,
+  Cpu,
   Settings,
   LogOut,
   Shield,
@@ -57,6 +60,14 @@ const primaryNav: NavItem[] = [
   { label: "Audits", icon: ClipboardCheck, href: "/audits" },
   { label: "Specialists", icon: Gamepad2, href: "/specialties" },
   { label: "Team", icon: Users, href: "/team" },
+];
+
+// Read-only lookups against the game panel. Kept in their own section: they
+// query Pterodactyl live rather than anything the portal stores.
+const toolsNav: NavItem[] = [
+  { label: "Server lookup", icon: Server, href: "/tools/server" },
+  { label: "User lookup", icon: CircleUser, href: "/tools/user" },
+  { label: "Node lookup", icon: Cpu, href: "/tools/node" },
 ];
 
 const secondaryNav: NavItem[] = [
@@ -166,6 +177,13 @@ export default function Sidebar({
           .map((item) => (
             <NavRow key={item.label} item={item} active={isActive(item)} />
           ))}
+
+        <p className="px-5 pb-2 pt-6 text-[11px] font-medium uppercase tracking-wider text-muted">
+          Panel tools
+        </p>
+        {toolsNav.map((item) => (
+          <NavRow key={item.label} item={item} active={isActive(item)} />
+        ))}
 
         <p className="px-5 pb-2 pt-6 text-[11px] font-medium uppercase tracking-wider text-muted">
           General
