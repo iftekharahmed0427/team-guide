@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, ImageUp, X } from "lucide-react";
 import CustomSelect from "@/app/components/custom-select";
-import { imageToDataUrl, imageFilesFrom } from "@/app/components/editor-images";
+import { imageToJpegFile, imageFilesFrom } from "@/app/components/editor-images";
 import { createAudit, updateAudit } from "./actions";
 import { AUDIT_CRITERIA, FIVE_POINT_GUIDE, TICKET_TYPES, computeTotals, percentage, type Criterion } from "./criteria";
 
 type Member = { id: string; name: string };
 type Entry = { na: boolean; score: number; comment: string };
 type ExistingShot = { id: string; src: string };
+// A screenshot picked in this session: the JPEG that gets sent, plus an object
+// URL for its thumbnail (revoked when the thumbnail goes away).
+type NewShot = { file: File; url: string };
 
 export type InitialAudit = {
   id: string;
@@ -25,6 +28,9 @@ export type InitialAudit = {
 
 const EMPTY: Entry = { na: false, score: 0, comment: "" };
 const MAX_SHOTS = 8;
+// Server actions accept an 8mb request body (next.config.ts). Stop short of it
+// here so an oversized batch is a message in the form, not a failed request.
+const MAX_TOTAL_BYTES = 6_000_000;
 
 const labelCls = "mb-1 block text-xs text-muted";
 const inputCls =
@@ -54,28 +60,49 @@ export default function AuditForm({ members, initial }: { members: Member[]; ini
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [scores, setScores] = useState<Record<string, Entry>>(() => buildScores(initial));
   const [existingShots, setExistingShots] = useState<ExistingShot[]>(initial?.screenshots ?? []);
-  const [newShots, setNewShots] = useState<string[]>([]);
+  const [newShots, setNewShots] = useState<NewShot[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const shotCount = existingShots.length + newShots.length;
 
+  // Release the object URLs when the form unmounts (removal revokes its own).
+  const shotsRef = useRef<NewShot[]>([]);
+  useEffect(() => {
+    shotsRef.current = newShots;
+  }, [newShots]);
+  useEffect(() => () => shotsRef.current.forEach((s) => URL.revokeObjectURL(s.url)), []);
+
   async function addFiles(files: File[]) {
     if (files.length === 0) return;
     setError(null);
     const room = Math.max(0, MAX_SHOTS - shotCount);
-    const urls: string[] = [];
+    const added: NewShot[] = [];
     for (const f of files.slice(0, room)) {
       try {
-        urls.push(await imageToDataUrl(f, 1400));
+        const file = await imageToJpegFile(f, 1400);
+        added.push({ file, url: URL.createObjectURL(file) });
       } catch {
         // skip an image that fails to decode
       }
     }
-    if (urls.length) {
-      setNewShots((s) => [...s, ...urls].slice(0, Math.max(0, MAX_SHOTS - existingShots.length)));
-    }
+    if (added.length === 0) return;
+    setNewShots((s) => {
+      const next = [...s, ...added].slice(0, Math.max(0, MAX_SHOTS - existingShots.length));
+      for (const shot of added) {
+        if (!next.includes(shot)) URL.revokeObjectURL(shot.url); // trimmed by the cap
+      }
+      return next;
+    });
+  }
+
+  function removeNewShot(index: number) {
+    setNewShots((s) => {
+      const gone = s[index];
+      if (gone) URL.revokeObjectURL(gone.url);
+      return s.filter((_, j) => j !== index);
+    });
   }
 
   const memberOptions = useMemo(
@@ -106,6 +133,10 @@ export default function AuditForm({ members, initial }: { members: Member[]; ini
     setError(null);
     if (!memberId) return setError("Choose the team member being reviewed.");
     if (!ticketNumber.trim()) return setError("Ticket # is required.");
+    const totalBytes = newShots.reduce((n, s) => n + s.file.size, 0);
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      return setError("Those screenshots are too large together. Remove one and save again.");
+    }
     const memberName = members.find((m) => m.id === memberId)?.name ?? "";
     const scoreList = AUDIT_CRITERIA.map((c) => {
       const e2 = scores[c.key] ?? EMPTY;
@@ -123,7 +154,7 @@ export default function AuditForm({ members, initial }: { members: Member[]; ini
             summary,
             scores: scoreList,
             keepScreenshotIds: existingShots.map((s) => s.id),
-            newScreenshots: newShots,
+            newScreenshots: newShots.map((s) => s.file),
           })
         : await createAudit({
             memberId,
@@ -133,7 +164,7 @@ export default function AuditForm({ members, initial }: { members: Member[]; ini
             ticketDate: ticketDate || null,
             summary,
             scores: scoreList,
-            screenshots: newShots,
+            screenshots: newShots.map((s) => s.file),
           });
       if ("error" in res) {
         setError(res.error);
@@ -192,12 +223,8 @@ export default function AuditForm({ members, initial }: { members: Member[]; ini
               onRemove={() => setExistingShots((s) => s.filter((x) => x.id !== shot.id))}
             />
           ))}
-          {newShots.map((src, i) => (
-            <Thumb
-              key={`new-${i}`}
-              src={src}
-              onRemove={() => setNewShots((s) => s.filter((_, j) => j !== i))}
-            />
+          {newShots.map((shot, i) => (
+            <Thumb key={shot.url} src={shot.url} onRemove={() => removeNewShot(i)} />
           ))}
           {shotCount < MAX_SHOTS ? (
             <button

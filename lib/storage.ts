@@ -37,18 +37,26 @@ const EXT: Record<string, string> = {
   "image/gif": "gif",
 };
 
-// Decode a `data:<mime>;base64,...` URL and write it under `prefix/`.
+// Write raw image bytes under `prefix/`, named from the content type.
 // Returns the stored key (what to persist in the DB).
-export async function uploadDataUrl(dataUrl: string, prefix: string): Promise<string> {
-  const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
-  if (!m) throw new Error("Expected a base64 data URL.");
-  const contentType = m[1]!;
+export async function uploadBytes(
+  bytes: Buffer,
+  contentType: string,
+  prefix: string,
+): Promise<string> {
   const key = `${prefix}/${randomUUID()}.${EXT[contentType] ?? "bin"}`;
   const full = resolveKey(key);
   if (!full) throw new Error("Storage is not configured (set STORAGE_DIR).");
   await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, Buffer.from(m[2]!, "base64"));
+  await writeFile(full, bytes);
   return key;
+}
+
+// Decode a `data:<mime>;base64,...` URL and store it. Returns the stored key.
+export async function uploadDataUrl(dataUrl: string, prefix: string): Promise<string> {
+  const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+  if (!m) throw new Error("Expected a base64 data URL.");
+  return uploadBytes(Buffer.from(m[2]!, "base64"), m[1]!, prefix);
 }
 
 // URL the browser loads a stored image from, or null if storage is off. The
