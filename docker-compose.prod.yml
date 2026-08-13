@@ -1,10 +1,62 @@
+# The whole portal on one host: the Next app and the Discord reports bot.
+# Postgres is NOT here - it is a shared container (/srv/postgres) serving this
+# and every other project on the box, reached over the external `data` network.
+#
+# Nothing publishes a port. Inbound traffic arrives only through cloudflared,
+# which reaches the app by container name over the external `edge` network.
+#
+#   cd /srv/teamguide/repo && docker compose -f docker-compose.prod.yml up -d --build
+#
+# Log rotation comes from the daemon default in /etc/docker/daemon.json.
+name: teamguide
+
 services:
   app:
     build: .
-    container_name: teamguide-app
+    image: teamguide-app
+    container_name: teamguide-app # cloudflared routes to http://teamguide-app:3000
     restart: unless-stopped
-    # Reads BETTER_AUTH_*, DISCORD_*, AUTH_ALLOWED_*, and the Supabase DATABASE_URL.
-    env_file: .env
-    # Published on loopback only; your reverse proxy terminates TLS and forwards here.
-    ports:
-      - "127.0.0.1:3000:3000"
+    # Secrets live OUTSIDE the checkout, so a git pull can never touch them.
+    env_file: ../.env
+    environment:
+      # Matches the bind mount below; keep the two in step.
+      STORAGE_DIR: /app/data/uploads
+    volumes:
+      # Uploaded screenshots. The host directory must be owned by uid 1001,
+      # the image's `nextjs` user, or writes fail.
+      - /srv/teamguide/data/uploads:/app/data/uploads
+    networks:
+      - edge # cloudflared
+      - data # postgres
+    healthcheck:
+      # /sign-in is the only page that renders without a session.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  bot:
+    build: ./bot
+    image: teamguide-bot
+    container_name: teamguide-bot
+    restart: unless-stopped
+    # Only needs DATABASE_URL/DATABASE_SSL from this file. Everything else (token,
+    # channels, schedule, presence) lives in the database and is edited at
+    # /settings/discord-bot.
+    env_file: ../.env
+    # Outbound only: dials Discord's gateway, no ports, no edge network.
+    networks:
+      - data
+
+networks:
+  edge:
+    external: true
+  data:
+    external: true
