@@ -50,6 +50,23 @@ body {
   background: #34343a;
 }
 
+/* v2 sidebar rail. The 3px track/thumb comes from the redesign frame and has to
+   be plain CSS: Tailwind v4 does not emit arbitrary variants for
+   ::-webkit-scrollbar, so utility classes silently produce nothing. Overrides
+   the app-wide 10px scrollbar above, including its 2px thumb border. */
+.v2-rail::-webkit-scrollbar {
+  width: 2px;
+}
+.v2-rail::-webkit-scrollbar-track {
+  background: #171e24;
+  border-radius: 999px;
+}
+.v2-rail::-webkit-scrollbar-thumb {
+  background: #243033;
+  border: 0;
+  border-radius: 999px;
+}
+
 /* Rich text content (TipTap editor + rendered articles) */
 .rich-text {
   font-size: 15px;

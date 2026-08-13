@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Newspaper,
@@ -19,30 +21,37 @@ import {
   CircleUser,
   Cpu,
   Settings,
-  MoreHorizontal,
+  LogOut,
 } from "lucide-react";
+import { signOut } from "@/lib/auth-client";
 
-// v2 side navigation. Same items and grouping as the live sidebar; the styling
-// is the redesign: light surface, rounded pill rows, small uppercase section
-// labels, tinted active row, pinned account card with a scroll fade above it.
+// v2 side navigation. Same items and grouping as the live sidebar; the surface,
+// type and spacing are lifted from the "team-dashboard-components" Figma frame
+// (node 3:5) - dark #0e1217 panel, hairline #243033 edges, sage #8fb0a7 accent
+// on the active row, and Figtree throughout.
 //
-// Rows are buttons, not links, while v2 is a canvas - clicking one only moves
-// the active state so the styling can be seen. They become <Link> once the v2
-// routes exist.
+// Only the nav scrolls - the brand lockup and the account pill are both pinned.
+// The rail is the frame's scrollbar-track/thumb (narrowed to 2px) rather than
+// the platform default, so it is always shown (overflow-y-scroll) as drawn.
+//
+// Rows with an href are real links and take their active state from the path.
+// The rest are still buttons while v2 is a canvas - clicking one only moves the
+// highlight so the styling can be seen. They get an href as each route lands.
 
 type NavItem = {
   label: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  href?: string;
 };
 
-type NavGroup = { label?: string; items: NavItem[] };
+type NavGroup = { label: string; items: NavItem[] };
 
 const GROUPS: NavGroup[] = [
-  { items: [{ label: "Dashboard", icon: LayoutDashboard }] },
+  { label: "Main", items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/v2" }] },
   {
     label: "Workspace",
     items: [
-      { label: "News", icon: Newspaper },
+      { label: "News", icon: Newspaper, href: "/v2/news" },
       { label: "Guides", icon: BookOpen },
       { label: "Board", icon: SquareKanban },
       { label: "Reports", icon: Ticket },
@@ -82,55 +91,95 @@ export default function V2Sidebar({
 }: {
   user: { name: string; email: string; image: string | null };
 }) {
-  const [active, setActive] = useState("Dashboard");
+  // A routed row wins unless an unrouted one was picked since the last
+  // navigation, so the highlight never sits on two rows at once.
+  const [picked, setPicked] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const routed = GROUPS.flatMap((g) => g.items)
+    .filter((i) => i.href && (pathname === i.href || pathname.startsWith(`${i.href}/`)))
+    .sort((a, b) => b.href!.length - a.href!.length)[0];
+  const active = picked ?? routed?.label;
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    await signOut();
+    router.push("/sign-in");
+    router.refresh();
+  }
 
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which wins
-  // over Tailwind's layered border utilities, so v2's light borders are marked
-  // important to opt out of the app-wide dark default.
+  // over Tailwind's layered border utilities, so every border here is marked
+  // important to opt out of the app-wide default.
   return (
-    <aside className="relative flex w-[268px] shrink-0 flex-col border-r border-slate-200! bg-white">
-      <div className="flex items-center gap-2.5 px-5 py-6">
-        <Image
-          src="/logo.png"
-          alt="Team Guide"
-          width={2018}
-          height={819}
-          priority
-          className="h-7 w-auto shrink-0 object-contain"
-        />
-        <span className="text-[19px] font-semibold tracking-tight text-slate-900">
-          Team Guide
+    <aside className="flex w-[260px] shrink-0 flex-col justify-between border-r border-[#243033]! bg-[#0e1217]">
+      <div className="flex items-center gap-[12px] px-[24px] pt-[24px]">
+        <span className="size-[36px] shrink-0 overflow-hidden rounded-[4px]">
+          <Image
+            src="/logo.png"
+            alt="Gravel Host"
+            width={2018}
+            height={819}
+            priority
+            className="size-full object-contain"
+          />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[18px] font-bold text-[#e2e8f0]">
+            GRAVEL HOST
+          </span>
+          <span className="block truncate text-[11px] font-semibold text-[#ff7a59]">
+            TEAM PORTAL
+          </span>
         </span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-10">
-        {GROUPS.map((group, i) => (
-          <div key={group.label ?? `group-${i}`}>
-            {group.label ? (
-              <p className="px-3 pb-2 pt-6 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {group.label}
-              </p>
-            ) : null}
+      {/* Right padding is 19px so that nav rows clear the 2px rail and its 3px
+          gutter at exactly the frame's 24px inset. */}
+      <nav className="v2-rail mt-[20px] mr-[3px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-scroll pr-[19px] pb-[24px] pl-[24px]">
+        {GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-[8px]">
+            <p className="text-[11px] font-bold tracking-[0.88px] text-[#94a3b8] uppercase">
+              {group.label}
+            </p>
             {group.items.map((item) => {
               const Icon = item.icon;
               const isActive = active === item.label;
-              return (
+              const className = `flex w-full cursor-pointer items-center gap-[12px] rounded-[8px] border px-[12px] py-[10px] text-[14px] transition-colors ${
+                isActive
+                  ? "border-[#243033]! bg-[#171e24] font-semibold text-[#e2e8f0]"
+                  : "border-transparent! font-medium text-[#94a3b8] hover:bg-[#171e24]/60 hover:text-[#e2e8f0]"
+              }`;
+              const inner = (
+                <>
+                  <Icon
+                    size={18}
+                    strokeWidth={2}
+                    className={`shrink-0 ${isActive ? "text-[#8fb0a7]" : "text-[#94a3b8]"}`}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </>
+              );
+
+              return item.href ? (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => setPicked(null)}
+                  className={className}
+                >
+                  {inner}
+                </Link>
+              ) : (
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setActive(item.label)}
-                  className={`mb-0.5 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition-colors ${
-                    isActive
-                      ? "bg-blue-50 font-medium text-blue-700"
-                      : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                  }`}
+                  onClick={() => setPicked(item.label)}
+                  className={className}
                 >
-                  <Icon
-                    size={20}
-                    strokeWidth={1.75}
-                    className={isActive ? "text-blue-600" : "text-slate-500"}
-                  />
-                  <span className="truncate">{item.label}</span>
+                  {inner}
                 </button>
               );
             })}
@@ -138,34 +187,41 @@ export default function V2Sidebar({
         ))}
       </nav>
 
-      {/* Fades the nav out as it scrolls under the account card. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-[76px] h-10 bg-gradient-to-t from-white to-transparent" />
-
-      <div className="border-t border-slate-200! p-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-100"
-        >
+      <div className="px-[24px] pt-[12px] pb-[24px]">
+        <div className="flex items-center gap-[12px] rounded-[8px] bg-[#171e24] p-[12px]">
           {user.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.image}
               alt={user.name}
-              className="h-9 w-9 shrink-0 rounded-full object-cover"
+              className="size-[32px] shrink-0 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-semibold text-rose-700">
+            <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-[#243033] text-[11px] font-semibold text-[#e2e8f0]">
               {initialsOf(user.name)}
             </span>
           )}
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-sm font-medium text-slate-900">
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-[#e2e8f0]">
               {user.name}
             </span>
-            <span className="block truncate text-xs text-slate-500">{user.email}</span>
+            <span className="block truncate text-[11px] font-normal text-[#94a3b8]">
+              {user.email}
+            </span>
           </span>
-          <MoreHorizontal size={18} strokeWidth={1.75} className="shrink-0 text-slate-400" />
-        </button>
+          {/* Negative margin keeps the 14px glyph on the frame's grid while
+              giving the control a 26px hit target. */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            aria-label="Log out"
+            title="Log out"
+            className="-m-[6px] shrink-0 cursor-pointer p-[6px] text-[#94a3b8] transition-colors hover:text-[#8fb0a7] disabled:cursor-default disabled:opacity-50"
+          >
+            <LogOut size={14} strokeWidth={2} />
+          </button>
+        </div>
       </div>
     </aside>
   );
