@@ -26,7 +26,9 @@ export default async function V2Layout({ children }: { children: React.ReactNode
           image: session?.user.image ?? null,
         }}
       />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      {/* v2-rail gives the workspace the sidebar's 2px rail instead of the
+          app-wide 10px scrollbar from globals.css. */}
+      <main className="v2-rail flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }

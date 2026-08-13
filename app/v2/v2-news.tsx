@@ -1,97 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Calendar, ChevronRight, Plus, Search } from "lucide-react";
+import { ARTICLES, CARD, CATEGORIES, CATEGORY_PILL, TAGS, type Category } from "./news-data";
 
 // v2 news listing, built from the "news-listing-page" Figma frame (node 25:4):
 // a top bar, a two-column card grid and the category / tag rail.
 //
 // Content is the frame's placeholder copy - this is still the redesign canvas,
 // so nothing here reads from news_post yet.
-
-type Category = "Processes" | "Guidelines" | "Scripts" | "Copyright" | "Promotions";
-
-type Article = {
-  title: string;
-  excerpt: string;
-  category: Category;
-  date: string;
-};
-
-// Each category carries its own pill colour in the frame.
-const CATEGORY_PILL: Record<Category, string> = {
-  Processes: "bg-[#8fb0a7]/[0.12] text-[#8fb0a7]",
-  Guidelines: "bg-[#38bdf8]/[0.12] text-[#38bdf8]",
-  Scripts: "bg-[#f59e0b]/[0.12] text-[#f59e0b]",
-  Copyright: "bg-[#c084fc]/[0.12] text-[#c084fc]",
-  Promotions: "bg-[#f472b6]/[0.12] text-[#f472b6]",
-};
-
-const CATEGORIES: Category[] = [
-  "Processes",
-  "Guidelines",
-  "Scripts",
-  "Copyright",
-  "Promotions",
-];
-
-const ARTICLES: Article[] = [
-  {
-    title: "Gravel Host Review Links",
-    excerpt:
-      "Gravel Host: https://g2.com, Trust Pilot, Host Advice and Google review links for the hosting company to share with clients for quality assurance.",
-    category: "Processes",
-    date: "Aug 12, 2026 · By Angeline",
-  },
-  {
-    title: "Security Verification Requirements",
-    excerpt:
-      "For Gravel Host Compliance: Email Address, Identity, Full Address Region, Postcode, Country are required to complete level-2 support validation.",
-    category: "Guidelines",
-    date: "Aug 12, 2026 · By Angeline",
-  },
-  {
-    title: "Services Terminated for Abuse Email",
-    excerpt:
-      "In the interest of Service Termination: Hello, This email is to notify you that your services with Gravel Host have been permanently flagged.",
-    category: "Guidelines",
-    date: "Aug 12, 2026 · By Angeline",
-  },
-  {
-    title: "DDoss Response",
-    excerpt:
-      "Gravel Host DDoS attack sec, law, and applicable laws, please understand our platform guidelines while we work to improve our routing policies.",
-    category: "Scripts",
-    date: "Aug 11, 2026 · By Angeline",
-  },
-  {
-    title: "Copyright infringement claims Team Response",
-    excerpt:
-      "Dear [Claimant], We have received your complaint and are investigating the matter across active client nodes to resolve potential issues swiftly.",
-    category: "Copyright",
-    date: "Jul 18, 2026 · By Angeline",
-  },
-  {
-    title: "Available Discount Codes",
-    excerpt:
-      "Available discount codes for Gravel Host customers. Please see below Customer Discount promotions and referral rules for the Q3 campaign.",
-    category: "Processes",
-    date: "Jul 2, 2026 · By Angeline",
-  },
-];
-
-const TAGS = [
-  "#security",
-  "#compliance",
-  "#hosting",
-  "#billing",
-  "#announcement",
-  "#templates",
-  "#support",
-  "#gravel-host",
-];
-
-const CARD = "rounded-[12px] border border-[#243033]! bg-[#171e24] p-[20px]";
 
 export default function V2News() {
   const [filter, setFilter] = useState<Category | null>(null);
@@ -135,9 +53,9 @@ export default function V2News() {
             </p>
           ) : null}
           {shown.map((a) => (
-            <button
-              key={a.title}
-              type="button"
+            <Link
+              key={a.slug}
+              href={`/v2/news/${a.slug}`}
               className={`flex min-h-[180px] min-w-px flex-col gap-[14px] text-left transition-colors hover:border-[#2f3d42]! ${CARD}`}
             >
               <div className="flex w-full items-center justify-between gap-[12px]">
@@ -168,7 +86,7 @@ export default function V2News() {
                   <ChevronRight size={14} strokeWidth={2} className="text-[#8fb0a7]" />
                 </div>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
 

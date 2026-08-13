@@ -53,7 +53,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "News", icon: Newspaper, href: "/v2/news" },
       { label: "Guides", icon: BookOpen },
-      { label: "Board", icon: SquareKanban },
+      { label: "Board", icon: SquareKanban, href: "/v2/board" },
       { label: "Reports", icon: Ticket },
       { label: "Reviews", icon: Star },
       { label: "Commissions", icon: HandCoins },
