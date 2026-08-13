@@ -23,7 +23,9 @@ type Stat = {
   value: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   delta?: string;
-  note: string;
+  note?: string;
+  /** Per-source counts, shown as pills instead of a note line. */
+  sources?: { count: string; label: string }[];
 };
 
 const STATS: Stat[] = [
@@ -33,7 +35,11 @@ const STATS: Stat[] = [
     label: "Reviews",
     value: "63",
     icon: Star,
-    note: "16 Trustpilot · 46 HostAdvice · 1 Gravel Host",
+    sources: [
+      { count: "16", label: "TP" },
+      { count: "46", label: "HA" },
+      { count: "1", label: "GH" },
+    ],
   },
   {
     label: "Earnings this period",
@@ -206,6 +212,18 @@ export default function V2Dashboard() {
                       <span className="text-[11px] font-bold text-[#10b981]">{stat.delta}</span>
                     </span>
                     <span className="text-[12px] font-normal text-[#94a3b8]">{stat.note}</span>
+                  </div>
+                ) : stat.sources ? (
+                  <div className="flex items-center gap-[8px] text-[11px]">
+                    {stat.sources.map((s) => (
+                      <span
+                        key={s.label}
+                        className="flex items-center gap-[6px] rounded-[4px] bg-white/[0.03] px-[6px] py-[2px]"
+                      >
+                        <span className="font-bold text-[#e2e8f0]">{s.count}</span>
+                        <span className="font-medium text-[#94a3b8]">{s.label}</span>
+                      </span>
+                    ))}
                   </div>
                 ) : (
                   <p className="text-[12px] font-normal text-[#94a3b8]">{stat.note}</p>

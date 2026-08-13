@@ -54,7 +54,7 @@ const GROUPS: NavGroup[] = [
       { label: "News", icon: Newspaper, href: "/v2/news" },
       { label: "Guides", icon: BookOpen },
       { label: "Board", icon: SquareKanban, href: "/v2/board" },
-      { label: "Reports", icon: Ticket },
+      { label: "Reports", icon: Ticket, href: "/v2/reports" },
       { label: "Reviews", icon: Star },
       { label: "Commissions", icon: HandCoins },
       { label: "Disputes", icon: Gavel },
