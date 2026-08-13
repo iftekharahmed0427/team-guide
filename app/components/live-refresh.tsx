@@ -2,24 +2,24 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase-client";
-import { REALTIME_EVENT, REALTIME_TOPIC } from "@/lib/realtime-shared";
+import { SSE_PATH } from "@/lib/realtime-shared";
 
 // Pages that don't need realtime - skip the subscription there entirely so an
-// idle tab doesn't hold a Supabase Realtime WebSocket open for no benefit. News
-// and Guides rarely change; Settings self-polls where it needs to (bot status);
-// the Board runs its OWN subscription (kanban-board.tsx), so the layout one is
-// redundant there.
+// idle tab doesn't hold a connection open for no benefit. News and Guides rarely
+// change; Settings self-polls where it needs to (bot status); the Board runs its
+// OWN subscription (kanban-board.tsx), so the layout one is redundant there.
 const NO_LIVE_PREFIXES = ["/news", "/guides", "/settings", "/board"];
 
 // Mounted once in the app layout. On pages that benefit from realtime, and while
-// the tab is VISIBLE, it subscribes to the app-wide Supabase broadcast channel
-// and re-renders the current route on every data change. The board holds its own
-// client state and reconciles separately, so a refresh here is harmless to it.
+// the tab is VISIBLE, it opens an SSE connection to /api/events and re-renders
+// the current route on every data change. The board holds its own client state
+// and reconciles separately, so a refresh here is harmless to it.
 //
-// When the tab goes HIDDEN it leaves the channel, so idle background tabs don't
-// keep a WebSocket open. On returning it rejoins and does one catch-up refresh to
-// pick up anything missed. Refreshes are debounced to coalesce bursts.
+// When the tab goes HIDDEN it closes the stream, so idle background tabs don't
+// hold a connection. On returning it reopens and does one catch-up refresh to
+// pick up anything missed. Same after a dropped connection, since events that
+// happen while disconnected are simply gone. Refreshes are debounced to
+// coalesce bursts.
 export default function LiveRefresh() {
   const router = useRouter();
   const pathname = usePathname();
@@ -28,8 +28,11 @@ export default function LiveRefresh() {
   useEffect(() => {
     if (!live) return;
 
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let source: EventSource | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Set whenever the stream drops, so the next successful open catches up on
+    // whatever changed while we were not listening.
+    let missedEvents = false;
 
     const scheduleRefresh = () => {
       if (timer) clearTimeout(timer);
@@ -37,19 +40,28 @@ export default function LiveRefresh() {
     };
 
     const connect = () => {
-      if (channel || document.hidden) return;
-      channel = supabase
-        .channel(REALTIME_TOPIC)
-        .on("broadcast", { event: REALTIME_EVENT }, scheduleRefresh)
-        .subscribe();
+      if (source || document.hidden) return;
+      const es = new EventSource(SSE_PATH);
+      es.onmessage = scheduleRefresh;
+      es.onopen = () => {
+        if (missedEvents) {
+          missedEvents = false;
+          scheduleRefresh();
+        }
+      };
+      // EventSource reconnects on its own; just remember that we have a gap.
+      es.onerror = () => {
+        missedEvents = true;
+      };
+      source = es;
     };
 
     const disconnect = () => {
       if (timer) clearTimeout(timer);
       timer = undefined;
-      if (channel) {
-        void supabase.removeChannel(channel);
-        channel = null;
+      if (source) {
+        source.close();
+        source = null;
       }
     };
 
