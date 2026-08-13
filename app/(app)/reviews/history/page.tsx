@@ -4,7 +4,7 @@ import { ArrowLeft, History } from "lucide-react";
 import { db } from "@/db";
 import { review, reportPeriod } from "@/db/app-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import { getReviewSources } from "@/lib/reviews";
 import ReviewLightbox from "../review-lightbox";
 
@@ -21,7 +21,7 @@ const SOURCE_BADGES = [
 
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 // Archived reviews grouped by the period they were closed into (a "Reset all"

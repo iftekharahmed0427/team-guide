@@ -1,41 +1,33 @@
 import { randomUUID } from "node:crypto";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import path from "node:path";
 
-// Private Supabase storage bucket (S3-compatible). Uploads land here instead of
-// inlining base64 in the database; reads use short-lived presigned URLs since the
-// bucket is private. All config comes from STORAGE_* env vars (see .env.example),
-// so storage is optional — when unset the callers fall back to inline data URLs.
+// Uploaded screenshots on local disk, under STORAGE_DIR. In the container that
+// path is a bind mount from the host (/srv/teamguide/data/uploads), so images
+// survive rebuilds and are backed up alongside the database.
+//
+// The stored value is a KEY like `reviews/<uuid>.png`, exactly the format the
+// previous S3 implementation used, so rows written before the move keep
+// resolving with no data migration beyond copying the objects onto the disk.
+// Storage stays optional: when STORAGE_DIR is unset the callers fall back to
+// inlining base64 data URLs in the database, and rows already holding a
+// `data:` URL are rendered directly by the callers, never through here.
 
-const endpoint = process.env.STORAGE_ENDPOINT;
-const region = process.env.STORAGE_REGION ?? "us-east-1";
-const accessKeyId = process.env.STORAGE_ACCESS_KEY_ID;
-const secretAccessKey = process.env.STORAGE_SECRET_ACCESS_KEY;
-const bucket = process.env.STORAGE_BUCKET;
+const root = process.env.STORAGE_DIR;
 
 export function storageEnabled(): boolean {
-  return Boolean(endpoint && accessKeyId && secretAccessKey && bucket);
+  return Boolean(root);
 }
 
-let client: S3Client | null = null;
-function s3(): S3Client {
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error("Storage is not configured (set the STORAGE_* env vars).");
-  }
-  if (!client) {
-    client = new S3Client({
-      region,
-      endpoint,
-      forcePathStyle: true, // Supabase's S3 gateway requires path-style addressing
-      credentials: { accessKeyId, secretAccessKey },
-    });
-  }
-  return client;
+// Absolute path for a key, or null if storage is off or the key tries to escape
+// the storage root (`../`, absolute paths, symlink-ish tricks in the key text).
+// Every filesystem call in this module and in /api/files goes through here.
+export function resolveKey(key: string): string | null {
+  if (!root) return null;
+  const base = path.resolve(root);
+  const full = path.resolve(base, key);
+  if (full !== base && !full.startsWith(base + path.sep)) return null;
+  return full;
 }
 
 const EXT: Record<string, string> = {
@@ -45,32 +37,37 @@ const EXT: Record<string, string> = {
   "image/gif": "gif",
 };
 
-// Decode a `data:<mime>;base64,...` URL and upload it under `prefix/`.
-// Returns the stored object key (what to persist in the DB).
+// Decode a `data:<mime>;base64,...` URL and write it under `prefix/`.
+// Returns the stored key (what to persist in the DB).
 export async function uploadDataUrl(dataUrl: string, prefix: string): Promise<string> {
   const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
   if (!m) throw new Error("Expected a base64 data URL.");
   const contentType = m[1]!;
-  const body = Buffer.from(m[2]!, "base64");
   const key = `${prefix}/${randomUUID()}.${EXT[contentType] ?? "bin"}`;
-  await s3().send(
-    new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }),
-  );
+  const full = resolveKey(key);
+  if (!full) throw new Error("Storage is not configured (set STORAGE_DIR).");
+  await mkdir(path.dirname(full), { recursive: true });
+  await writeFile(full, Buffer.from(m[2]!, "base64"));
   return key;
 }
 
-// A short-lived presigned GET URL for a private object, or null if storage is off.
-export async function signedGetUrl(key: string, expiresIn = 3600): Promise<string | null> {
+// URL the browser loads a stored image from, or null if storage is off. The
+// route behind it checks the session, so these are not public links and there is
+// nothing to sign. Async to keep the call sites uniform with the DB reads
+// around them.
+export async function fileUrl(key: string): Promise<string | null> {
   if (!storageEnabled()) return null;
-  return getSignedUrl(s3(), new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn });
+  return `/api/files/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 // Best-effort delete; never throws (cleanup shouldn't block a row delete).
-export async function deleteObject(key: string): Promise<void> {
-  if (!storageEnabled()) return;
+export async function deleteFile(key: string): Promise<void> {
+  if (key.startsWith("data:")) return; // legacy inline image, nothing on disk
+  const full = resolveKey(key);
+  if (!full) return;
   try {
-    await s3().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    await rm(full, { force: true });
   } catch {
-    // ignore — the DB row is already gone / will be
+    // ignore - the DB row is already gone / will be
   }
 }

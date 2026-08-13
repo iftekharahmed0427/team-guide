@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
-import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
+import { storageEnabled, uploadDataUrl, deleteFile } from "@/lib/storage";
 import { logActivity } from "@/lib/activity";
 import { AUDIT_CRITERIA, computeTotals } from "./criteria";
 
@@ -179,7 +179,7 @@ export async function updateAudit(
   if (remove.length > 0) {
     await db.delete(auditScreenshot).where(inArray(auditScreenshot.id, remove.map((s) => s.id)));
     for (const s of remove) {
-      if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteObject(s.imageUrl);
+      if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteFile(s.imageUrl);
     }
   }
   if (shots.urls.length > 0) {
@@ -207,7 +207,7 @@ export async function deleteAudit(id: string): Promise<void> {
     .where(eq(auditScreenshot.auditId, id));
   await db.delete(audit).where(eq(audit.id, id));
   for (const s of shots) {
-    if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteObject(s.imageUrl);
+    if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteFile(s.imageUrl);
   }
   await logActivity("audit.deleted", a ? `#${a.ticketNumber}` : "");
   await notifyChange();
