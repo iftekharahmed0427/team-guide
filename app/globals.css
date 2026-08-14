@@ -167,6 +167,102 @@ body {
   pointer-events: none;
 }
 
+/* The same rendered editor HTML, in the v2 palette. The redesign does not use
+   the app-wide CSS variables above, so the article body needs its own block
+   rather than a token swap: rounded corners, sage links and #243033 hairlines.
+   Kept next to .rich-text so the two stay in step as the editor gains nodes. */
+.v2-rich-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+.v2-rich-text > :first-child {
+  margin-top: 0;
+}
+.v2-rich-text > :last-child {
+  margin-bottom: 0;
+}
+.v2-rich-text h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 1.5rem 0 0.5rem;
+}
+.v2-rich-text h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+}
+.v2-rich-text p {
+  margin: 0.75rem 0;
+}
+.v2-rich-text ul,
+.v2-rich-text ol {
+  margin: 0.75rem 0;
+  padding-left: 1.4rem;
+}
+.v2-rich-text ul {
+  list-style: disc;
+}
+.v2-rich-text ol {
+  list-style: decimal;
+}
+.v2-rich-text li {
+  margin: 0.25rem 0;
+}
+.v2-rich-text li p {
+  margin: 0;
+}
+.v2-rich-text a {
+  color: #8fb0a7;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  /* Pasted URLs are long enough to push the card wider than its column. */
+  overflow-wrap: anywhere;
+}
+.v2-rich-text strong {
+  font-weight: 700;
+}
+.v2-rich-text blockquote {
+  border-left: 2px solid #243033;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #94a3b8;
+}
+.v2-rich-text code {
+  background: #0f141a;
+  border: 1px solid #243033;
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.v2-rich-text pre {
+  background: #0f141a;
+  border: 1px solid #243033;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.v2-rich-text pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.v2-rich-text hr {
+  border: 0;
+  border-top: 1px solid #243033;
+  margin: 1.5rem 0;
+}
+.v2-rich-text img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.75rem 0;
+  border: 1px solid #243033;
+  border-radius: 8px;
+}
+
 /* ---------------------------------------------------------------------------
    Motion: a small, dependency-free animation layer that matches the flat,
    squared design. Entrance fades, a dropdown reveal, and a left-to-right

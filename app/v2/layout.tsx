@@ -1,4 +1,5 @@
 import { Figtree } from "next/font/google";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import V2Sidebar from "./v2-sidebar";
 
@@ -14,6 +15,14 @@ const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
 // every v2 route shares it and only the main area swaps on navigation.
 export default async function V2Layout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
+
+  // Now that /v2 serves real content, it re-validates the session the way the
+  // (app) layout does. proxy.ts only checks that a session cookie is present,
+  // which it documents as optimistic. In development lib/auth hands back a stub
+  // session, so this never fires locally.
+  if (!session) {
+    redirect("/sign-in");
+  }
 
   return (
     <div
