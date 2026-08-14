@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import { formatDateTime } from "@/lib/datetime";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import Avatar from "@/app/components/avatar";
 import DeleteAuditButton from "../delete-audit-button";
 import AuditScreenshots from "../audit-screenshots";
@@ -17,7 +17,7 @@ import { AUDIT_CRITERIA, percentage } from "../criteria";
 // already renderable as-is.
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

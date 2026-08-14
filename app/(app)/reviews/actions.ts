@@ -9,7 +9,7 @@ import { review, reviewSetting, reviewBonusMember, reviewSource } from "@/db/app
 import { user as userTable } from "@/db/auth-schema";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
-import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
+import { storageEnabled, uploadDataUrl, deleteFile } from "@/lib/storage";
 
 const PAGE = "/reviews";
 // A downscaled JPEG data URL is well under this; the cap just blocks abuse.
@@ -133,7 +133,7 @@ export async function deleteReview(id: string): Promise<Result> {
   await db.delete(review).where(eq(review.id, id));
   // Remove the stored object too (keys, not inline data URLs).
   if (row?.imageUrl && !row.imageUrl.startsWith("data:")) {
-    await deleteObject(row.imageUrl);
+    await deleteFile(row.imageUrl);
   }
   await logActivity("review.deleted");
   revalidatePath(PAGE);

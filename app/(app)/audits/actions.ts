@@ -7,14 +7,14 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { notifyChange } from "@/lib/notify";
-import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
+import { storageEnabled, uploadBytes, deleteFile } from "@/lib/storage";
 import { logActivity } from "@/lib/activity";
 import { AUDIT_CRITERIA, computeTotals } from "./criteria";
 
 const PAGE = "/audits";
 const MAX_SHOTS = 8;
-// A downscaled JPEG data URL is well under this; the cap just blocks abuse.
-const MAX_IMAGE_CHARS = 4_000_000;
+// A downscaled JPEG is well under this; the cap just blocks abuse.
+const MAX_IMAGE_BYTES = 3_000_000;
 
 type Result = { ok: true; id: string } | { error: string };
 
@@ -71,24 +71,33 @@ function prepare(input: AuditFields) {
   };
 }
 
-// Upload new screenshots (client-downscaled data URLs) to the bucket, returning
-// stored keys (or inline data URLs when storage is off), or an error message.
-async function uploadNewShots(dataUrls: string[]): Promise<{ urls: string[] } | { error: string }> {
+// Store the new screenshots, returning stored keys (or inline data URLs when
+// storage is off), or an error message.
+//
+// These arrive as Files, NOT as data URL strings. React sends each File as its
+// own multipart part, whereas strings are decoded into the action's argument
+// payload, whose total decoded string length React caps at 1,000,000 characters
+// once the payload holds any multi-element array (`scores` always does). Two
+// screenshots were enough to exceed it, and the request then failed with
+// "Maximum array nesting exceeded" before this action ever ran.
+async function uploadNewShots(files: File[]): Promise<{ urls: string[] } | { error: string }> {
   const urls: string[] = [];
-  for (const raw of (dataUrls ?? []).slice(0, MAX_SHOTS)) {
-    const dataUrl = (raw ?? "").trim();
-    if (!dataUrl.startsWith("data:image/")) continue;
-    if (dataUrl.length > MAX_IMAGE_CHARS) {
+  for (const file of (files ?? []).slice(0, MAX_SHOTS)) {
+    if (!file || typeof file.arrayBuffer !== "function") continue;
+    if (!file.type.startsWith("image/")) continue;
+    if (file.size > MAX_IMAGE_BYTES) {
       return { error: "One of the screenshots is too large. Try a tighter capture." };
     }
+    const bytes = Buffer.from(await file.arrayBuffer());
     if (storageEnabled()) {
       try {
-        urls.push(await uploadDataUrl(dataUrl, "audits"));
+        urls.push(await uploadBytes(bytes, file.type, "audits"));
       } catch {
         return { error: "Couldn't upload a screenshot. Try again." };
       }
     } else {
-      urls.push(dataUrl);
+      // No STORAGE_DIR (local dev): keep the old inline behaviour.
+      urls.push(`data:${file.type};base64,${bytes.toString("base64")}`);
     }
   }
   return { urls };
@@ -107,7 +116,7 @@ function scoreRowValues(auditId: string, rows: { key: string; na: boolean; score
 
 // Admin creates a QA audit for a member's ticket (audit + one audit_score per
 // criterion + any screenshots, written together).
-export async function createAudit(input: AuditFields & { screenshots: string[] }): Promise<Result> {
+export async function createAudit(input: AuditFields & { screenshots: File[] }): Promise<Result> {
   let session;
   try {
     session = await requireAdmin();
@@ -146,7 +155,7 @@ export async function createAudit(input: AuditFields & { screenshots: string[] }
 // are in `keepScreenshotIds`, removes the rest (and their bucket objects), and
 // adds any `newScreenshots`. The original reviewer is preserved.
 export async function updateAudit(
-  input: AuditFields & { id: string; keepScreenshotIds: string[]; newScreenshots: string[] },
+  input: AuditFields & { id: string; keepScreenshotIds: string[]; newScreenshots: File[] },
 ): Promise<Result> {
   try {
     await requireAdmin();
@@ -179,7 +188,7 @@ export async function updateAudit(
   if (remove.length > 0) {
     await db.delete(auditScreenshot).where(inArray(auditScreenshot.id, remove.map((s) => s.id)));
     for (const s of remove) {
-      if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteObject(s.imageUrl);
+      if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteFile(s.imageUrl);
     }
   }
   if (shots.urls.length > 0) {
@@ -207,7 +216,7 @@ export async function deleteAudit(id: string): Promise<void> {
     .where(eq(auditScreenshot.auditId, id));
   await db.delete(audit).where(eq(audit.id, id));
   for (const s of shots) {
-    if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteObject(s.imageUrl);
+    if (s.imageUrl && !s.imageUrl.startsWith("data:")) await deleteFile(s.imageUrl);
   }
   await logActivity("audit.deleted", a ? `#${a.ticketNumber}` : "");
   await notifyChange();

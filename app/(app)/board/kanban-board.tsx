@@ -53,8 +53,7 @@ import {
   unassignMember,
 } from "./actions";
 import Avatar from "@/app/components/avatar";
-import { supabase } from "@/lib/supabase-client";
-import { REALTIME_EVENT, REALTIME_TOPIC } from "@/lib/realtime-shared";
+import { SSE_PATH } from "@/lib/realtime-shared";
 
 type Columns = Record<string, Task[]>;
 
@@ -662,18 +661,26 @@ export default function KanbanBoard({
     }
   }, []);
 
-  // Subscribe to the app-wide Supabase broadcast channel; refetch + reconcile on
-  // each change. (Board data only shows here, but the channel is shared app-wide.)
+  // Subscribe to the app-wide change stream; refetch + reconcile on each change.
+  // (Board data only shows here, but the channel is shared app-wide.) EventSource
+  // reconnects on its own, and every reconnect reconciles, so a dropped stream
+  // costs at most one stale render.
   useEffect(() => {
-    const channel = supabase
-      .channel(REALTIME_TOPIC)
-      .on("broadcast", { event: REALTIME_EVENT }, () => {
-        setRefreshKey((k) => k + 1);
-        void reconcile();
-      })
-      .subscribe();
+    const source = new EventSource(SSE_PATH);
+    let opened = false;
+    const onChange = () => {
+      setRefreshKey((k) => k + 1);
+      void reconcile();
+    };
+    source.onmessage = onChange;
+    source.onopen = () => {
+      // Skip the first open (the server just rendered this); a LATER one means
+      // the stream dropped and reconnected, so catch up on the gap.
+      if (opened) onChange();
+      opened = true;
+    };
     return () => {
-      void supabase.removeChannel(channel);
+      source.close();
     };
   }, [reconcile]);
 

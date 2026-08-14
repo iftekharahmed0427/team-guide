@@ -4,7 +4,7 @@ import { Gavel, Coins, HandCoins, History, Lock } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { reportPeriod } from "@/db/app-schema";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import {
   canAccessDisputes,
@@ -20,7 +20,7 @@ import DisputesClient, { type DisputeItem } from "./disputes-client";
 // already renderable as-is.
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 // Payment disputes logged by the Disputes role (and admins). Each carries a

@@ -1,6 +1,6 @@
 # Setup
 
-Auth uses Better Auth (Discord OAuth, invite-only) with Drizzle ORM on Supabase Postgres.
+Auth uses Better Auth (Discord OAuth, invite-only) with Drizzle ORM on Postgres.
 
 ## 1. Install dependencies
 
@@ -8,27 +8,30 @@ Auth uses Better Auth (Discord OAuth, invite-only) with Drizzle ORM on Supabase 
 bun install
 ```
 
-## 2. Create the Supabase database
+## 2. Point at a Postgres
 
-1. Create a project at https://supabase.com. Pick a region close to where the app will run and save the database password it gives you.
-2. In the dashboard go to Project Settings > Database > Connection string. You will use two of them:
-   - Transaction pooler (port 6543) for the running app -> `DATABASE_URL`
-   - Direct connection (port 5432) for migrations -> `DIRECT_URL`
+Production runs Postgres 17 in a container on the VPS, shared with the other
+projects on that host and reachable only from inside Docker. Two connection
+strings, same server:
 
-   They look like:
+```
+# DATABASE_URL  (app + bot; the container name on the internal `data` network)
+postgres://teamguide:[PASSWORD]@postgres:5432/teamguide
 
-   ```
-   # DATABASE_URL  (transaction pooler, app runtime)
-   postgresql://postgres.[project-ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+# DIRECT_URL  (migrations and host-side tools; published on loopback only)
+postgres://teamguide:[PASSWORD]@127.0.0.1:5432/teamguide
+```
 
-   # DIRECT_URL  (direct connection, migrations)
-   postgresql://postgres:[PASSWORD]@db.[project-ref].supabase.co:5432/postgres
-   ```
+Set `DATABASE_SSL=disable` for that setup: the connection never leaves the host.
+Against a managed provider reached over the internet, leave it empty and TLS
+stays on, handled by `db/index.ts` and `drizzle.config.ts` with no CA file.
 
-   Replace `[PASSWORD]` with your database password.
-3. SSL is required and is handled automatically by `db/index.ts` and `drizzle.config.ts` (no CA file needed).
+Note that LISTEN/NOTIFY, which drives live updates (`lib/notify.ts` ->
+`lib/events.ts` -> `/api/events`), does **not** work through a transaction
+pooler. Point the app at a real Postgres port, not a pgBouncer-style pooler.
 
-Tip: for an isolated dev database, create a second Supabase project and use its strings in `.env.local`. Otherwise local dev and production share the same data.
+Tip: for an isolated dev database, run your own Postgres and use its string in
+`.env.local`. Otherwise local dev and production share the same data.
 
 ## 3. Environment variables
 
@@ -38,11 +41,11 @@ cp .env.example .env.local
 
 Fill in `.env.local`:
 
-- `BETTER_AUTH_SECRET` - generate with `openssl rand -base64 32`
-- `DATABASE_URL` - Supabase transaction pooler string (port 6543)
-- `DIRECT_URL` - Supabase direct connection string (port 5432)
+- `BETTER_AUTH_SECRET` - generate with `openssl rand -base64 32`. Keep it stable: changing it invalidates every session cookie and logs the whole team out.
+- `DATABASE_URL` / `DIRECT_URL` - from step 2
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` - from step 4
 - `AUTH_ALLOWED_EMAILS` - comma-separated emails allowed to sign up (the invite list)
+- `STORAGE_DIR` - where uploaded screenshots are written. Unset falls back to inlining them as data URLs in the database.
 
 ## 4. Create the Discord OAuth app
 
@@ -74,28 +77,43 @@ bun run db:migrate      # apply it
 bun run dev
 ```
 
-Open http://localhost:3000; you will be redirected to `/sign-in` until you log in with Discord. Local dev connects straight to Supabase over TLS, so there is no tunnel or local database to run.
+Open http://localhost:3000; you will be redirected to `/sign-in` until you log in with Discord.
 
 ## 7. Deploy
 
-The database is managed by Supabase, so you can host the Next app anywhere; it connects to Supabase over TLS. In your host, set the same env vars, plus `BETTER_AUTH_URL=https://YOUR_DOMAIN`, and add the production Discord redirect (`https://YOUR_DOMAIN/api/auth/callback/discord`).
+Production is a single OVH VPS running Docker. Nothing listens on a public port:
+Cloudflare Tunnel dials out and reaches the app container by name, so there is no
+inbound firewall rule and no TLS to manage on the box.
 
-### Option A: Vercel
-
-1. Import the repo in Vercel.
-2. Add env vars: `DATABASE_URL` (transaction pooler), `DIRECT_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (your Vercel URL), `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `AUTH_ALLOWED_EMAILS`.
-3. Run migrations from your machine or CI (the Vercel build does not): `bun run db:migrate` against `DIRECT_URL`.
-
-### Option B: Docker (VPS or any container host)
-
-The repo ships a standalone-output `Dockerfile` and an app-only `docker-compose.prod.yml`.
-
-```bash
-# on the host, with a .env file containing the vars above
-docker compose -f docker-compose.prod.yml up -d --build
+```
+/srv/
+├── postgres/       shared Postgres 17 (one database per project on the host)
+├── cloudflared/    the tunnel, the only thing facing the internet
+└── teamguide/
+    ├── repo/       this checkout
+    ├── .env        secrets, deliberately outside the checkout
+    ├── data/uploads/   screenshots, bind-mounted into the app (must be uid 1001)
+    └── backups/
 ```
 
-The app listens on `127.0.0.1:3000`; put your reverse proxy in front and terminate TLS there. Run `bun run db:migrate` against `DIRECT_URL` once.
+Two external Docker networks: `edge` (cloudflared to web containers) and `data`
+(Postgres and its clients). The app joins both, the bot only `data`.
+
+```bash
+cd /srv/teamguide/repo && ./deploy.sh
+```
+
+That pulls, rebuilds and restarts both the app and the reports bot from
+`docker-compose.prod.yml`. Set `BETTER_AUTH_URL=https://YOUR_DOMAIN` in
+`/srv/teamguide/.env` and add the production Discord redirect
+(`https://YOUR_DOMAIN/api/auth/callback/discord`). Run `bun run db:migrate`
+against `DIRECT_URL` from the host once per schema change.
+
+In Cloudflare, the tunnel routes the hostname to `http://teamguide-app:3000`.
+
+`NEXT_PUBLIC_PANEL_URL` and `NEXT_PUBLIC_WHMCS_URL` are inlined at build time,
+not read at runtime. Their built-in defaults already match production, so they
+only need `--build-arg` wiring if those URLs ever change.
 
 ## How auth is wired
 
@@ -105,7 +123,7 @@ The app listens on `127.0.0.1:3000`; put your reverse proxy in front and termina
 - `proxy.ts` - optimistic redirect to `/sign-in` when the session cookie is absent (Next 16 renamed middleware to proxy).
 - `app/(app)/layout.tsx` - server-side session guard for everything in the `(app)` route group; the real enforcement.
 - `app/sign-in/` - public sign-in page with the Discord button.
-- `db/index.ts` - connects to Supabase over TLS; `db/auth-schema.ts` is generated; migrations live in `drizzle/`.
+- `db/index.ts` - connects to Postgres (TLS unless `DATABASE_SSL=disable`); `db/auth-schema.ts` is generated; migrations live in `drizzle/`.
 
 ## Invite-only behavior
 

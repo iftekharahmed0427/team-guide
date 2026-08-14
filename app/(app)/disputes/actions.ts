@@ -10,7 +10,7 @@ import { canAccessDisputes } from "@/lib/disputes";
 import { isDisputeOutcome } from "./constants";
 import { notifyChange } from "@/lib/notify";
 import { logActivity } from "@/lib/activity";
-import { storageEnabled, uploadDataUrl, deleteObject } from "@/lib/storage";
+import { storageEnabled, uploadDataUrl, deleteFile } from "@/lib/storage";
 
 const PAGE = "/disputes";
 const PAYMENTS = "/payments";
@@ -107,7 +107,7 @@ export async function deleteDispute(id: string): Promise<Result> {
   await db.delete(dispute).where(eq(dispute.id, id));
   // Remove the stored object too (keys, not inline data URLs).
   if (row.imageUrl && !row.imageUrl.startsWith("data:")) {
-    await deleteObject(row.imageUrl);
+    await deleteFile(row.imageUrl);
   }
   await logActivity("dispute.deleted");
   revalidatePath(PAGE);

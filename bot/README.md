@@ -30,7 +30,7 @@ API, so it does **not** need the privileged *Message Content* intent.
 ## Everything is controlled from the website
 
 Sign in as an admin and open **Settings > Discord bot**. Everything below is
-edited there and stored in the shared Supabase database; the bot reads it at
+edited there and stored in the shared database; the bot reads it at
 runtime (polled every 30s) and reports its health back:
 
 - **Bot token.** Set, replace, or clear it from the UI (stored set-only; never
@@ -52,7 +52,7 @@ runtime (polled every 30s) and reports its health back:
   it; leave the role blank for a plain message. To ping a non-mentionable role the
   bot needs the *Mention @everyone, @here, and All Roles* permission.
 
-The bot's environment only needs `DATABASE_URL` (the same Supabase Postgres).
+The bot's environment only needs `DATABASE_URL` (the same Postgres the website uses).
 
 ## How counting and resets work
 
@@ -109,32 +109,21 @@ bun run now                 # post the embeds once immediately, then exit
 
 ## 3. Deploy with Docker (VPS)
 
-The bot is **outbound-only**. It opens connections to Discord and Postgres and
-never listens on a port, so it cannot conflict with other containers. The compose
-project name and container name are unique, and no host ports are published.
+The bot ships as a service in the portal's stack, alongside the app, rather than
+as its own deployment: it lives on the same host and reads the same database. See
+the repo root `docker-compose.prod.yml` and `deploy.sh`.
 
 ```bash
-# in bot/, with .env (DATABASE_URL) filled in
-docker compose up -d --build
-docker compose logs -f
+cd /srv/teamguide/repo && ./deploy.sh          # both containers
+docker compose -f docker-compose.prod.yml logs -f bot
 ```
+
+It is **outbound-only**. It opens connections to Discord and Postgres and never
+listens on a port, so it joins only the internal `data` network and publishes
+nothing. Its whole environment is `DATABASE_URL` (+ `DATABASE_SSL`), shared with
+the app from `/srv/teamguide/.env`.
 
 All other configuration is done in the website, with no container restart needed.
-
-### Updating after a push
-
-To pull the latest code and rebuild in one step, run the deploy script on the
-VPS after each push:
-
-```bash
-cd team-guide/bot
-chmod +x deploy.sh   # first time only
-./deploy.sh
-```
-
-It does a fast-forward `git pull`, rebuilds and restarts the container, prunes
-old images, and tails the logs. Your `.env` and the config in the database are
-left untouched.
 
 ## Files
 

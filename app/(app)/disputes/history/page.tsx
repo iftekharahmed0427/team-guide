@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, History, Lock } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatDateTime } from "@/lib/datetime";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import { formatUSD } from "@/app/(app)/payments/constants";
 import { getArchivedDisputes, DISPUTE_BONUS_RATE } from "@/lib/disputes";
 import { BONUS_OUTCOME, OUTCOME_LABEL, OUTCOME_BADGE } from "../constants";
@@ -12,7 +12,7 @@ import DisputeShot from "../dispute-shot";
 // already renderable as-is.
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 // Archived disputes grouped by the report period they were closed into (a

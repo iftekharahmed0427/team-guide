@@ -6,12 +6,12 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import AuditForm, { type InitialAudit } from "../../audit-form";
 
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 // Admin-only: edit an existing audit (reuses the scorecard form, pre-filled).

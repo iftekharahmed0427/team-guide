@@ -8,7 +8,8 @@ import type { EditorView } from "@tiptap/pm/view";
 const MAX_DIM = 1600;
 const QUALITY = 0.9;
 
-export async function imageToDataUrl(file: Blob, maxDim = MAX_DIM): Promise<string> {
+// Draw the image onto a canvas at most `maxDim` on its longest side.
+async function downscale(file: Blob, maxDim: number): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file);
   try {
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
@@ -20,10 +21,28 @@ export async function imageToDataUrl(file: Blob, maxDim = MAX_DIM): Promise<stri
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("canvas 2d context unavailable");
     ctx.drawImage(bitmap, 0, 0, width, height);
-    return canvas.toDataURL("image/jpeg", QUALITY);
+    return canvas;
   } finally {
     bitmap.close?.();
   }
+}
+
+export async function imageToDataUrl(file: Blob, maxDim = MAX_DIM): Promise<string> {
+  return (await downscale(file, maxDim)).toDataURL("image/jpeg", QUALITY);
+}
+
+// Same downscale, but kept as binary. Pass these straight to a server action:
+// React sends a File as its own multipart part, while a data URL travels as a
+// string in the action's argument payload, where React caps the total decoded
+// string length at 1,000,000 characters. Audits send several screenshots at
+// once, so they must go as Files (see app/(app)/audits/actions.ts).
+export async function imageToJpegFile(file: Blob, maxDim = MAX_DIM): Promise<File> {
+  const canvas = await downscale(file, maxDim);
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", QUALITY),
+  );
+  if (!blob) throw new Error("could not encode the image");
+  return new File([blob], "screenshot.jpg", { type: "image/jpeg" });
 }
 
 // Pull image files out of a paste/drop payload (clipboard exposes them via

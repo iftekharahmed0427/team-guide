@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { review, reportPeriod } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
-import { signedGetUrl } from "@/lib/storage";
+import { fileUrl } from "@/lib/storage";
 import {
   getReviewBonusSetting,
   REVIEW_BONUS_DEFAULTS,
@@ -22,7 +22,7 @@ import ReviewBonusConfig from "./review-bonus-config";
 // already renderable as-is.
 async function displayUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith("data:")) return imageUrl;
-  return (await signedGetUrl(imageUrl)) ?? "";
+  return (await fileUrl(imageUrl)) ?? "";
 }
 
 // Badge/counter colors assigned by the source's position in the catalog, so
