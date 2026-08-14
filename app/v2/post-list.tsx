@@ -3,28 +3,40 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Calendar, ChevronRight, Plus, Search } from "lucide-react";
-import { ARTICLES, CARD, CATEGORIES, CATEGORY_PILL, TAGS, type Category } from "./news-data";
+import { CARD, CATEGORIES, CATEGORY_PILL, TAGS, type Article, type Category } from "./news-data";
 
-// v2 news listing, built from the "news-listing-page" Figma frame (node 25:4):
-// a top bar, a two-column card grid and the category / tag rail.
+// The v2 listing layout, built from the "news-listing-page" Figma frame
+// (node 25:4): a top bar, a two-column card grid and the category / tag rail.
+// News and Guides both render it - the frame has no separate guides design, so
+// the two pages are the same layout over different content.
 //
-// Content is the frame's placeholder copy - this is still the redesign canvas,
-// so nothing here reads from news_post yet.
+// Content is placeholder - this is still the redesign canvas, so nothing here
+// reads from news_post yet and New post / search are inert.
 
-export default function V2News() {
+type Props = {
+  title: string;
+  subtitle: string;
+  posts: Article[];
+  /** Route the cards link into, e.g. "/v2/news". */
+  basePath: string;
+  newLabel: string;
+  allLabel: string;
+};
+
+export default function V2PostList({ title, subtitle, posts, basePath, newLabel, allLabel }: Props) {
   const [filter, setFilter] = useState<Category | null>(null);
 
-  // Counts come from the articles rather than the frame's hand-written numbers,
+  // Counts come from the posts rather than the frame's hand-written numbers,
   // which add up to 8 against a six-card grid.
-  const countOf = (c: Category) => ARTICLES.filter((a) => a.category === c).length;
-  const shown = filter ? ARTICLES.filter((a) => a.category === filter) : ARTICLES;
+  const countOf = (c: Category) => posts.filter((a) => a.category === c).length;
+  const shown = filter ? posts.filter((a) => a.category === filter) : posts;
 
   return (
     <div className="flex flex-col gap-[24px] p-[32px]">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-[4px]">
-          <h1 className="text-[28px] font-bold text-[#e2e8f0]">News</h1>
-          <p className="text-[14px] font-normal text-[#94a3b8]">All announcements and updates</p>
+          <h1 className="text-[28px] font-bold text-[#e2e8f0]">{title}</h1>
+          <p className="text-[14px] font-normal text-[#94a3b8]">{subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-[16px]">
           <div className="flex w-[280px] items-center gap-[10px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[14px] py-[10px]">
@@ -38,7 +50,7 @@ export default function V2News() {
             className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[16px] py-[10px] transition-opacity hover:opacity-90"
           >
             <Plus size={14} strokeWidth={2} className="text-[#0f141a]" />
-            <span className="text-[14px] font-semibold text-[#0f141a]">New post</span>
+            <span className="text-[14px] font-semibold text-[#0f141a]">{newLabel}</span>
           </button>
         </div>
       </div>
@@ -55,7 +67,7 @@ export default function V2News() {
           {shown.map((a) => (
             <Link
               key={a.slug}
-              href={`/v2/news/${a.slug}`}
+              href={`${basePath}/${a.slug}`}
               className={`flex min-h-[180px] min-w-px flex-col gap-[14px] text-left transition-colors hover:border-[#2f3d42]! ${CARD}`}
             >
               <div className="flex w-full items-center justify-between gap-[12px]">
@@ -108,7 +120,7 @@ export default function V2News() {
                 <span
                   className={`text-[14px] ${filter === null ? "font-semibold text-[#8fb0a7]" : "font-medium text-[#e2e8f0]"}`}
                 >
-                  All articles
+                  {allLabel}
                 </span>
                 <span
                   className={`rounded-full px-[8px] py-[2px] text-[11px] font-bold ${
@@ -117,7 +129,7 @@ export default function V2News() {
                       : "bg-[#243033] text-[#94a3b8]"
                   }`}
                 >
-                  {ARTICLES.length}
+                  {posts.length}
                 </span>
               </button>
               {CATEGORIES.map((c) => {

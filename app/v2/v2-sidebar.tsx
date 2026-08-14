@@ -52,7 +52,7 @@ const GROUPS: NavGroup[] = [
     label: "Workspace",
     items: [
       { label: "News", icon: Newspaper, href: "/v2/news" },
-      { label: "Guides", icon: BookOpen },
+      { label: "Guides", icon: BookOpen, href: "/v2/guides" },
       { label: "Board", icon: SquareKanban, href: "/v2/board" },
       { label: "Reports", icon: Ticket, href: "/v2/reports" },
       { label: "Reviews", icon: Star },
@@ -61,7 +61,7 @@ const GROUPS: NavGroup[] = [
       { label: "Payments", icon: Wallet, href: "/v2/payments" },
       { label: "Audits", icon: ClipboardCheck },
       { label: "Specialists", icon: Gamepad2, href: "/v2/specialists" },
-      { label: "Team", icon: Users },
+      { label: "Team", icon: Users, href: "/v2/team" },
     ],
   },
   {
