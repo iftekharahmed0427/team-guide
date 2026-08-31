@@ -1,4 +1,6 @@
-import { GripVertical, Inbox, Plus } from "lucide-react";
+import { Inbox, Plus } from "lucide-react";
+import TaskCard from "./task-card";
+import type { BoardTask } from "./task-modal";
 
 // /v2/board - the redesign's kanban board, built from the "kanban-board-page"
 // Figma frame (node 43:4): three columns, each with a counted header, its cards
@@ -8,9 +10,7 @@ import { GripVertical, Inbox, Plus } from "lucide-react";
 // so nothing here reads from the database. Cards are not draggable yet either,
 // despite the subtitle; the real board uses dnd-kit.
 
-type Task = { author: string; at: string; subject: string };
-
-type Column = { title: string; tasks: Task[]; empty: string };
+type Column = { title: string; tasks: BoardTask[]; empty: string };
 
 const COLUMNS: Column[] = [
   { title: "To Do", tasks: [], empty: "No tasks in backlog" },
@@ -75,32 +75,7 @@ export default function V2BoardPage() {
             ) : (
               <div className="flex flex-col gap-[12px]">
                 {column.tasks.map((task) => (
-                  <div
-                    key={`${column.title}-${task.author}-${task.at}`}
-                    className="flex flex-col gap-[10px] rounded-[12px] border border-[#243033]! bg-[#171e24] p-[14px]"
-                  >
-                    <div className="flex items-center justify-between gap-[8px]">
-                      <span className="flex min-w-0 items-center gap-[8px]">
-                        <GripVertical
-                          size={12}
-                          strokeWidth={2}
-                          className="shrink-0 text-[#64748b]"
-                        />
-                        <span className="truncate text-[13px] font-semibold text-[#e2e8f0]">
-                          {task.author}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-[11px] font-normal text-[#64748b]">
-                        {task.at}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-[6px]">
-                      <span className="h-[14px] w-[2px] shrink-0 rounded-full bg-[#8fb0a7]" />
-                      <p className="min-w-0 flex-1 truncate text-[13px] font-normal text-[#94a3b8]">
-                        {task.subject}
-                      </p>
-                    </div>
-                  </div>
+                  <TaskCard key={`${column.title}-${task.author}-${task.at}`} task={task} />
                 ))}
               </div>
             )}

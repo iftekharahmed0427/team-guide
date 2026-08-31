@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { History, RotateCcw } from "lucide-react";
 import { HIDDEN, PER_TICKET, PERIOD, ROWS, money, sum } from "./payments-data";
 import PaymentsTable from "./payments-table";
@@ -33,13 +34,13 @@ export default function V2PaymentsPage() {
             {money(PER_TICKET)} per ticket (live from Reports)
           </p>
         </div>
-        <button
-          type="button"
+        <Link
+          href="/v2/payments/history"
           className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[16px] py-[10px] text-[14px] font-semibold text-white transition-colors hover:border-[#2f3d42]!"
         >
           <History size={16} strokeWidth={2} className="text-[#94a3b8]" />
           History
-        </button>
+        </Link>
       </div>
 
       <div className="flex items-start gap-[16px]">

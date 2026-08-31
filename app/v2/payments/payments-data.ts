@@ -8,18 +8,18 @@ export const PER_TICKET = 1;
 
 export const PERIOD = { label: "Jul 31 – Aug 14", note: "14 days in" };
 
-/** The five columns the edit state turns into inputs. */
-export const EDITABLE = ["base", "tickets", "bonus", "commissions", "adjustment"] as const;
-
-export type EditableKey = (typeof EDITABLE)[number];
-
 export type Row = {
   name: string;
   initials: string;
   /** Avatar fill - the frame gives each member their own muted hue. */
   tint: string;
   role: string;
-} & Record<EditableKey, number>;
+  base: number;
+  tickets: number;
+  bonus: number;
+  commissions: number;
+  adjustment: number;
+};
 
 export const ROWS: Row[] = [
   {
@@ -118,12 +118,6 @@ export const HIDDEN = [
 
 export const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-
-/** Adjustments carry their sign; a zero stays unsigned. */
-export const signed = (n: number) => (n > 0 ? `+${money(n)}` : money(n));
-
-export const amountOf = (r: Record<EditableKey, number>) =>
-  r.base + r.tickets * PER_TICKET + r.bonus + r.commissions + r.adjustment;
 
 export const sum = (rows: Row[], pick: (r: Row) => number) =>
   rows.reduce((total, r) => total + pick(r), 0);
