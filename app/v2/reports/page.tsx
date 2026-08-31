@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Award, Crown, History, List, Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 // /v2/reports - the redesign's ticket leaderboard, built from the
@@ -92,13 +93,13 @@ export default function V2ReportsPage() {
             <span className="text-[13px] font-semibold text-[#94a3b8]">TEAM TOTAL</span>
             <span className="text-[14px] font-bold text-[#8fb0a7]">{TEAM_TOTAL} Tickets</span>
           </div>
-          <button
-            type="button"
+          <Link
+            href="/v2/reports/history"
             className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[16px] py-[8px] transition-opacity hover:opacity-90"
           >
             <History size={14} strokeWidth={2} className="text-[#0e1217]" />
             <span className="text-[14px] font-semibold text-[#0e1217]">History</span>
-          </button>
+          </Link>
         </div>
       </div>
 

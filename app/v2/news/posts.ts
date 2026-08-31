@@ -33,3 +33,10 @@ export async function getPost(slug: string): Promise<Post | null> {
   const rows = await db.select().from(newsPost).where(eq(newsPost.slug, slug)).limit(1);
   return rows[0] ? toPost(rows[0]) : null;
 }
+
+// Distinct tags across all posts, which is the closest thing news has to a
+// category catalogue: the table stores no categories, only free-form tags.
+export async function listNewsCategories(): Promise<string[]> {
+  const rows = await db.select({ tags: newsPost.tags }).from(newsPost);
+  return Array.from(new Set(rows.flatMap((r) => r.tags))).sort((a, b) => a.localeCompare(b));
+}

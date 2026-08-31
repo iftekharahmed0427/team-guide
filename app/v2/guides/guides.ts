@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { guide } from "@/db/app-schema";
+import { gameCategory, guide } from "@/db/app-schema";
 import { longDate, shortDate, type Post } from "../post-shape";
 
 // `guide` reads for the v2 canvas. Unlike news_post this table has a real
@@ -35,4 +35,14 @@ export async function listGuides(): Promise<Post[]> {
 export async function getGuide(slug: string): Promise<Post | null> {
   const rows = await db.select().from(guide).where(eq(guide.slug, slug)).limit(1);
   return rows[0] ? toPost(rows[0]) : null;
+}
+
+// The admin-managed game catalogue, in its configured order. This is a real
+// category list, unlike news, and it is what the frame's Category card wants.
+export async function listGuideCategories(): Promise<string[]> {
+  const rows = await db
+    .select({ name: gameCategory.name })
+    .from(gameCategory)
+    .orderBy(asc(gameCategory.position));
+  return rows.map((r) => r.name);
 }

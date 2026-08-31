@@ -24,16 +24,19 @@ export type Post = {
   updatedLong: string;
 };
 
-// The frame's five pill colours. Names the frames happened to use keep the
+// The frame's five accent colours. Names the frames happened to use keep the
 // colour they were drawn in; anything an admin adds later is assigned one by
 // name, so a given value is always the same colour. With 14 games in use the
 // palette repeats, which is the frame's palette doing what it can.
-const PILL = [
-  "bg-[#8fb0a7]/[0.12] text-[#8fb0a7]",
-  "bg-[#38bdf8]/[0.12] text-[#38bdf8]",
-  "bg-[#f59e0b]/[0.12] text-[#f59e0b]",
-  "bg-[#c084fc]/[0.12] text-[#c084fc]",
-  "bg-[#f472b6]/[0.12] text-[#f472b6]",
+//
+// `pill` is the listing/detail badge, `hex` the raw value for the small swatch
+// dots the new-post frame draws in its Manage Categories list.
+const PALETTE = [
+  { hex: "#8fb0a7", pill: "bg-[#8fb0a7]/[0.12] text-[#8fb0a7]" },
+  { hex: "#38bdf8", pill: "bg-[#38bdf8]/[0.12] text-[#38bdf8]" },
+  { hex: "#f59e0b", pill: "bg-[#f59e0b]/[0.12] text-[#f59e0b]" },
+  { hex: "#c084fc", pill: "bg-[#c084fc]/[0.12] text-[#c084fc]" },
+  { hex: "#f472b6", pill: "bg-[#f472b6]/[0.12] text-[#f472b6]" },
 ];
 
 const NAMED: Record<string, number> = {
@@ -44,13 +47,20 @@ const NAMED: Record<string, number> = {
   promotions: 4,
 };
 
-export function pillFor(name: string): string {
+function indexFor(name: string): number {
   const named = NAMED[name.toLowerCase()];
-  if (named !== undefined) return PILL[named];
+  if (named !== undefined) return named;
   let hash = 0;
-  for (const ch of name) hash = (hash + ch.charCodeAt(0)) % PILL.length;
-  return PILL[hash];
+  for (const ch of name) hash = (hash + ch.charCodeAt(0)) % PALETTE.length;
+  return hash;
 }
+
+export const pillFor = (name: string): string => PALETTE[indexFor(name)].pill;
+
+/** The palette itself, for pickers that let someone choose a colour. */
+export const PALETTE_COLOURS: readonly { hex: string; pill: string }[] = PALETTE;
+
+export const swatchFor = (name: string): string => PALETTE[indexFor(name)].hex;
 
 const MONTHS = [
   "January",

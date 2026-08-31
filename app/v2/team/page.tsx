@@ -1,4 +1,5 @@
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
+import RemoveMember from "./remove-member";
 
 // /v2/team - the redesign's member roster, built from the "team-members-page"
 // Figma frame (node 67:4): the title bar with its active count, the invite card,
@@ -231,13 +232,7 @@ export default function V2TeamPage() {
                   >
                     {member.admin ? "Make member" : "Make admin"}
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${member.name}`}
-                    className="cursor-pointer rounded-[6px] p-[8px] text-[#64748b] transition-colors hover:bg-white/[0.03] hover:text-[#ef4444]"
-                  >
-                    <Trash2 size={14} strokeWidth={2} />
-                  </button>
+                  <RemoveMember name={member.name} />
                 </>
               )}
             </div>

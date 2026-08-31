@@ -63,13 +63,13 @@ export default function V2PostList({
               Search news and guides
             </span>
           </div>
-          <button
-            type="button"
+          <Link
+            href={`${basePath}/new`}
             className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[16px] py-[10px] transition-opacity hover:opacity-90"
           >
             <Plus size={14} strokeWidth={2} className="text-[#0f141a]" />
             <span className="text-[14px] font-semibold text-[#0f141a]">{newLabel}</span>
-          </button>
+          </Link>
         </div>
       </div>
 
