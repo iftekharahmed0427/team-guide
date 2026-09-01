@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
-import { eq } from "drizzle-orm";
+import { ArrowLeft, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { audit, auditScore } from "@/db/app-schema";
+import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
+import { fileUrl } from "@/lib/storage";
 import { AUDIT_CRITERIA } from "@/app/(app)/audits/criteria";
 import { initialsOf, plainName, tintFor } from "../../../member";
 import { badgeLabel, badgeTone, pct, splitSummary } from "../../audits-data";
+import AuditScreenshots, { type Shot } from "./screenshots";
 
 // /v2/audits/[member]/[audit] - one filled-in scorecard, from the
 // "ticket-audit-review" Figma frame (node 146:176). Reached by clicking a ticket
@@ -17,8 +19,8 @@ import { badgeLabel, badgeTone, pct, splitSummary } from "../../audits-data";
 // so the padding does not jump between the three audits screens; everything
 // inside is the frame's.
 //
-// Edit and Delete Audit are inert: both are real admin actions on the live
-// /audits/[id] page, and v2 is still a canvas.
+// Edit Audit opens the pre-filled form. Delete Audit is inert - it is a real
+// admin action on the live /audits/[id] page, and v2 is still a canvas.
 
 const MONTHS = [
   "Jan",
@@ -44,6 +46,14 @@ function fmtTicketDate(value: string | null): string | null {
   return y && m && d ? `${MONTHS[m - 1]} ${d}, ${y}` : value;
 }
 
+// A stored key needs the /api/files route; a legacy inline data URL is already
+// renderable. fileUrl returns null when STORAGE_DIR is unset, which is the case
+// in local development - those tiles are dropped rather than drawn broken.
+async function displayUrl(imageUrl: string): Promise<string | null> {
+  if (imageUrl.startsWith("data:")) return imageUrl;
+  return fileUrl(imageUrl);
+}
+
 export default async function V2AuditReviewPage({
   params,
 }: {
@@ -67,6 +77,22 @@ export default async function V2AuditReviewPage({
     .from(auditScore)
     .where(eq(auditScore.auditId, auditId));
   const byKey = new Map(scores.map((s) => [s.criterionKey, s]));
+
+  // Screenshots belong to the older audits only; newer ones carry the transcript
+  // link instead, so the section is dropped when there are none.
+  const shotRows = await db
+    .select()
+    .from(auditScreenshot)
+    .where(eq(auditScreenshot.auditId, auditId))
+    .orderBy(asc(auditScreenshot.createdAt));
+  const shots = (
+    await Promise.all(
+      shotRows.map(async (s) => ({
+        id: s.id,
+        src: await displayUrl(s.imageUrl),
+      })),
+    )
+  ).filter((s): s is Shot => Boolean(s.src));
 
   const name = plainName(row.memberName || "Member");
   const percent = pct(row.totalScore, row.possibleScore);
@@ -157,27 +183,55 @@ export default async function V2AuditReviewPage({
           const score = byKey.get(criterion.key);
           const na = score?.na ?? false;
           const value = score?.score ?? 0;
+          const note = score?.comment.trim() ?? "";
           return (
             <div
               key={criterion.key}
-              className="flex items-center justify-between gap-[16px] border-b border-[#243033]! py-[16px]"
+              className="flex flex-col gap-[10px] border-b border-[#243033]! py-[16px]"
             >
-              <p className="min-w-0 flex-1 text-[14px] font-medium text-[#e2e8f0]">
-                {i + 1}. {criterion.label}
-              </p>
-              <span
-                className={`shrink-0 rounded-[6px] px-[10px] py-[4px] text-[13px] font-semibold ${badgeTone(
-                  na,
-                  value,
-                  criterion.maxPoints,
-                )}`}
-              >
-                {badgeLabel(na, value, criterion.maxPoints)}
-              </span>
+              <div className="flex items-center justify-between gap-[16px]">
+                <p className="min-w-0 flex-1 text-[14px] font-medium text-[#e2e8f0]">
+                  {i + 1}. {criterion.label}
+                </p>
+                <span
+                  className={`shrink-0 rounded-[6px] px-[10px] py-[4px] text-[13px] font-semibold ${badgeTone(
+                    na,
+                    value,
+                    criterion.maxPoints,
+                  )}`}
+                >
+                  {badgeLabel(na, value, criterion.maxPoints)}
+                </span>
+              </div>
+
+              {/* The reviewer's note on this criterion, when there is one. No
+                  frame draws it - the icon matches the one the form puts on the
+                  comment field it was typed into. */}
+              {note ? (
+                <div className="flex items-start gap-[8px]">
+                  <MessageSquare
+                    size={14}
+                    strokeWidth={2}
+                    className="mt-[2px] shrink-0 text-[#64748b]"
+                  />
+                  <p className="min-w-0 flex-1 text-[13px] leading-[1.5] font-normal whitespace-pre-line text-[#94a3b8]">
+                    {note}
+                  </p>
+                </div>
+              ) : null}
             </div>
           );
         })}
       </div>
+
+      {shots.length ? (
+        <div className={`flex flex-col gap-[16px] p-[24px] ${card}`}>
+          <p className="text-[14px] font-bold text-[#8fb0a7] uppercase">
+            Screenshots ({shots.length})
+          </p>
+          <AuditScreenshots shots={shots} />
+        </div>
+      ) : null}
 
       <div className={`flex flex-col gap-[16px] p-[24px] ${card}`}>
         <p className="text-[14px] font-bold text-[#8fb0a7] uppercase">
@@ -204,13 +258,13 @@ export default async function V2AuditReviewPage({
       </div>
 
       <div className="flex items-start justify-center gap-[12px]">
-        <button
-          type="button"
-          className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[20px] py-[10px] text-[14px] font-semibold text-[#0e1217] transition-colors hover:bg-[#a3c0b8]"
+        <Link
+          href={`/v2/audits/${encodeURIComponent(memberKey)}/${auditId}/edit`}
+          className="flex items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[20px] py-[10px] text-[14px] font-semibold text-[#0e1217] transition-colors hover:bg-[#a3c0b8]"
         >
           <Pencil size={14} strokeWidth={2} />
           Edit Audit
-        </button>
+        </Link>
         <button
           type="button"
           className="flex cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#ef4444]! bg-[#ef4444]/15 px-[20px] py-[10px] text-[14px] font-semibold text-[#ef4444] transition-colors hover:bg-[#ef4444]/25"

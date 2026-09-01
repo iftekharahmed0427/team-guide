@@ -101,7 +101,10 @@ export async function auditMembers(): Promise<{
 // carry one; the plate is dropped when there is none.
 const TRAILING_URL = /\n*[ \t]*Ticket URL:[ \t]*(\S+)[ \t]*$/i;
 
-export function splitSummary(summary: string): { body: string; url: string | null } {
+export function splitSummary(summary: string): {
+  body: string;
+  url: string | null;
+} {
   const match = summary.match(TRAILING_URL);
   if (!match) return { body: summary.trim(), url: null };
   return { body: summary.slice(0, match.index).trim(), url: match[1] };
