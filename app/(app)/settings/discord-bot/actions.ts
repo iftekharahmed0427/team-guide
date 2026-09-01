@@ -114,6 +114,32 @@ export async function updatePresence(input: {
   return { ok: true };
 }
 
+// ── Period length ────────────────────────────────────────────────────────────
+
+// How long a period runs. Read by the reports page (its label and averages),
+// lib/payments (the payout window) and the bot (its report range). It has always
+// been a column with no UI; the v2 settings Period page is the first editor.
+const MAX_PERIOD_DAYS = 365;
+
+export async function updatePeriodLength(days: number): Promise<Result> {
+  const denied = await adminGuard();
+  if (denied) return denied;
+  if (!Number.isInteger(days) || days < 1 || days > MAX_PERIOD_DAYS) {
+    return { error: `Enter a whole number of days, 1 to ${MAX_PERIOD_DAYS}.` };
+  }
+  await ensureSettingsRow();
+  await db
+    .update(botSetting)
+    .set({ periodDays: days })
+    .where(eq(botSetting.id, "singleton"));
+  await logActivity("bot.period_days", `${days} days`);
+  revalidatePath(PAGE);
+  revalidatePath("/reports");
+  revalidatePath("/payments");
+  await notifyChange();
+  return { ok: true };
+}
+
 // ── Run-now ──────────────────────────────────────────────────────────────────
 
 export async function requestRunNow(): Promise<Result> {

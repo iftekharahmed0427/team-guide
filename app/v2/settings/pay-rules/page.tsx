@@ -4,15 +4,20 @@ import { review, reviewSetting } from "@/db/app-schema";
 import { TICKET_RATE } from "@/app/(app)/payments/constants";
 import { DISPUTE_BONUS_RATE } from "@/lib/disputes";
 import { REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
-import { CARD, EditsOn, Row, SettingsHeader, Section } from "../settings-ui";
+import { CARD, Row, SettingsHeader, Section } from "../settings-ui";
+import ReviewBonusForm from "./review-bonus-form";
 
 // /v2/settings/pay-rules - the numbers behind every payout, in one place.
 //
 // These are the settings an admin cannot currently find because two of them are
 // not settings at all: the ticket rate and the dispute bonus rate are constants
 // in the code, and the review bonus rule is edited inline on /reviews rather
-// than anywhere in settings. Collecting them here is the point of the page,
-// even while it only reads.
+// than anywhere in settings.
+//
+// The review bonus is editable here, through the Reviews page's own action. The
+// other two are shown but not editable: they have no column to write to, so
+// making them settings needs a migration and a change to the code that reads
+// them.
 
 export default async function V2SettingsPayRulesPage() {
   const [bonusRow, periodReviews] = await Promise.all([
@@ -29,7 +34,6 @@ export default async function V2SettingsPayRulesPage() {
 
   const bonus = bonusRow[0] ?? REVIEW_BONUS_DEFAULTS;
   const logged = periodReviews[0]?.n ?? 0;
-  const met = logged >= bonus.threshold;
 
   return (
     <div className="flex flex-col gap-[28px] p-[32px]">
@@ -41,7 +45,7 @@ export default async function V2SettingsPayRulesPage() {
       <Section
         title="Ticket pay"
         hint="What a solved ticket is worth to a member on a per-ticket role."
-        footer="Set in the code, not the database. It becomes editable when this page is wired up."
+        footer="A constant in the code, so changing it is a deploy. Making it editable needs a column to write to."
       >
         <Row
           label="Ticket rate"
@@ -54,7 +58,7 @@ export default async function V2SettingsPayRulesPage() {
       <Section
         title="Dispute bonus"
         hint="A share of what the team recovers from won disputes, split across the members who logged them."
-        footer="Set in the code, not the database. It becomes editable when this page is wired up."
+        footer="A constant in the code, so changing it is a deploy. Making it editable needs a column to write to."
       >
         <Row
           label="Bonus rate"
@@ -72,33 +76,11 @@ export default async function V2SettingsPayRulesPage() {
       <Section
         title="Review bonus"
         hint="A flat amount for each eligible member, paid only when the team hits the target for the period."
-        footer={
-          <span className="flex items-center gap-[8px]">
-            Edited on the Reviews page today, not in settings.
-            <EditsOn href="/v2/reviews" label="Open Reviews" />
-          </span>
-        }
+        footer="Which members are eligible is ticked per member on the Reviews page."
       >
-        <Row
-          label="Target"
-          hint="Team total reviews needed in the period"
-          value={`${bonus.threshold} reviews`}
-          tone="accent"
-        />
-        <Row
-          label="Amount"
-          hint="Per eligible member, once the target is met"
-          value={`$${bonus.amount}`}
-          tone="accent"
-        />
-        <Row
-          label="This period"
-          hint={
-            met
-              ? "The target is met, so the bonus pays out"
-              : `${bonus.threshold - logged} more to reach the target`
-          }
-          value={`${logged} logged`}
+        <ReviewBonusForm
+          initial={{ threshold: bonus.threshold, amount: bonus.amount }}
+          logged={logged}
         />
       </Section>
 

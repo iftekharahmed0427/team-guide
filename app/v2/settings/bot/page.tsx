@@ -1,13 +1,16 @@
 import { eq } from "drizzle-orm";
-import { Play } from "lucide-react";
 import { db } from "@/db";
 import { botSetting, botStatus } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
 import { Row, Section } from "../settings-ui";
+import { RunNowButton, TokenForm } from "./connection-forms";
 
 // /v2/settings/bot - connection: is it up, what is it signed in as, and the
 // token behind that. The live page keeps status, controls and token as three
 // separate cards among six; they are one question, so they are one panel.
+//
+// The token never leaves the server: only whether one is stored, and its last
+// four characters, reach the browser.
 
 const STATE: Record<string, { label: string; tone: string }> = {
   online: { label: "Online", tone: "text-[#10b981]" },
@@ -66,33 +69,14 @@ export default async function V2BotConnectionPage() {
         title="Token"
         hint="From the Discord Developer Portal, in your app's Bot tab under Reset Token. Stored once and never shown again."
       >
-        <Row
-          label="Bot token"
-          hint={token ? "Saved. Only the last four characters are readable." : undefined}
-          value={token ? `Set, ending ${token.slice(-4)}` : "Not set"}
-          tone={token ? "accent" : "plain"}
-        />
+        <TokenForm hasToken={!!token} last4={token ? token.slice(-4) : null} />
       </Section>
 
       <Section
         title="Run a report now"
         hint="Posts the current standings to Discord immediately. The bot never posts on its own: only this and ending a period make it publish."
-        footer="Inert on the redesign canvas. The live page owns this action."
       >
-        <div className="flex items-center justify-between gap-[16px] pt-[4px]">
-          <p className="min-w-0 text-[13px] font-normal text-[#64748b]">
-            Useful for checking the announcement looks right before a period
-            ends.
-          </p>
-          <button
-            type="button"
-            disabled
-            className="flex shrink-0 cursor-default items-center gap-[8px] rounded-[6px] bg-[#8fb0a7] px-[18px] py-[10px] text-[13px] font-semibold text-[#0e1217] opacity-60"
-          >
-            <Play size={14} strokeWidth={2} />
-            Run now
-          </button>
-        </div>
+        <RunNowButton hasToken={!!token} />
       </Section>
     </div>
   );

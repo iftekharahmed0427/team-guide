@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { count, desc, eq, isNull, sum } from "drizzle-orm";
-import { AlertTriangle, ArrowUpRight, RotateCcw } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { db } from "@/db";
 import {
   botSetting,
@@ -10,7 +10,8 @@ import {
   review,
 } from "@/db/app-schema";
 import { formatDate } from "@/lib/datetime";
-import { CARD, Row, SettingsHeader, Section } from "../settings-ui";
+import { Row, SettingsHeader, Section } from "../settings-ui";
+import { EndPeriodButton, PeriodLengthForm } from "./period-forms";
 
 // /v2/settings/period - the period, given a page of its own.
 //
@@ -19,11 +20,12 @@ import { CARD, Row, SettingsHeader, Section } from "../settings-ui";
 // the disputes and the payments), and today it sits at the bottom of the Discord
 // bot page inside "Report channels", named as if it only touched channels. And
 // `periodDays`, which drives the reports label, the payments window and the
-// bot's report range, has no editor anywhere: it can only be changed in the
-// database.
+// bot's report range, had no editor anywhere: it could only be changed in the
+// database. This page is the first one.
 //
-// Read-only here, like the rest of v2 settings. The button is inert by design:
-// a canvas page must not be able to close a period.
+// Ending a period calls the same action the live page does. It is the one write
+// in the portal with no undo, so it asks twice: once to arm, once to type the
+// words.
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -108,18 +110,19 @@ export default async function V2SettingsPeriodPage() {
           label="Running for"
           value={elapsed === null ? "-" : `${elapsed} day${elapsed === 1 ? "" : "s"}`}
         />
-        <Row
-          label="Period length"
-          hint="Drives the reports period label, the payments window and the bot's report range"
-          value={`${periodDays} days`}
-          tone="accent"
-        />
+      </Section>
+
+      <Section
+        title="Period length"
+        hint="How long a period is measured as. Ending one is still manual: this only sets the window the reports and payments pages describe."
+      >
+        <PeriodLengthForm initial={periodDays} />
       </Section>
 
       <Section
         title="Ending the period"
         hint="One action archives everything below, zeroes the live counts, and tells the bot to post the closing report."
-        footer="Today this lives on the Discord bot page, at the bottom of Report channels, labelled Reset all."
+        footer="On the live settings this is Reset all, at the bottom of the Discord bot page under Report channels."
       >
         <div className="flex flex-col">
           {archives.map((a) => (
@@ -146,40 +149,10 @@ export default async function V2SettingsPeriodPage() {
           ))}
         </div>
 
-        <div className="mt-[20px] flex items-center justify-between gap-[16px] rounded-[8px] border border-[#f59e0b]/40! bg-[#f59e0b]/[0.06] p-[16px]">
-          <div className="flex min-w-0 items-center gap-[10px]">
-            <AlertTriangle
-              size={16}
-              strokeWidth={2}
-              className="shrink-0 text-[#f59e0b]"
-            />
-            <p className="min-w-0 text-[13px] font-medium text-[#f59e0b]">
-              This cannot be undone. Everything above moves to history and the
-              counts start from zero.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled
-            title="Inert on the redesign canvas"
-            className="flex shrink-0 cursor-default items-center gap-[8px] rounded-[6px] bg-[#f59e0b] px-[18px] py-[10px] text-[13px] font-semibold text-[#0e1217] opacity-60"
-          >
-            <RotateCcw size={14} strokeWidth={2} />
-            End period
-          </button>
-        </div>
+        <EndPeriodButton channelCount={channels[0]?.n ?? 0} />
+
       </Section>
 
-      <div className={`flex flex-col gap-[6px] p-[20px] ${CARD}`}>
-        <p className="text-[14px] font-semibold text-[#e2e8f0]">
-          Period length has no editor today
-        </p>
-        <p className="text-[13px] font-normal text-[#94a3b8]">
-          The value above is real and three things read it, but nothing in the
-          portal can change it: it is set in the database. Making it editable is
-          part of wiring this page up.
-        </p>
-      </div>
     </div>
   );
 }

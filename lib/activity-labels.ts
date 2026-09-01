@@ -77,6 +77,7 @@ export const ACTION_LABELS: Record<string, string> = {
   "bot.channel_deleted": "removed a report channel",
   "bot.channel_reset": "reset a report channel",
   "bot.reset_all": "reset all report channels",
+  "bot.period_days": "changed the period length to",
   "invite.created": "invited a member",
   "invite.revoked": "revoked an invite",
   "member.role_changed": "changed a member's role",
