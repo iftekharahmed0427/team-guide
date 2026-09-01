@@ -2,13 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  Link2,
-  MessageSquare,
-} from "lucide-react";
+import { ArrowLeft, Check, Link2, MessageSquare } from "lucide-react";
+import V2Select from "../custom-select";
 import {
   AUDIT_CRITERIA,
   FIVE_POINT_GUIDE,
@@ -70,6 +65,9 @@ const fieldLabel = "text-[13px] font-semibold text-[#94a3b8]";
 const input =
   "w-full rounded-[8px] border border-[#243033]! bg-[#0f141a] px-[16px] py-[12px] text-[14px] font-normal text-[#e2e8f0] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#8fb0a7]!";
 const card = "rounded-[12px] border border-[#243033]! bg-[#171e24]";
+// The selects match the text fields beside them, which are a step larger than
+// the reviews frame's.
+const SELECT_TRIGGER = "px-[16px] py-[12px] text-[14px] font-normal";
 const chip =
   "flex cursor-pointer items-center justify-center rounded-[6px] border px-[12px] py-[8px] text-[13px] font-semibold transition-colors";
 
@@ -188,29 +186,16 @@ export default function V2AuditForm({
         <div className={`flex flex-col gap-[20px] p-[24px] ${card}`}>
           <div className="flex items-start gap-[20px]">
             <div className={field}>
-              <label htmlFor="member" className={fieldLabel}>
-                Team member
-              </label>
-              <div className="relative">
-                <select
-                  id="member"
-                  value={memberId}
-                  onChange={(e) => setMemberId(e.target.value)}
-                  className={`appearance-none pr-[44px] ${input} ${memberId ? "" : "text-[#94a3b8]!"}`}
-                >
-                  <option value="">Select a member...</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={16}
-                  strokeWidth={2}
-                  className="pointer-events-none absolute top-1/2 right-[16px] -translate-y-1/2 text-[#94a3b8]"
-                />
-              </div>
+              <p className={fieldLabel}>Team member</p>
+              <V2Select
+                id="member"
+                ariaLabel="Team member"
+                value={memberId}
+                placeholder="Select a member..."
+                options={members.map((m) => ({ value: m.id, label: m.name }))}
+                onChange={setMemberId}
+                triggerClass={SELECT_TRIGGER}
+              />
             </div>
 
             <div className={field}>
@@ -229,29 +214,16 @@ export default function V2AuditForm({
 
           <div className="flex items-start gap-[20px]">
             <div className={field}>
-              <label htmlFor="type" className={fieldLabel}>
-                Ticket type
-              </label>
-              <div className="relative">
-                <select
-                  id="type"
-                  value={ticketType}
-                  onChange={(e) => setTicketType(e.target.value)}
-                  className={`appearance-none pr-[44px] ${input} ${ticketType ? "" : "text-[#94a3b8]!"}`}
-                >
-                  <option value="">Select a type...</option>
-                  {TICKET_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={16}
-                  strokeWidth={2}
-                  className="pointer-events-none absolute top-1/2 right-[16px] -translate-y-1/2 text-[#94a3b8]"
-                />
-              </div>
+              <p className={fieldLabel}>Ticket type</p>
+              <V2Select
+                id="type"
+                ariaLabel="Ticket type"
+                value={ticketType}
+                placeholder="Select a type..."
+                options={TICKET_TYPES.map((t) => ({ value: t, label: t }))}
+                onChange={setTicketType}
+                triggerClass={SELECT_TRIGGER}
+              />
             </div>
 
             <div className={field}>

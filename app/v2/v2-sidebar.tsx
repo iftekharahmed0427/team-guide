@@ -40,14 +40,21 @@ import { signOut } from "@/lib/auth-client";
 
 type NavItem = {
   label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  icon: React.ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+    className?: string;
+  }>;
   href?: string;
 };
 
 type NavGroup = { label: string; items: NavItem[] };
 
 const GROUPS: NavGroup[] = [
-  { label: "Main", items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/v2" }] },
+  {
+    label: "Main",
+    items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/v2" }],
+  },
   {
     label: "Workspace",
     items: [
@@ -55,9 +62,9 @@ const GROUPS: NavGroup[] = [
       { label: "Guides", icon: BookOpen, href: "/v2/guides" },
       { label: "Board", icon: SquareKanban, href: "/v2/board" },
       { label: "Reports", icon: Ticket, href: "/v2/reports" },
-      { label: "Reviews", icon: Star },
-      { label: "Commissions", icon: HandCoins },
-      { label: "Disputes", icon: Gavel },
+      { label: "Reviews", icon: Star, href: "/v2/reviews" },
+      { label: "Commissions", icon: HandCoins, href: "/v2/commissions" },
+      { label: "Disputes", icon: Gavel, href: "/v2/disputes" },
       { label: "Payments", icon: Wallet, href: "/v2/payments" },
       { label: "Audits", icon: ClipboardCheck, href: "/v2/audits" },
       { label: "Specialists", icon: Gamepad2, href: "/v2/specialists" },
@@ -99,7 +106,10 @@ export default function V2Sidebar({
   const pathname = usePathname();
 
   const routed = GROUPS.flatMap((g) => g.items)
-    .filter((i) => i.href && (pathname === i.href || pathname.startsWith(`${i.href}/`)))
+    .filter(
+      (i) =>
+        i.href && (pathname === i.href || pathname.startsWith(`${i.href}/`)),
+    )
     .sort((a, b) => b.href!.length - a.href!.length)[0];
   const active = picked ?? routed?.label;
 

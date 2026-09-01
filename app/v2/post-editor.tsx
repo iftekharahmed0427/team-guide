@@ -25,7 +25,10 @@ import {
   Underline as UnderlineIcon,
   X,
 } from "lucide-react";
-import { imageEditorProps, imageToDataUrl } from "@/app/components/editor-images";
+import {
+  imageEditorProps,
+  imageToDataUrl,
+} from "@/app/components/editor-images";
 import V2ConfirmDialog from "./confirm-dialog";
 import { PALETTE_COLOURS, pillFor, swatchFor } from "./post-shape";
 
@@ -38,6 +41,18 @@ import { PALETTE_COLOURS, pillFor, swatchFor } from "./post-shape";
 // typing, formatting, images and the word count all work. Publish and Save draft
 // are inert, like every other action on the v2 canvas - nothing here writes to
 // the database yet.
+//
+// Serves both the new-post pages and the edit pages behind a post. There is no
+// separate frame for editing - as with the audit form, only the heading and the
+// publish label change, and the fields start filled.
+
+/** An existing post being edited. */
+export type InitialPost = {
+  title: string;
+  category: string | null;
+  /** Stored HTML; TipTap parses it on mount. */
+  html: string | null;
+};
 
 type Props = {
   heading: string;
@@ -50,6 +65,7 @@ type Props = {
   /** Category names the picker starts with. */
   categories: string[];
   categoryHint: string;
+  initial?: InitialPost;
 };
 
 // Alignment needs @tiptap/extension-text-align, which the project does not have.
@@ -75,9 +91,12 @@ export default function V2PostEditor({
   publishLabel,
   categories,
   categoryHint,
+  initial,
 }: Props) {
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [category, setCategory] = useState<string | null>(
+    initial?.category ?? null,
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   // The picker owns its own list so adding and removing are visible. Neither
@@ -85,7 +104,11 @@ export default function V2PostEditor({
   // expose addGame, with no rename or delete action. Colours are presentational
   // for the same reason - game_category stores a name and a position, nothing
   // more - so a chosen colour lives here rather than being saved.
-  const [list, setList] = useState(categories);
+  const [list, setList] = useState(() =>
+    initial?.category && !categories.includes(initial.category)
+      ? [...categories, initial.category]
+      : categories,
+  );
   const [chosen, setChosen] = useState<Record<string, number>>({});
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -97,9 +120,13 @@ export default function V2PostEditor({
   const plusRef = useRef<HTMLButtonElement>(null);
 
   const pillClass = (name: string) =>
-    chosen[name] !== undefined ? PALETTE_COLOURS[chosen[name]].pill : pillFor(name);
+    chosen[name] !== undefined
+      ? PALETTE_COLOURS[chosen[name]].pill
+      : pillFor(name);
   const colourOf = (name: string) =>
-    chosen[name] !== undefined ? PALETTE_COLOURS[chosen[name]].hex : swatchFor(name);
+    chosen[name] !== undefined
+      ? PALETTE_COLOURS[chosen[name]].hex
+      : swatchFor(name);
 
   function closeAdding() {
     setAdding(false);
@@ -140,7 +167,8 @@ export default function V2PostEditor({
       // The plus is a toggle, so let its own handler close the popover rather
       // than closing here and having the click reopen it.
       if (plusRef.current?.contains(target)) return;
-      if (popoverRef.current && !popoverRef.current.contains(target)) closeAdding();
+      if (popoverRef.current && !popoverRef.current.contains(target))
+        closeAdding();
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
@@ -152,6 +180,7 @@ export default function V2PostEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
+    content: initial?.html ?? "",
     extensions: [
       // H1 and H2, matching the frame's two heading buttons. The live editors
       // use H2/H3; nothing reads these levels back, so the frame wins here.
@@ -333,16 +362,24 @@ export default function V2PostEditor({
                 <Btn
                   label="Heading 1"
                   active={marks?.h1}
-                  onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleHeading({ level: 1 }).run()
+                  }
                 >
-                  <span className="text-[14px] leading-[16px] font-bold">H1</span>
+                  <span className="text-[14px] leading-[16px] font-bold">
+                    H1
+                  </span>
                 </Btn>
                 <Btn
                   label="Heading 2"
                   active={marks?.h2}
-                  onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleHeading({ level: 2 }).run()
+                  }
                 >
-                  <span className="text-[14px] leading-[16px] font-bold">H2</span>
+                  <span className="text-[14px] leading-[16px] font-bold">
+                    H2
+                  </span>
                 </Btn>
               </div>
               <Divider />
@@ -364,7 +401,9 @@ export default function V2PostEditor({
                 <Btn
                   label="Underline"
                   active={marks?.underline}
-                  onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleUnderline().run()
+                  }
                 >
                   <UnderlineIcon size={16} strokeWidth={2} />
                 </Btn>
@@ -389,14 +428,18 @@ export default function V2PostEditor({
                 <Btn
                   label="Bullet list"
                   active={marks?.bulletList}
-                  onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleBulletList().run()
+                  }
                 >
                   <List size={16} strokeWidth={2} />
                 </Btn>
                 <Btn
                   label="Numbered list"
                   active={marks?.orderedList}
-                  onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleOrderedList().run()
+                  }
                 >
                   <ListOrdered size={16} strokeWidth={2} />
                 </Btn>
@@ -406,7 +449,9 @@ export default function V2PostEditor({
                 <Btn
                   label="Quote"
                   active={marks?.blockquote}
-                  onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+                  onClick={() =>
+                    editor?.chain().focus().toggleBlockquote().run()
+                  }
                 >
                   <TextQuote size={16} strokeWidth={2} />
                 </Btn>
@@ -420,7 +465,10 @@ export default function V2PostEditor({
                 <Btn label="Link" active={marks?.link} onClick={toggleLink}>
                   <Link2 size={16} strokeWidth={2} />
                 </Btn>
-                <Btn label="Insert image" onClick={() => fileRef.current?.click()}>
+                <Btn
+                  label="Insert image"
+                  onClick={() => fileRef.current?.click()}
+                >
                   <ImageIcon size={16} strokeWidth={2} />
                 </Btn>
               </div>
@@ -442,7 +490,9 @@ export default function V2PostEditor({
         <div className="flex w-[360px] shrink-0 flex-col gap-[20px]">
           <div className="flex flex-col gap-[16px] rounded-[12px] border border-[#243033]! bg-[#171e24] p-[20px]">
             <div className="flex flex-col gap-[4px]">
-              <p className="text-[14px] leading-[20px] font-semibold text-[#e2e8f0]">Category</p>
+              <p className="text-[14px] leading-[20px] font-semibold text-[#e2e8f0]">
+                Category
+              </p>
               <p className="text-[12px] leading-[16px] font-medium text-[#94a3b8]">
                 {categoryHint}
               </p>
@@ -455,26 +505,34 @@ export default function V2PostEditor({
                 also stops the rail running to 29 rows on guides. */}
             <div className="relative flex flex-col gap-[12px]">
               <div className="flex flex-wrap items-center gap-[8px]">
-                <div role="radiogroup" aria-label="Category" className="contents">
+                <div
+                  role="radiogroup"
+                  aria-label="Category"
+                  className="contents"
+                >
                   {list.map((name) => {
                     const picked = category === name;
                     return (
                       <span
-                      key={name}
-                      // The cross inherits this, so it matches its own pill.
-                      style={{ color: colourOf(name) }}
-                      className="relative inline-flex max-w-full"
-                    >
+                        key={name}
+                        // The cross inherits this, so it matches its own pill.
+                        style={{ color: colourOf(name) }}
+                        className="relative inline-flex max-w-full"
+                      >
                         <button
                           type="button"
                           role="radio"
                           aria-checked={picked}
                           onClick={() => setCategory(picked ? null : name)}
-                          style={picked ? { borderColor: colourOf(name) } : undefined}
+                          style={
+                            picked ? { borderColor: colourOf(name) } : undefined
+                          }
                           // Right padding is always reserved for the cross, so
                           // hovering never rewraps the row.
                           className={`max-w-full cursor-pointer truncate rounded-full border py-[4px] pr-[26px] pl-[10px] text-[11px] font-bold uppercase transition-opacity ${pillClass(name)} ${
-                            picked ? "" : "border-transparent! opacity-70 hover:opacity-100"
+                            picked
+                              ? ""
+                              : "border-transparent! opacity-70 hover:opacity-100"
                           }`}
                         >
                           {name}
@@ -490,7 +548,7 @@ export default function V2PostEditor({
                         </button>
                       </span>
                     );
-                    })}
+                  })}
                 </div>
 
                 <button
@@ -538,7 +596,9 @@ export default function V2PostEditor({
                   </div>
 
                   <div className="flex flex-col gap-[6px]">
-                    <p className="text-[12px] font-semibold text-[#94a3b8]">Colour</p>
+                    <p className="text-[12px] font-semibold text-[#94a3b8]">
+                      Colour
+                    </p>
                     <div className="flex items-center gap-[8px]">
                       {PALETTE_COLOURS.map((swatch, i) => (
                         <button
@@ -558,7 +618,9 @@ export default function V2PostEditor({
                     </div>
                   </div>
 
-                  {error ? <p className="text-[12px] text-[#ef4444]">{error}</p> : null}
+                  {error ? (
+                    <p className="text-[12px] text-[#ef4444]">{error}</p>
+                  ) : null}
 
                   <div className="flex items-center gap-[8px]">
                     <button
@@ -581,7 +643,9 @@ export default function V2PostEditor({
             </div>
 
             {list.length === 0 ? (
-              <p className="text-[13px] font-normal text-[#64748b]">No categories yet</p>
+              <p className="text-[13px] font-normal text-[#64748b]">
+                No categories yet
+              </p>
             ) : null}
           </div>
         </div>
