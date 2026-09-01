@@ -2,8 +2,14 @@ import Link from "next/link";
 import { asc, desc, inArray } from "drizzle-orm";
 import { Award, ChevronLeft } from "lucide-react";
 import { db } from "@/db";
-import { reportPeriod, reportPeriodEntry, review, reviewSource } from "@/db/app-schema";
+import {
+  reportPeriod,
+  reportPeriodEntry,
+  review,
+  reviewSource,
+} from "@/db/app-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { initialsOf, plainName, tintFor } from "../../member";
 import DeletePeriod from "./delete-period";
 
 // /v2/reports/history - the archive from the "report-history-page" Figma frame
@@ -17,41 +23,11 @@ import DeletePeriod from "./delete-period";
 // Gold, silver and bronze from the frame.
 const MEDALS = ["#ffb03a", "#cbd5e1", "#cd7f32"];
 
-// The muted avatar set the payments and team frames use, picked by name so a
-// member keeps the same colour across every archived period.
-const TINTS = [
-  "#a78fb0",
-  "#8fa7b0",
-  "#8fb0a7",
-  "#b08f8f",
-  "#b0a78f",
-  "#98b08f",
-  "#8fb09e",
-  "#afa7af",
-];
-
-function tintFor(name: string): string {
-  let hash = 0;
-  for (const ch of name) hash = (hash + ch.charCodeAt(0)) % TINTS.length;
-  return TINTS[hash];
-}
-
-// Two letters, the way the frame picks them: across words where there are two
-// ("Siren Vampy" -> SV), otherwise across an internal capital ("OrewSegs" -> OS,
-// "iiYoyo" -> IY). Names with neither fall back to their first two characters.
-function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-
-  const word = words[0];
-  const inner = word.slice(1).search(/\p{Lu}/u);
-  if (inner !== -1) return (word[0] + word[inner + 1]).toUpperCase();
-  return word.slice(0, 2).toUpperCase();
-}
-
 export default async function V2ReportHistoryPage() {
-  const periods = await db.select().from(reportPeriod).orderBy(desc(reportPeriod.endedAt));
+  const periods = await db
+    .select()
+    .from(reportPeriod)
+    .orderBy(desc(reportPeriod.endedAt));
   const ids = periods.map((p) => p.id);
 
   const entries = ids.length
@@ -78,7 +54,12 @@ export default async function V2ReportHistoryPage() {
     .orderBy(asc(reviewSource.sortOrder), asc(reviewSource.name));
   const sourceName = new Map(sources.map((s) => [s.id, s.name]));
 
-  const rowsFor = (periodId: string) => entries.filter((e) => e.periodId === periodId);
+  // One member's Discord name is set in fancy Unicode; the frames all read it
+  // as plain letters.
+  const rowsFor = (periodId: string) =>
+    entries
+      .filter((e) => e.periodId === periodId)
+      .map((e) => ({ ...e, name: plainName(e.name || "Member") }));
 
   function reviewsFor(periodId: string): string | null {
     const counts = new Map<string, number>();
@@ -101,7 +82,9 @@ export default async function V2ReportHistoryPage() {
     <div className="flex flex-col gap-[28px] p-[32px]">
       <div className="flex items-center justify-between gap-[24px]">
         <div className="flex flex-col gap-[6px]">
-          <h1 className="text-[28px] font-bold text-[#e2e8f0]">Report history</h1>
+          <h1 className="text-[28px] font-bold text-[#e2e8f0]">
+            Report history
+          </h1>
           <p className="text-[14px] font-normal text-[#94a3b8]">
             Archived periods from each Reset all
           </p>
@@ -117,7 +100,8 @@ export default async function V2ReportHistoryPage() {
 
       {periods.length === 0 ? (
         <p className="rounded-[12px] border border-[#243033]! bg-[#171e24] p-[40px] text-center text-[13px] text-[#64748b]">
-          No archived periods yet. One is written each time an admin runs Reset all.
+          No archived periods yet. One is written each time an admin runs Reset
+          all.
         </p>
       ) : null}
 
@@ -135,13 +119,18 @@ export default async function V2ReportHistoryPage() {
             >
               <div className="flex items-start justify-between gap-[16px]">
                 <div className="flex min-w-0 flex-col gap-[6px]">
-                  <p className="truncate text-[18px] font-bold text-[#e2e8f0]">{span}</p>
+                  <p className="truncate text-[18px] font-bold text-[#e2e8f0]">
+                    {span}
+                  </p>
                   <div className="flex flex-col gap-[2px]">
                     <p className="text-[13px] leading-[18px] font-normal text-[#94a3b8]">
-                      Reset: {formatDateTime(period.endedAt)} · Total tickets done: {period.total}
+                      Reset: {formatDateTime(period.endedAt)} · Total tickets
+                      done: {period.total}
                     </p>
                     {reviews ? (
-                      <p className="text-[12px] font-medium text-[#8fb0a7]">{reviews}</p>
+                      <p className="text-[12px] font-medium text-[#8fb0a7]">
+                        {reviews}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -175,7 +164,9 @@ export default async function V2ReportHistoryPage() {
                           aria-label={`Rank ${i + 1}`}
                         />
                       ) : (
-                        <span className="text-[13px] font-semibold text-[#64748b]">#{i + 1}</span>
+                        <span className="text-[13px] font-semibold text-[#64748b]">
+                          #{i + 1}
+                        </span>
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 items-center gap-[12px]">
@@ -186,7 +177,7 @@ export default async function V2ReportHistoryPage() {
                         {initialsOf(entry.name)}
                       </span>
                       <p className="truncate text-[14px] font-semibold text-[#e2e8f0]">
-                        {entry.name || "Member"}
+                        {entry.name}
                       </p>
                     </div>
                     <p className="w-[100px] shrink-0 text-right text-[14px] font-bold text-[#e2e8f0]">

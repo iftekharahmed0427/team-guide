@@ -3,6 +3,7 @@ import { asc, desc, inArray } from "drizzle-orm";
 import { ArrowLeft, Plus } from "lucide-react";
 import { db } from "@/db";
 import { paymentPeriod, paymentPeriodRow } from "@/db/app-schema";
+import { initialsOf, plainName, tintFor } from "../../member";
 import PeriodCard, { type PeriodMember } from "./period-card";
 
 // /v2/payments/history - the archive from the "payment-history-page" Figma frame
@@ -12,25 +13,6 @@ import PeriodCard, { type PeriodMember } from "./period-card";
 // Reads the real payment_period / payment_period_row snapshots. Amounts go
 // through historyRowAmount, the same helper the live page uses, so the admin
 // override and the signed adjustment behave identically here.
-
-// The muted avatar set the payments and team frames use, picked by name so a
-// member keeps the same colour across every period.
-const TINTS = [
-  "#a78fb0",
-  "#8fa7b0",
-  "#8fb0a7",
-  "#b08f8f",
-  "#b0a78f",
-  "#98b08f",
-  "#8fb09e",
-  "#afa7af",
-];
-
-function tintFor(name: string): string {
-  let hash = 0;
-  for (const ch of name) hash = (hash + ch.charCodeAt(0)) % TINTS.length;
-  return TINTS[hash];
-}
 
 // startDate / endDate are date-only columns, so they are split literally rather
 // than parsed as instants. lib/datetime is explicit that a "YYYY-MM-DD" must not
@@ -57,19 +39,6 @@ function fmtDate(value: string | null): string {
   return y && m && d ? `${MONTHS[m - 1]} ${d}, ${y}` : value;
 }
 
-// Two letters, the way the frames pick them: across words where there are two
-// ("Siren Vampy" -> SV), otherwise across an internal capital ("OrewSegs" -> OS).
-function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-
-  const word = words[0];
-  const inner = word.slice(1).search(/\p{Lu}/u);
-  if (inner !== -1) return (word[0] + word[inner + 1]).toUpperCase();
-  return word.slice(0, 2).toUpperCase();
-}
-
 export default async function V2PaymentHistoryPage() {
   const periods = await db
     .select()
@@ -92,7 +61,9 @@ export default async function V2PaymentHistoryPage() {
     <div className="flex flex-col gap-[24px] p-[32px]">
       <div className="flex items-center justify-between gap-[24px]">
         <div className="flex flex-col gap-[4px]">
-          <h1 className="text-[28px] font-bold text-[#e2e8f0]">Payment history</h1>
+          <h1 className="text-[28px] font-bold text-[#e2e8f0]">
+            Payment history
+          </h1>
           <p className="text-[14px] font-normal text-[#94a3b8]">
             Past pay periods and payouts for all team members by hand
           </p>
@@ -133,22 +104,27 @@ export default async function V2PaymentHistoryPage() {
 
           const people: PeriodMember[] = rows
             .filter((r) => r.periodId === period.id)
-            .map((r) => ({
-              id: r.id,
-              name: r.memberName || "Member",
-              initials: initialsOf(r.memberName || "Member"),
-              tint: tintFor(r.memberName || "Member"),
-              role: r.roleName,
-              paidPerTicket: r.paidPerTicket,
-              amountOverride: r.amountOverride,
-              values: {
-                base: r.baseCompensation,
-                tickets: r.tickets,
-                bonus: r.bonus,
-                commissions: r.commission,
-                adjustment: r.adjustment,
-              },
-            }));
+            .map((r) => {
+              // One member's Discord name is set in fancy Unicode; the frames
+              // all read it as plain letters.
+              const name = plainName(r.memberName || "Member");
+              return {
+                id: r.id,
+                name,
+                initials: initialsOf(name),
+                tint: tintFor(name),
+                role: r.roleName,
+                paidPerTicket: r.paidPerTicket,
+                amountOverride: r.amountOverride,
+                values: {
+                  base: r.baseCompensation,
+                  tickets: r.tickets,
+                  bonus: r.bonus,
+                  commissions: r.commission,
+                  adjustment: r.adjustment,
+                },
+              };
+            });
 
           return (
             <PeriodCard

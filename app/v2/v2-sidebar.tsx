@@ -59,7 +59,7 @@ const GROUPS: NavGroup[] = [
       { label: "Commissions", icon: HandCoins },
       { label: "Disputes", icon: Gavel },
       { label: "Payments", icon: Wallet, href: "/v2/payments" },
-      { label: "Audits", icon: ClipboardCheck },
+      { label: "Audits", icon: ClipboardCheck, href: "/v2/audits" },
       { label: "Specialists", icon: Gamepad2, href: "/v2/specialists" },
       { label: "Team", icon: Users, href: "/v2/team" },
     ],
