@@ -74,9 +74,9 @@ const GROUPS: NavGroup[] = [
   {
     label: "Panel tools",
     items: [
-      { label: "Server lookup", icon: Server },
-      { label: "User lookup", icon: CircleUser },
-      { label: "Node lookup", icon: Cpu },
+      { label: "Server lookup", icon: Server, href: "/v2/tools/server" },
+      { label: "User lookup", icon: CircleUser, href: "/v2/tools/user" },
+      { label: "Node lookup", icon: Cpu, href: "/v2/tools/node" },
     ],
   },
   {
