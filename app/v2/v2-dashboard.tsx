@@ -1,6 +1,7 @@
 import Link from "next/link";
 import V2Notifications from "./v2-notifications";
 import type { DashboardData } from "./dashboard-data";
+import type { Notice } from "./notifications-data";
 import V2SearchTrigger from "./search-trigger";
 import {
   ArrowDown,
@@ -101,7 +102,15 @@ function ViewAll({
   );
 }
 
-export default function V2Dashboard({ data }: { data: DashboardData }) {
+export default function V2Dashboard({
+  data,
+  notices,
+  isAdmin,
+}: {
+  data: DashboardData;
+  notices: Notice[];
+  isAdmin: boolean;
+}) {
   const weeks = monthGrid(data.month);
   const monthLabel = MONTH_FORMAT.format(
     new Date(Date.UTC(data.month.year, data.month.month, 1)),
@@ -153,7 +162,7 @@ export default function V2Dashboard({ data }: { data: DashboardData }) {
         </div>
         <div className="flex shrink-0 items-center gap-[16px]">
           <V2SearchTrigger />
-          <V2Notifications />
+          <V2Notifications notices={notices} isAdmin={isAdmin} />
         </div>
       </div>
 
