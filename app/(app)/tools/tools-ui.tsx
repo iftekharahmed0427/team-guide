@@ -241,15 +241,21 @@ function RowLink({ href, children }: { href: string; children: string }) {
 // The payroll table's columns, re-cut for servers. Name and Owner take the
 // slack so the right-hand columns stay flush at any window width; the whole
 // thing scrolls sideways below its natural width rather than crushing.
+//
+// Each column carries its own gutter here rather than the cells adding one
+// case by case. That way a heading always sits over its own values, and no
+// column can run into the one beside it - Disk and Service used to read as a
+// single "DISKSERVICE" heading over two numbers with nothing between them.
+// The gutter is inside the width, so the totals below are unchanged.
 const COL = {
-  id: "w-[64px]",
-  name: "min-w-[150px] flex-1",
-  identifier: "w-[104px]",
-  owner: "min-w-[170px] flex-1",
-  status: "w-[104px]",
-  ram: "w-[88px] text-right",
-  disk: "w-[88px] text-right",
-  service: "w-[96px]",
+  id: "w-[64px] pr-[12px]",
+  name: "min-w-[150px] flex-1 pr-[16px]",
+  identifier: "w-[104px] pr-[16px]",
+  owner: "min-w-[170px] flex-1 pr-[16px]",
+  status: "w-[104px] pr-[12px]",
+  ram: "w-[104px] pr-[20px] text-right",
+  disk: "w-[104px] pr-[20px] text-right",
+  service: "w-[96px] pr-[12px]",
   links: "w-[128px] text-right",
 };
 
@@ -275,7 +281,7 @@ export function ServerTable({
       {/* The natural width of the columns, so the table scrolls sideways in
           place rather than crushing. Dropping Owner takes its share back. */}
       <div
-        className={`flex flex-col ${showOwner ? "min-w-[940px]" : "min-w-[770px]"}`}
+        className={`flex flex-col ${showOwner ? "min-w-[1024px]" : "min-w-[854px]"}`}
       >
         <div className="flex items-center rounded-[6px] bg-[#0e1217] px-[16px] py-[12px] text-[11px] font-bold text-[#94a3b8] uppercase">
           <p className={COL.id}>ID</p>
@@ -285,7 +291,7 @@ export function ServerTable({
           <p className={COL.status}>Status</p>
           <p className={COL.ram}>RAM</p>
           <p className={COL.disk}>Disk</p>
-          <p className={COL.service}>Service</p>
+          <p className={COL.service}>Service ID</p>
           <p className={COL.links}>Links</p>
         </div>
 
@@ -301,19 +307,19 @@ export function ServerTable({
             </p>
             <p
               title={s.name}
-              className={`truncate pr-[12px] text-[14px] font-semibold text-[#e2e8f0] ${COL.name}`}
+              className={`truncate text-[14px] font-semibold text-[#e2e8f0] ${COL.name}`}
             >
               {s.name}
             </p>
             <p
-              className={`truncate pr-[12px] font-mono text-[13px] font-normal text-[#94a3b8] ${COL.identifier}`}
+              className={`truncate font-mono text-[13px] font-normal text-[#94a3b8] ${COL.identifier}`}
             >
               {s.identifier}
             </p>
             {showOwner ? (
               <p
                 title={s.ownerEmail ?? ""}
-                className={`truncate pr-[12px] text-[13px] font-normal text-[#94a3b8] ${COL.owner}`}
+                className={`truncate text-[13px] font-normal text-[#94a3b8] ${COL.owner}`}
               >
                 {s.ownerEmail ?? "-"}
               </p>
@@ -332,7 +338,7 @@ export function ServerTable({
               {formatMB(s.disk)}
             </p>
             <p
-              className={`truncate pl-[12px] font-mono text-[13px] font-normal text-[#94a3b8] ${COL.service}`}
+              className={`truncate font-mono text-[13px] font-normal text-[#94a3b8] ${COL.service}`}
             >
               {s.externalId ?? "-"}
             </p>
