@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Check, MessageSquare, Pencil, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  Check,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  X,
+} from "lucide-react";
+import { reviewCommission } from "@/app/(app)/commissions/actions";
 import { money, type CommissionRow as Row } from "../commissions-shape";
 
 // One commission, three to a row. At that width the stats sit two by two rather
@@ -9,18 +18,51 @@ import { money, type CommissionRow as Row } from "../commissions-shape";
 // reviewed so the pricing controls keep the space they need - the Edit-in-place
 // pattern the payment history cards use, widened.
 //
-// Nothing saves: the live /commissions page owns reviewCommission, and it is
-// admin-gated. The payout recomputes as the price and rate are typed, so the
-// arithmetic can be checked.
+// Approve and Deny call the live reviewCommission, which is admin-gated. The
+// payout recomputes as the price and rate are typed, so the arithmetic is
+// visible before the decision is made.
 
 type Props = {
   row: Row & { renewalLabel: string | null };
+  /** Pricing and the decision are an admin job; a member only reads. */
+  isAdmin: boolean;
   statusClass: string;
   statusText: string;
 };
 
-export default function CommissionRow({ row, statusClass, statusText }: Props) {
+export default function CommissionRow({
+  row,
+  isAdmin,
+  statusClass,
+  statusText,
+}: Props) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  // Approve and Deny are the same write with a different decision: the action
+  // stores the pricing either way, so a denied commission keeps the numbers it
+  // was judged on.
+  function decide(decision: "approved" | "denied") {
+    setError("");
+    startTransition(async () => {
+      const res = await reviewCommission({
+        id: row.id,
+        renewalDate: renewal || null,
+        productPrice: num(price),
+        commissionRate: num(rate),
+        decision,
+        note,
+      });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  }
   const [price, setPrice] = useState(
     row.price === null ? "" : String(row.price),
   );
@@ -58,18 +100,20 @@ export default function CommissionRow({ row, statusClass, statusText }: Props) {
           >
             {statusText}
           </span>
-          <button
-            type="button"
-            onClick={() => setEditing((e) => !e)}
-            aria-label={editing ? "Stop editing" : `Edit ${row.ticketName}`}
-            className="flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-[#243033]! bg-[#0e1217] text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0]"
-          >
-            {editing ? (
-              <X size={14} strokeWidth={2} />
-            ) : (
-              <Pencil size={14} strokeWidth={2} />
-            )}
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => setEditing((e) => !e)}
+              aria-label={editing ? "Stop editing" : `Edit ${row.ticketName}`}
+              className="flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-[#243033]! bg-[#0e1217] text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0]"
+            >
+              {editing ? (
+                <X size={14} strokeWidth={2} />
+              ) : (
+                <Pencil size={14} strokeWidth={2} />
+              )}
+            </button>
+          ) : null}
         </div>
         <p
           title={row.customerEmail}
@@ -155,18 +199,36 @@ export default function CommissionRow({ row, statusClass, statusText }: Props) {
           </div>
 
           <div className="flex items-center justify-end gap-[12px]">
+            {error ? (
+              <p className="mr-auto flex min-w-0 items-center gap-[6px] text-[12px] font-medium text-[#ef4444]">
+                <AlertCircle size={13} strokeWidth={2} className="shrink-0" />
+                {error}
+              </p>
+            ) : null}
             <button
               type="button"
-              className="flex cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#ef4444]! bg-[#ef4444]/15 px-[20px] py-[10px] text-[14px] font-semibold text-[#ef4444] transition-colors hover:bg-[#ef4444]/25"
+              onClick={() => decide("denied")}
+              disabled={pending}
+              className="flex cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#ef4444]! bg-[#ef4444]/15 px-[20px] py-[10px] text-[14px] font-semibold text-[#ef4444] transition-colors hover:bg-[#ef4444]/25 disabled:cursor-default disabled:opacity-60"
             >
-              <X size={14} strokeWidth={2.5} />
+              {pending ? (
+                <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <X size={14} strokeWidth={2.5} />
+              )}
               Deny
             </button>
             <button
               type="button"
-              className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#10b981] px-[20px] py-[10px] text-[14px] font-bold text-[#0e1217] transition-colors hover:bg-[#34d399]"
+              onClick={() => decide("approved")}
+              disabled={pending}
+              className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#10b981] px-[20px] py-[10px] text-[14px] font-bold text-[#0e1217] transition-colors hover:bg-[#34d399] disabled:cursor-default disabled:opacity-60"
             >
-              <Check size={14} strokeWidth={2.5} />
+              {pending ? (
+                <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <Check size={14} strokeWidth={2.5} />
+              )}
               Approve
             </button>
           </div>

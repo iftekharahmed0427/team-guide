@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { ArrowLeft } from "lucide-react";
 import { initialsOf, tintFor } from "../../member";
 import CommissionsHeader from "../commissions-header";
@@ -23,8 +24,16 @@ export default async function V2CommissionMemberPage({
   params: Promise<{ member: string }>;
 }) {
   const { member: segment } = await params;
+  const key = decodeURIComponent(segment);
+
+  // Payouts are private to the submitter, so a member can only open their own
+  // page. Members are keyed by user id where there is one.
+  const session = await getSession();
+  const isAdmin = session?.user.role === "admin";
+  if (!isAdmin && key !== session?.user.id) redirect("/v2");
+
   const { members, total, pending } = await commissionMembers();
-  const member = members.find((m) => m.key === decodeURIComponent(segment));
+  const member = members.find((m) => m.key === key);
   if (!member) notFound();
 
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which
@@ -71,6 +80,7 @@ export default async function V2CommissionMemberPage({
       <div className="grid grid-cols-3 gap-[16px]">
         {member.rows.map((row) => (
           <CommissionRow
+              isAdmin={isAdmin}
             key={row.id}
             row={{ ...row, renewalLabel: fmtRenewal(row.renewal) }}
             statusClass={statusTone(row.status)}

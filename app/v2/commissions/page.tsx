@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { initialsOf, tintFor } from "../member";
@@ -29,6 +31,13 @@ const COLUMNS: Record<number, string> = {
 };
 
 export default async function V2CommissionsPage() {
+  // A member sees only their own payouts, so the grid of everyone is admin
+  // only; a member is sent straight to their own page.
+  const session = await getSession();
+  if (session?.user.role !== "admin") {
+    redirect(`/v2/commissions/${encodeURIComponent(session?.user.id ?? "")}`);
+  }
+
   const { members, total, pending } = await commissionMembers();
 
   const card = "rounded-[12px] border border-[#243033]! bg-[#171e24]";
