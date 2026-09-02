@@ -4,7 +4,7 @@ import { review, reviewSetting } from "@/db/app-schema";
 import { TICKET_RATE } from "@/app/(app)/payments/constants";
 import { DISPUTE_BONUS_RATE } from "@/lib/disputes";
 import { REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
-import { CARD, Row, SettingsHeader, Section } from "../settings-ui";
+import { Row, SettingsHeader, Section } from "../settings-ui";
 import ReviewBonusForm from "./review-bonus-form";
 
 // /v2/settings/pay-rules - the numbers behind every payout, in one place.
@@ -83,17 +83,6 @@ export default async function V2SettingsPayRulesPage() {
           logged={logged}
         />
       </Section>
-
-      <div className={`flex flex-col gap-[6px] p-[20px] ${CARD}`}>
-        <p className="text-[14px] font-semibold text-[#e2e8f0]">
-          Two of these live in the code
-        </p>
-        <p className="text-[13px] font-normal text-[#94a3b8]">
-          The ticket rate and the dispute bonus rate are constants, so changing
-          either one is a deploy today. Moving them into the database is an
-          additive migration, and it is what makes this page editable.
-        </p>
-      </div>
     </div>
   );
 }
