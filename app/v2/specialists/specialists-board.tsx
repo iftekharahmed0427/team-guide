@@ -17,6 +17,7 @@ import {
   deleteGame,
   removeSpecialty,
 } from "@/app/(app)/specialties/actions";
+import V2ConfirmDialog from "../confirm-dialog";
 
 // The by-game directory from the "specialists-compact" frame (node 61:4), wired
 // to the live specialty actions.
@@ -50,6 +51,7 @@ export default function SpecialistsBoard({
   // Which pair is mid-flight, so only the row being toggled shows a spinner.
   const [busy, setBusy] = useState<string | null>(null);
   const [addingGame, setAddingGame] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Game | null>(null);
 
   async function toggle(game: Game, member: Member) {
     const assigned = game.memberIds.includes(member.id);
@@ -82,6 +84,7 @@ export default function SpecialistsBoard({
   }
 
   async function removeGame(game: Game) {
+    setPendingDelete(null);
     setError("");
     const res = await deleteGame(game.id);
     if ("error" in res) {
@@ -89,6 +92,18 @@ export default function SpecialistsBoard({
       return;
     }
     router.refresh();
+  }
+
+  // What the confirmation says, spelled out from the game in hand: deleting it
+  // takes its specialists off with it (the join rows cascade), and the action
+  // refuses outright while a guide is still filed under the name.
+  function deleteCopy(game: Game): string {
+    const n = game.memberIds.length;
+    const specialists =
+      n === 0
+        ? "It has no specialists assigned."
+        : `Its ${n} specialist${n === 1 ? "" : "s"} will be unassigned.`;
+    return `"${game.name}" will be removed from the games list and from the Guides category picker. ${specialists} This cannot be undone.`;
   }
 
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which
@@ -177,10 +192,14 @@ export default function SpecialistsBoard({
                   {game.name}
                 </p>
                 {isAdmin ? (
-                  <DeleteGameButton
-                    name={game.name}
-                    onConfirm={() => removeGame(game)}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(game)}
+                    aria-label={`Delete ${game.name}`}
+                    className="shrink-0 cursor-pointer rounded-[6px] p-[6px] text-[#4b5e63] transition-colors hover:bg-white/[0.03] hover:text-[#ef4444]"
+                  >
+                    <Trash2 size={14} strokeWidth={2} />
+                  </button>
                 ) : null}
               </div>
 
@@ -211,6 +230,15 @@ export default function SpecialistsBoard({
           );
         })}
       </div>
+
+      <V2ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete game?"}
+        description={pendingDelete ? deleteCopy(pendingDelete) : ""}
+        confirmLabel="Delete game"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => pendingDelete && removeGame(pendingDelete)}
+      />
     </div>
   );
 }
@@ -468,45 +496,5 @@ function MemberPicker({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function DeleteGameButton({
-  name,
-  onConfirm,
-}: {
-  name: string;
-  onConfirm: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    if (!confirming) return;
-    const t = setTimeout(() => setConfirming(false), 4000);
-    return () => clearTimeout(t);
-  }, [confirming]);
-
-  if (confirming) {
-    return (
-      <button
-        type="button"
-        onClick={onConfirm}
-        aria-label={`Confirm removing ${name}`}
-        className="shrink-0 cursor-pointer rounded-[6px] bg-[#ef4444] px-[8px] py-[4px] text-[11px] font-bold text-[#0e1217] transition-colors hover:bg-[#f87171]"
-      >
-        Remove
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      aria-label={`Remove ${name}`}
-      className="shrink-0 cursor-pointer rounded-[6px] p-[6px] text-[#4b5e63] transition-colors hover:bg-white/[0.03] hover:text-[#ef4444]"
-    >
-      <Trash2 size={14} strokeWidth={2} />
-    </button>
   );
 }
