@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import V2PostEditor from "../../post-editor";
 import { listNewsCategories } from "../posts";
 
@@ -5,10 +7,14 @@ import { listNewsCategories } from "../posts";
 // Categories come from the tags already in use, since news_post has no category
 // column of its own.
 export default async function V2NewPostPage() {
+  const session = await getSession();
+  if (session?.user.role !== "admin") redirect("/v2/news");
+
   const categories = await listNewsCategories();
 
   return (
     <V2PostEditor
+      kind="news"
       heading="Create Announcement"
       subheading="Draft and publish a new article for client workspaces"
       backHref="/v2/news"

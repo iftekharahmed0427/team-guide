@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import V2PostEditor from "../../../post-editor";
 import { getPost, listNewsCategories } from "../../posts";
 
@@ -10,6 +11,9 @@ export default async function V2EditPostPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const session = await getSession();
+  if (session?.user.role !== "admin") redirect("/v2/news");
+
   const { slug } = await params;
   const post = await getPost(slug);
   if (!post) notFound();
@@ -18,6 +22,7 @@ export default async function V2EditPostPage({
 
   return (
     <V2PostEditor
+      kind="news"
       heading="Edit Announcement"
       subheading={`Editing "${post.title}"`}
       backHref={`/v2/news/${slug}`}
@@ -27,7 +32,13 @@ export default async function V2EditPostPage({
       publishLabel="Save changes"
       categories={categories}
       categoryHint="Assign to an operations directory"
-      initial={{ title: post.title, category: post.category, html: post.html }}
+      initial={{
+        id: post.id,
+        title: post.title,
+        category: post.category,
+        html: post.html,
+        tags: post.tags,
+      }}
     />
   );
 }

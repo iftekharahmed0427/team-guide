@@ -1,13 +1,7 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Folder,
-  Pencil,
-  Trash2,
-  User,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Folder, User } from "lucide-react";
+import V2PostActions from "./post-actions";
+import type { PostKind } from "./post-editor";
 import { CARD, pillFor, type Post } from "./post-shape";
 
 // The v2 detail layout, built from the "news-article-detail" Figma frame
@@ -19,10 +13,16 @@ import { CARD, pillFor, type Post } from "./post-shape";
 // and goes in unsanitised. Only the stylesheet differs - .v2-rich-text carries
 // the redesign's palette instead of the app-wide one.
 //
-// Edit opens the pre-filled composer. Delete is inert while v2 is a canvas.
+// Edit and Delete are admin-only and live in post-actions.tsx, which needs to be
+// a client component for the confirmation; everything else here stays server
+// rendered.
 
 type Props = {
+  /** Which table the post came from, so the actions know what to call. */
+  kind: PostKind;
   post: Post;
+  /** Admins get Edit and Delete; everyone else just reads. */
+  isAdmin: boolean;
   /** Everything in the same section, used to fill the related list. */
   pool: Post[];
   /** Route the back link and related rows point at, e.g. "/v2/news". */
@@ -48,7 +48,14 @@ function relatedTo(post: Post, pool: Post[]): Post[] {
   );
 }
 
-export default function V2PostDetail({ post, pool, basePath, copy }: Props) {
+export default function V2PostDetail({
+  kind,
+  post,
+  isAdmin,
+  pool,
+  basePath,
+  copy,
+}: Props) {
   const related = relatedTo(post, pool);
   const pill = post.category;
 
@@ -62,22 +69,15 @@ export default function V2PostDetail({ post, pool, basePath, copy }: Props) {
           <ArrowLeft size={14} strokeWidth={2} />
           {copy.back}
         </Link>
-        <div className="flex shrink-0 items-start gap-[12px]">
-          <Link
-            href={`${basePath}/${post.slug}/edit`}
-            className="flex items-center gap-[8px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[14px] py-[8px] text-[14px] font-semibold text-[#e2e8f0] transition-colors hover:border-[#2f3d42]!"
-          >
-            <Pencil size={14} strokeWidth={2} />
-            Edit
-          </Link>
-          <button
-            type="button"
-            className="flex cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#ef4444]! bg-[#ef4444]/10 px-[14px] py-[8px] text-[14px] font-semibold text-[#ef4444]"
-          >
-            <Trash2 size={14} strokeWidth={2} />
-            Delete
-          </button>
-        </div>
+        {isAdmin ? (
+          <V2PostActions
+            kind={kind}
+            id={post.id}
+            title={post.title}
+            slug={post.slug}
+            basePath={basePath}
+          />
+        ) : null}
       </div>
 
       <div className="flex items-start gap-[24px]">

@@ -177,5 +177,9 @@ export async function deleteGuide(formData: FormData) {
   await logActivity("guide.deleted", g?.title ?? "");
   revalidatePath("/guides");
   await notifyChange();
-  redirect("/guides");
+  // Callers can say where to land afterwards, so the v2 pages return to their
+  // own list instead of the old one. Only same-origin paths are accepted, which
+  // keeps this from becoming an open redirect.
+  const to = String(formData.get("redirectTo") ?? "");
+  redirect(/^\/(?!\/)/.test(to) ? to : "/guides");
 }

@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import V2PostEditor from "../../../post-editor";
 import { getGuide, listGuideCategories } from "../../guides";
 
@@ -9,6 +10,9 @@ export default async function V2EditGuidePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const session = await getSession();
+  if (session?.user.role !== "admin") redirect("/v2/guides");
+
   const { slug } = await params;
   const guide = await getGuide(slug);
   if (!guide) notFound();
@@ -17,6 +21,7 @@ export default async function V2EditGuidePage({
 
   return (
     <V2PostEditor
+      kind="guide"
       heading="Edit Guide"
       subheading={`Editing "${guide.title}"`}
       backHref={`/v2/guides/${slug}`}
@@ -27,9 +32,11 @@ export default async function V2EditGuidePage({
       categories={categories}
       categoryHint="File under a game directory"
       initial={{
+        id: guide.id,
         title: guide.title,
         category: guide.category,
         html: guide.html,
+        tags: guide.tags,
       }}
     />
   );

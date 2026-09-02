@@ -7,6 +7,8 @@
 // the way the live /news page does.
 
 export type Post = {
+  /** Row id, needed by the edit and delete actions. */
+  id: string;
   slug: string;
   title: string;
   excerpt: string;

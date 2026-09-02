@@ -141,5 +141,9 @@ export async function deletePost(formData: FormData) {
   await logActivity("news.deleted", p?.title ?? "");
   revalidatePath("/news");
   await notifyChange();
-  redirect("/news");
+  // Callers can say where to land afterwards, so the v2 pages return to their
+  // own list instead of the old one. Only same-origin paths are accepted, which
+  // keeps this from becoming an open redirect.
+  const to = String(formData.get("redirectTo") ?? "");
+  redirect(/^\/(?!\/)/.test(to) ? to : "/news");
 }

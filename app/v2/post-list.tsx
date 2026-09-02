@@ -20,6 +20,8 @@ type Props = {
   /** Route the cards link into, e.g. "/v2/news". */
   basePath: string;
   newLabel: string;
+  /** Composing is admin-only, so members do not get the button. */
+  isAdmin: boolean;
   allLabel: string;
   /** What the rail rows are: guides group by their game, news by tag. */
   groupBy: "category" | "tag";
@@ -32,6 +34,7 @@ export default function V2PostList({
   posts,
   basePath,
   newLabel,
+  isAdmin,
   allLabel,
   groupBy,
   facetSubtitle,
@@ -63,6 +66,7 @@ export default function V2PostList({
               Search news and guides
             </span>
           </div>
+{isAdmin ? (
           <Link
             href={`${basePath}/new`}
             className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[16px] py-[10px] transition-opacity hover:opacity-90"
@@ -70,6 +74,7 @@ export default function V2PostList({
             <Plus size={14} strokeWidth={2} className="text-[#0f141a]" />
             <span className="text-[14px] font-semibold text-[#0f141a]">{newLabel}</span>
           </Link>
+          ) : null}
         </div>
       </div>
 

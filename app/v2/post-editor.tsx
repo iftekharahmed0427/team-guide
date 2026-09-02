@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEditor, useEditorState, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import {
+  AlertCircle,
   AlignCenter,
   AlignLeft,
   AlignRight,
@@ -19,6 +21,7 @@ import {
   List,
   ListOrdered,
   Plus,
+  Loader2,
   Send,
   Strikethrough,
   TextQuote,
@@ -29,6 +32,8 @@ import {
   imageEditorProps,
   imageToDataUrl,
 } from "@/app/components/editor-images";
+import { createPost, updatePost } from "@/app/(app)/news/actions";
+import { addGame, createGuide, updateGuide } from "@/app/(app)/guides/actions";
 import V2ConfirmDialog from "./confirm-dialog";
 import { PALETTE_COLOURS, pillFor, swatchFor } from "./post-shape";
 
@@ -38,23 +43,38 @@ import { PALETTE_COLOURS, pillFor, swatchFor } from "./post-shape";
 // render it; only the copy and the category list differ.
 //
 // The editor is real TipTap on the same StarterKit the live editors use, so
-// typing, formatting, images and the word count all work. Publish and Save draft
-// are inert, like every other action on the v2 canvas - nothing here writes to
-// the database yet.
+// typing, formatting, images and the word count all work. Publishing calls the
+// live news / guides actions, which own the slug, the activity log and the
+// revalidation.
+//
+// The frame draws a "Save draft" button beside Publish; there is nothing for it
+// to write, since neither news_post nor guide has a draft or published column,
+// so it is not rendered rather than sitting there doing nothing.
 //
 // Serves both the new-post pages and the edit pages behind a post. There is no
 // separate frame for editing - as with the audit form, only the heading and the
 // publish label change, and the fields start filled.
 
 /** An existing post being edited. */
+export type PostKind = "news" | "guide";
+
 export type InitialPost = {
+  /** The row being edited. Absent when composing a new post. */
+  id: string;
   title: string;
   category: string | null;
   /** Stored HTML; TipTap parses it on mount. */
   html: string | null;
+  /**
+   * Every tag on the row. News shows only the first as its category, so the
+   * rest ride along and are written back untouched rather than dropped.
+   */
+  tags: string[];
 };
 
 type Props = {
+  /** Which table this writes to, and so which actions it calls. */
+  kind: PostKind;
   heading: string;
   subheading: string;
   backHref: string;
@@ -77,11 +97,49 @@ const ALIGNMENT = [
   { icon: AlignRight, label: "Align right" },
 ];
 
+// Toolbar buttons keep the frame's 32px footprint: p-8 around a 16px glyph.
+// Declared out here rather than inside the editor so it is one component
+// across renders instead of a new one each time.
+function Btn({
+  onClick,
+  active,
+  disabled,
+  label,
+  children,
+}: {
+  onClick?: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      title={label}
+      disabled={disabled}
+      // Keep the selection while clicking, or formatting applies to nothing.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className={`flex cursor-pointer items-center justify-center rounded-[6px] p-[8px] transition-colors disabled:cursor-default disabled:opacity-40 ${
+        active
+          ? "bg-[#8fb0a7]/[0.12] text-[#8fb0a7]"
+          : "text-[#94a3b8] hover:bg-white/[0.04] hover:text-[#e2e8f0]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Divider() {
   return <span className="mx-[8px] h-[16px] w-px shrink-0 bg-[#243033]" />;
 }
 
 export default function V2PostEditor({
+  kind,
   heading,
   subheading,
   backHref,
@@ -115,9 +173,90 @@ export default function V2PostEditor({
   const [draftColour, setDraftColour] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const [saving, startSaving] = useTransition();
+  const router = useRouter();
   const popoverRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const plusRef = useRef<HTMLButtonElement>(null);
+
+  // Publishing. The excerpt is the first 200 characters of the body text, the
+  // way the live editors derive it, so there is no separate field for it.
+  //
+  // News keeps its category in `tags[0]`: the table has no category column, so
+  // the chosen one is written first and the row's other tags are carried
+  // through untouched. Guides have a real `game` column, and the action refuses
+  // a game that is not in the catalogue.
+  function save() {
+    const editorInstance = editor;
+    if (!editorInstance) return;
+
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setSaveError("Give the post a title.");
+      return;
+    }
+    const content = editorInstance.getHTML();
+    if (!content || content === "<p></p>") {
+      setSaveError("Write something before publishing.");
+      return;
+    }
+    if (kind === "guide" && !category) {
+      setSaveError("Pick a game for this guide.");
+      return;
+    }
+
+    const excerpt = editorInstance.getText().trim().slice(0, 200);
+    const carried = (initial?.tags ?? []).filter(
+      (t) => t !== initial?.category,
+    );
+    const tags =
+      kind === "news"
+        ? [...(category ? [category] : []), ...carried]
+        : (initial?.tags ?? []);
+
+    setSaveError("");
+    startSaving(async () => {
+      const res =
+        kind === "news"
+          ? initial
+            ? await updatePost(initial.id, {
+                title: trimmedTitle,
+                content,
+                excerpt,
+                tags,
+              })
+            : await createPost({
+                title: trimmedTitle,
+                content,
+                excerpt,
+                tags,
+              })
+          : initial
+            ? await updateGuide(initial.id, {
+                title: trimmedTitle,
+                content,
+                excerpt,
+                tags,
+                game: category ?? "",
+              })
+            : await createGuide({
+                title: trimmedTitle,
+                content,
+                excerpt,
+                tags,
+                game: category ?? "",
+              });
+
+      if ("error" in res) {
+        setSaveError(res.error);
+        return;
+      }
+      const base = kind === "news" ? "/v2/news" : "/v2/guides";
+      router.push(`${base}/${res.slug}`);
+      router.refresh();
+    });
+  }
 
   const pillClass = (name: string) =>
     chosen[name] !== undefined
@@ -134,6 +273,11 @@ export default function V2PostEditor({
     setError(null);
   }
 
+  // Guides file under a real catalogue (game_category), so a new one is saved
+  // through the guides addGame action and is then available everywhere games
+  // are. News has no category table at all - its categories are just the tags
+  // already in use - so a new one lives here until the post is published and
+  // becomes a tag on the row.
   function addCategory() {
     const name = draftName.trim();
     if (!name) {
@@ -144,12 +288,31 @@ export default function V2PostEditor({
       setError("That one already exists.");
       return;
     }
-    setList([...list, name]);
-    setChosen({ ...chosen, [name]: draftColour });
-    setCategory(name);
-    closeAdding();
+
+    if (kind === "news") {
+      setList([...list, name]);
+      setChosen({ ...chosen, [name]: draftColour });
+      setCategory(name);
+      closeAdding();
+      return;
+    }
+
+    startSaving(async () => {
+      const res = await addGame(name);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setList([...list, res.name]);
+      setChosen({ ...chosen, [res.name]: draftColour });
+      setCategory(res.name);
+      closeAdding();
+      router.refresh();
+    });
   }
 
+  // Only ever removes it from this picker. Deleting a game for real lives on
+  // Specialists, where the confirmation can say what else it takes with it.
   function removeCategory(name: string) {
     setList(list.filter((c) => c !== name));
     if (category === name) setCategory(null);
@@ -253,41 +416,6 @@ export default function V2PostEditor({
       .run();
   }
 
-  // Toolbar buttons keep the frame's 32px footprint: p-8 around a 16px glyph.
-  function Btn({
-    onClick,
-    active,
-    disabled,
-    label,
-    children,
-  }: {
-    onClick?: () => void;
-    active?: boolean;
-    disabled?: boolean;
-    label: string;
-    children: React.ReactNode;
-  }) {
-    return (
-      <button
-        type="button"
-        aria-label={label}
-        aria-pressed={active}
-        title={label}
-        disabled={disabled}
-        // Keep the selection while clicking, or formatting applies to nothing.
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onClick}
-        className={`flex cursor-pointer items-center justify-center rounded-[6px] p-[8px] transition-colors disabled:cursor-default disabled:opacity-40 ${
-          active
-            ? "bg-[#8fb0a7]/[0.12] text-[#8fb0a7]"
-            : "text-[#94a3b8] hover:bg-white/[0.04] hover:text-[#e2e8f0]"
-        }`}
-      >
-        {children}
-      </button>
-    );
-  }
-
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which
   // wins over Tailwind's layered border utilities, so borders are marked
   // important to opt out of the app-wide default.
@@ -320,18 +448,24 @@ export default function V2PostEditor({
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-start gap-[12px]">
+        <div className="flex shrink-0 items-center gap-[12px]">
+          {saveError ? (
+            <p className="flex items-center gap-[6px] text-[13px] font-medium text-[#ef4444]">
+              <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
+              {saveError}
+            </p>
+          ) : null}
           <button
             type="button"
-            className="cursor-pointer rounded-[8px] border border-[#243033]! px-[16px] py-[10px] text-[14px] leading-[20px] font-semibold text-[#e2e8f0] transition-colors hover:border-[#2f3d42]!"
+            onClick={save}
+            disabled={saving}
+            className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[18px] py-[10px] text-[14px] leading-[20px] font-semibold text-[#0f141a] transition-colors hover:bg-[#a3c0b8] disabled:cursor-default disabled:opacity-60"
           >
-            Save draft
-          </button>
-          <button
-            type="button"
-            className="flex cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#8fb0a7] px-[18px] py-[10px] text-[14px] leading-[20px] font-semibold text-[#0f141a] transition-colors hover:bg-[#a3c0b8]"
-          >
-            <Send size={14} strokeWidth={2} />
+            {saving ? (
+              <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Send size={14} strokeWidth={2} />
+            )}
             {publishLabel}
           </button>
         </div>

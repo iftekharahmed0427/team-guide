@@ -10,6 +10,7 @@ type Row = typeof newsPost.$inferSelect;
 
 function toPost(row: Row): Post {
   return {
+    id: row.id,
     slug: row.slug,
     title: row.title,
     excerpt: row.excerpt,
