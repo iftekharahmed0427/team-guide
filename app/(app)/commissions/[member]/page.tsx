@@ -4,16 +4,15 @@ import { getSession } from "@/lib/auth";
 import { ArrowLeft } from "lucide-react";
 import { initialsOf, tintFor } from "../../member";
 import CommissionsHeader from "../commissions-header";
-import CommissionRow from "./commission-row";
+import CommissionCards from "../commission-cards";
 import { commissionMembers } from "../commissions-data";
-import {
-  fmtRenewal,
-  money,
-  statusLabel,
-  statusTone,
-} from "../commissions-shape";
+import { money } from "../commissions-shape";
 
 // /commissions/[member] - one submitter's commissions, reached from the grid.
+//
+// Admin only. A member's own commissions are on /commissions itself, so this
+// page never has to answer for a member who has submitted nothing: it used to
+// notFound() on them, which is what a member with an empty tool saw.
 //
 // Laid out like the audit member detail it borrows from: the shared header, a
 // divider, a back link beside a member pill, then a card per row.
@@ -26,11 +25,11 @@ export default async function CommissionMemberPage({
   const { member: segment } = await params;
   const key = decodeURIComponent(segment);
 
-  // Payouts are private to the submitter, so a member can only open their own
-  // page. Members are keyed by user id where there is one.
+  // Payouts are private to the submitter, so the grid and everything behind it
+  // is admin only. A member goes to /commissions, which is their own view.
   const session = await getSession();
   const isAdmin = session?.user.role === "admin";
-  if (!isAdmin && key !== session?.user.id) redirect("/");
+  if (!isAdmin) redirect("/commissions");
 
   const { members, total, pending } = await commissionMembers();
   const member = members.find((m) => m.key === key);
@@ -74,20 +73,11 @@ export default async function CommissionMemberPage({
         </div>
       </div>
 
-      {/* Three up. Rows stretch so a card carrying a review note does not stand
-          taller than the two beside it. A card expands to the full row while it
-          is being reviewed, so the pricing controls keep their width. */}
-      <div className="grid grid-cols-3 gap-[16px]">
-        {member.rows.map((row) => (
-          <CommissionRow
-              isAdmin={isAdmin}
-            key={row.id}
-            row={{ ...row, renewalLabel: fmtRenewal(row.renewal) }}
-            statusClass={statusTone(row.status)}
-            statusText={statusLabel(row.status)}
-          />
-        ))}
-      </div>
+      <CommissionCards
+        rows={member.rows}
+        isAdmin={isAdmin}
+        empty="This member has no commissions."
+      />
     </div>
   );
 }

@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { initialsOf, tintFor } from "../member";
 import CommissionsHeader from "./commissions-header";
 import SubmitCommission from "./submit-commission";
-import { commissionMembers } from "./commissions-data";
+import CommissionCards from "./commission-cards";
+import { commissionMembers, commissionsForMember } from "./commissions-data";
 import { money, statusTone } from "./commissions-shape";
 
 // /commissions - the renewal commission tool. No Figma frame draws it, so it
@@ -13,9 +13,16 @@ import { money, statusTone } from "./commissions-shape";
 // grid, the reviews log card for the submit form, and the audit scorecard's
 // badge tones for the statuses.
 //
-// Reads the real commission table. The frames' admin view is what this renders -
-// every submitter, not just your own - the way the audits grid does; the live
-// page is the one that gates on the session.
+// Two pages in one, because a payout is private to the submitter:
+//
+// - An admin gets the frames' view, the grid of every submitter.
+// - A member gets their own commissions and nothing else. They are NOT
+//   redirected to /commissions/[id]: the submit form lives here, so bouncing
+//   them off this page took away the one thing the tool exists for, and their
+//   own id in the URL bought nothing.
+//
+// Either way the submit form is the first thing on the page, since submitting
+// is what a member comes here to do.
 
 // One row for as long as it fits. The grid takes a column per submitter so a
 // fifth joining fills the row rather than starting a second one, capped at five
@@ -31,11 +38,38 @@ const COLUMNS: Record<number, string> = {
 };
 
 export default async function CommissionsPage() {
-  // A member sees only their own payouts, so the grid of everyone is admin
-  // only; a member is sent straight to their own page.
   const session = await getSession();
-  if (session?.user.role !== "admin") {
-    redirect(`/commissions/${encodeURIComponent(session?.user.id ?? "")}`);
+  const isAdmin = session?.user.role === "admin";
+
+  // A member's own view. commissionsForMember queries for their rows alone, so
+  // the team's totals are never in scope to leak into the header.
+  if (!isAdmin) {
+    const mine = await commissionsForMember(session?.user.id ?? "");
+    return (
+      <div className="flex flex-col gap-[28px] p-[32px]">
+        <CommissionsHeader
+          total={mine.rows.length}
+          pending={mine.pending}
+          scope="yours"
+          earnings={mine.earnings}
+        />
+
+        <SubmitCommission />
+
+        <div className="flex flex-col gap-[12px]">
+          <div className="flex items-start pb-[4px]">
+            <p className="text-[12px] font-bold text-[#8fb0a7] uppercase">
+              Your commissions
+            </p>
+          </div>
+          <CommissionCards
+            rows={mine.rows}
+            isAdmin={false}
+            empty="You have not submitted a commission yet. Add one above and an admin will price it."
+          />
+        </div>
+      </div>
+    );
   }
 
   const { members, total, pending } = await commissionMembers();
