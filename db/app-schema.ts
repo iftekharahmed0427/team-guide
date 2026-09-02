@@ -136,14 +136,23 @@ export const memberGame = pgTable(
   (t) => [unique("member_game_unique").on(t.userId, t.gameId)],
 );
 
-// Free-form team notes. Anyone signed in can post; everyone sees them with the
-// author's name. Deletable by the author or an admin.
+// Free-form team notes: anything from a one-line heads-up to a piece of team
+// documentation. Anyone signed in can post; everyone sees them with the author's
+// name. Editable and deletable by the author or an admin.
+//
+// `title` is optional, so that a quick heads-up is one field to post while a
+// document can still carry a real name. `pinned` keeps reference material above
+// the feed, which is the whole difference between notes and a chat channel.
+// `updatedAt` is null until the first edit, which is what marks a note edited.
 export const note = pgTable("note", {
   id: text("id").primaryKey(),
+  title: text("title").notNull().default(""),
   body: text("body").notNull(),
+  pinned: boolean("pinned").notNull().default(false),
   authorId: text("author_id"),
   authorName: text("author_name").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
 });
 
 // A member marks a single day they are unavailable. Visible to all members.

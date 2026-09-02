@@ -63,7 +63,7 @@ export default function V2PostList({
           <div className="flex w-[280px] items-center gap-[10px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[14px] py-[10px]">
             <Search size={14} strokeWidth={2} className="shrink-0 text-[#94a3b8]" />
             <span className="min-w-0 flex-1 truncate text-[14px] font-normal text-[#94a3b8]">
-              Search news and guides
+              Search news, guides and notes
             </span>
           </div>
 {isAdmin ? (

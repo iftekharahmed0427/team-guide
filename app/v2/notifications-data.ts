@@ -44,6 +44,8 @@ const WORTH_TELLING: Record<string, string> = {
   "board.task_created": "Board",
   "board.comment_added": "Board",
   "board.member_assigned": "Board",
+  "note.created": "Notes",
+  "note.pinned": "Notes",
   "specialty.added": "Specialists",
   "specialty.game_added": "Specialists",
   "invite.created": "Team",

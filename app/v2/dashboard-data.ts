@@ -107,12 +107,15 @@ export async function getDashboard(): Promise<DashboardData> {
     db
       .select({
         id: note.id,
+        title: note.title,
         body: note.body,
         authorName: note.authorName,
         createdAt: note.createdAt,
       })
       .from(note)
-      .orderBy(desc(note.createdAt))
+      // Pinned first, the way /v2/notes orders them, so what the team has been
+      // asked to read is what the dashboard shows.
+      .orderBy(desc(note.pinned), desc(note.createdAt))
       .limit(5),
     db.select().from(ticketCount).where(eq(ticketCount.id, "singleton")).limit(1),
     db
@@ -179,7 +182,9 @@ export async function getDashboard(): Promise<DashboardData> {
         initials: initialsOf(name),
         tint: tintFor(name),
         at: ago(n.createdAt, now),
-        body: n.body,
+        // A titled note is a document, and its first line is a poor preview of
+        // one, so the name stands in for it here.
+        body: n.title || n.body,
       };
     }),
     daysOff,

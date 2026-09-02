@@ -33,7 +33,7 @@ export default function V2SearchTrigger() {
     >
       <Search size={14} strokeWidth={2} className="shrink-0 text-[#94a3b8]" />
       <span className="min-w-0 flex-1 truncate text-[14px] font-normal text-[#94a3b8]">
-        Search news and guides
+        Search news, guides and notes
       </span>
       {chord ? (
         <kbd className="shrink-0 rounded-[4px] border border-[#243033]! px-[6px] py-[2px] text-[11px] font-semibold text-[#64748b]">

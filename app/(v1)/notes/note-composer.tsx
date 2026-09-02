@@ -19,7 +19,7 @@ export default function NoteComposer() {
       return;
     }
     startTransition(async () => {
-      const res = await createNote(text);
+      const res = await createNote({ body: text });
       if ("error" in res) {
         setError(res.error);
         return;

@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Newspaper,
   BookOpen,
+  StickyNote,
   SquareKanban,
   Ticket,
   Star,
@@ -75,6 +76,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: "News", icon: Newspaper, href: "/v2/news" },
       { label: "Guides", icon: BookOpen, href: "/v2/guides" },
+      { label: "Notes", icon: StickyNote, href: "/v2/notes" },
       { label: "Board", icon: SquareKanban, href: "/v2/board" },
       { label: "Reports", icon: Ticket, href: "/v2/reports" },
       { label: "Reviews", icon: Star, href: "/v2/reviews" },

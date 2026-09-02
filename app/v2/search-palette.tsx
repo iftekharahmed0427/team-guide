@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Fuse from "fuse.js";
-import { BookOpen, FileText, Loader2, Search, SearchX } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  Loader2,
+  Search,
+  SearchX,
+  StickyNote,
+} from "lucide-react";
 import type { SearchItem } from "@/app/api/search/route";
 
 // The v2 search palette. Same index and the same Fuse weighting as the live
@@ -14,7 +21,9 @@ import type { SearchItem } from "@/app/api/search/route";
 // through a window event rather than a prop, since the two sit in different
 // parts of the tree.
 //
-// The index covers news and guides only, which is what /api/search builds.
+// The index covers news, guides and notes. Notes are opt-in on the endpoint
+// (`?include=notes`) because the v1 palette routes anything that is not news to
+// /guides; only this one asks for them.
 
 export const OPEN_EVENT = "v2-open-search";
 
@@ -35,7 +44,7 @@ export default function V2SearchPalette() {
     if (items || loading) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/search");
+      const res = await fetch("/api/search?include=notes");
       if (res.ok) {
         const data = (await res.json()) as { items: SearchItem[] };
         setItems(data.items);
@@ -110,8 +119,14 @@ export default function V2SearchPalette() {
   const go = useCallback(
     (item: SearchItem) => {
       close();
+      // A note has no page of its own: the notes list anchors each card by
+      // id, so opening a result scrolls the list to it.
       router.push(
-        item.type === "news" ? `/v2/news/${item.slug}` : `/v2/guides/${item.slug}`,
+        item.type === "news"
+          ? `/v2/news/${item.slug}`
+          : item.type === "guide"
+            ? `/v2/guides/${item.slug}`
+            : `/v2/notes#note-${item.slug}`,
       );
     },
     [close, router],
@@ -154,7 +169,7 @@ export default function V2SearchPalette() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search news and guides"
+        aria-label="Search news, guides and notes"
         className="flex max-h-full w-[560px] max-w-full flex-col overflow-hidden rounded-[14px] border border-[#243033]! bg-[#171e24] shadow-[0px_24px_60px_-16px_rgba(0,0,0,0.7)]"
       >
         <div className="flex shrink-0 items-center gap-[10px] border-b border-[#243033]! px-[18px] py-[14px]">
@@ -167,8 +182,8 @@ export default function V2SearchPalette() {
               setActive(0);
             }}
             onKeyDown={onInputKey}
-            aria-label="Search news and guides"
-            placeholder="Search news and guides"
+            aria-label="Search news, guides and notes"
+            placeholder="Search news, guides and notes"
             className="min-w-0 flex-1 bg-transparent text-[15px] font-normal text-[#e2e8f0] outline-none placeholder:text-[#64748b]"
           />
           {loading ? (
@@ -187,7 +202,7 @@ export default function V2SearchPalette() {
         <div className="v2-rail flex max-h-[420px] min-h-0 flex-col overflow-y-auto py-[6px]">
           {!q ? (
             <p className="px-[18px] py-[16px] text-[13px] font-normal text-[#64748b]">
-              Type to search across news and guides.
+              Type to search across news, guides and notes.
             </p>
           ) : results.length === 0 ? (
             <div className="flex flex-col items-center gap-[10px] px-[18px] py-[28px] text-center">
@@ -198,8 +213,18 @@ export default function V2SearchPalette() {
             </div>
           ) : (
             results.map((item, i) => {
-              const Icon = item.type === "news" ? FileText : BookOpen;
-              const label = item.type === "news" ? "News" : item.game || "Guide";
+              const Icon =
+                item.type === "news"
+                  ? FileText
+                  : item.type === "note"
+                    ? StickyNote
+                    : BookOpen;
+              const label =
+                item.type === "news"
+                  ? "News"
+                  : item.type === "note"
+                    ? "Note"
+                    : item.game || "Guide";
               return (
                 <button
                   key={`${item.type}-${item.slug}`}
@@ -238,7 +263,7 @@ export default function V2SearchPalette() {
 
         <div className="flex shrink-0 items-center justify-between gap-[16px] border-t border-[#243033]! px-[18px] py-[10px] text-[11px] font-normal text-[#64748b]">
           <span>Arrow keys to move, Enter to open</span>
-          <span>News and guides only</span>
+          <span>News, guides and notes</span>
         </div>
       </div>
     </div>

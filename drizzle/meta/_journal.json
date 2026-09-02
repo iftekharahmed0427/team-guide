@@ -344,6 +344,13 @@
       "when": 1784041314543,
       "tag": "0048_complex_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1788331455452,
+      "tag": "0049_chief_malcolm_colcord",
+      "breakpoints": true
     }
   ]
 }
