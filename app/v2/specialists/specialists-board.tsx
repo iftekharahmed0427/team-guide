@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -255,6 +255,21 @@ function AvatarStack({ members }: { members: Member[] }) {
 // for scanning to be slower than typing.
 const FILTER_FROM = 8;
 
+type Placement = {
+  side: "up" | "down";
+  align: "right" | "left";
+  maxList: number;
+};
+
+// The list's own ceiling, the header and filter above it, one row, the popover
+// width, and the gap kept against the container edge. Used to work out where
+// the popover fits.
+const MAX_LIST = 240;
+const CHROME = 84;
+const ROW = 38;
+const WIDTH = 248;
+const MARGIN = 16;
+
 function MemberPicker({
   game,
   members,
@@ -273,7 +288,53 @@ function MemberPicker({
   onToggle: (member: Member) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
+
+  // Which way the popover opens, and how tall its list may be. A card in the
+  // top row has nothing above it, so opening upward there runs off the top of
+  // the page; this measures the real gap on each side and takes the better one.
+  const [placement, setPlacement] = useState<Placement>({
+    side: "up",
+    align: "right",
+    maxList: MAX_LIST,
+  });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    // The workspace scrolls and clips on both axes, so it is the frame the
+    // popover has to fit inside, not the window.
+    const frame = trigger.closest("main") ?? document.documentElement;
+
+    function measure() {
+      const rect = trigger!.getBoundingClientRect();
+      const bounds = frame.getBoundingClientRect();
+
+      const above = rect.top - bounds.top - MARGIN - CHROME;
+      const below = bounds.bottom - rect.bottom - MARGIN - CHROME;
+      const side = above >= below ? "up" : "down";
+      const room = side === "up" ? above : below;
+
+      // Anchored to the trigger's right edge the popover reaches leftward; when
+      // that runs past the frame it anchors left and reaches the other way.
+      const fitsLeftward = rect.right - WIDTH >= bounds.left + MARGIN;
+      const align = fitsLeftward ? "right" : "left";
+
+      // One row is the floor: a popover shorter than that is not worth opening.
+      setPlacement({
+        side,
+        align,
+        maxList: Math.max(ROW, Math.min(MAX_LIST, room)),
+      });
+    }
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -300,6 +361,7 @@ function MemberPicker({
   return (
     <div ref={ref} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={onOpen}
         aria-label={`Assign a member to ${game.name}`}
@@ -314,7 +376,11 @@ function MemberPicker({
       </button>
 
       {open ? (
-        <div className="absolute right-0 bottom-[34px] z-20 flex w-[248px] flex-col overflow-hidden rounded-[10px] border border-[#243033]! bg-[#1c2630] shadow-[0px_18px_40px_-12px_rgba(0,0,0,0.6)]">
+        <div
+          className={`absolute z-20 flex w-[248px] flex-col overflow-hidden rounded-[10px] border border-[#243033]! bg-[#1c2630] shadow-[0px_18px_40px_-12px_rgba(0,0,0,0.6)] ${
+            placement.side === "up" ? "bottom-[34px]" : "top-[34px]"
+          } ${placement.align === "right" ? "right-0" : "left-0"}`}
+        >
           <div className="flex items-center justify-between gap-[8px] border-b border-[#243033]! px-[12px] py-[10px]">
             <p className="truncate text-[12px] font-bold text-white uppercase">
               {game.name}
@@ -342,7 +408,10 @@ function MemberPicker({
             </div>
           ) : null}
 
-          <div className="v2-rail flex max-h-[240px] flex-col overflow-y-auto py-[4px]">
+          <div
+            style={{ maxHeight: placement.maxList }}
+            className="v2-rail flex flex-col overflow-y-auto py-[4px]"
+          >
             {shown.length === 0 ? (
               <p className="px-[12px] py-[10px] text-[12px] font-normal text-[#4b5e63]">
                 No member matches that.
