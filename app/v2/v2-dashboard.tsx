@@ -1,6 +1,7 @@
 import Link from "next/link";
 import V2Notifications from "./v2-notifications";
 import type { DashboardData } from "./dashboard-data";
+import V2SearchTrigger from "./search-trigger";
 import {
   ArrowDown,
   ArrowRight,
@@ -9,7 +10,6 @@ import {
   ChevronRight,
   CircleCheck,
   FileText,
-  Search,
   Star,
   Users,
 } from "lucide-react";
@@ -152,16 +152,7 @@ export default function V2Dashboard({ data }: { data: DashboardData }) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-[16px]">
-          <div className="flex w-[280px] items-center gap-[10px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[14px] py-[10px]">
-            <Search
-              size={14}
-              strokeWidth={2}
-              className="shrink-0 text-[#94a3b8]"
-            />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-normal text-[#94a3b8]">
-              Search news and guides
-            </span>
-          </div>
+          <V2SearchTrigger />
           <V2Notifications />
         </div>
       </div>

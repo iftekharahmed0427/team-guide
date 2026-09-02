@@ -2,6 +2,7 @@ import { Figtree } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import V2Sidebar from "./v2-sidebar";
+import V2SearchPalette from "./search-palette";
 
 // The redesign is typeset in Figtree. Scoped to /v2 so the rest of the app keeps
 // Geist, which globals.css sets on <body>; a font class on this wrapper beats
@@ -38,6 +39,10 @@ export default async function V2Layout({ children }: { children: React.ReactNode
       {/* v2-rail gives the workspace the sidebar's 2px rail instead of the
           app-wide 10px scrollbar from globals.css. */}
       <main className="v2-rail flex-1 overflow-y-auto">{children}</main>
+
+      {/* Mounted here rather than on the dashboard so Cmd/Ctrl+K reaches it
+          from any v2 page. */}
+      <V2SearchPalette />
     </div>
   );
 }
