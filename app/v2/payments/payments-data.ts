@@ -1,123 +1,69 @@
-// Shared shape and placeholder content for /v2/payments, used by the server
-// page (header, stat cards, hidden section) and by the client table island that
-// owns the read/edit states. Still redesign-canvas data - nothing here reads
-// from the payment tables.
+import {
+  TICKET_RATE,
+  effectiveCommission,
+  effectiveTickets,
+  memberTotal,
+  type PayableMember,
+} from "@/app/(app)/payments/constants";
+import { initialsOf, plainName, tintFor } from "../member";
 
-// Tickets pay a flat rate; roles that are not on tickets earn their base only.
-export const PER_TICKET = 1;
+// The shape the v2 payroll table renders, derived from the live PayableMember so
+// both sheets agree on what a member is owed. The arithmetic itself is the live
+// memberTotal: this file only picks the columns the frame draws.
 
-export const PERIOD = { label: "Jul 31 – Aug 14", note: "14 days in" };
+export const PER_TICKET = TICKET_RATE;
 
 export type Row = {
+  /** userId where the channel is linked, else the channel id. */
+  key: string;
+  userId: string | null;
   name: string;
   initials: string;
-  /** Avatar fill - the frame gives each member their own muted hue. */
+  /** Avatar fill - the frames give each member their own muted hue. */
   tint: string;
   role: string;
+  roleId: string | null;
+  paidPerTicket: boolean;
   base: number;
   tickets: number;
+  /** The admin's fixed count, when they set one. */
+  override: number | null;
+  /** Manual bonus plus the automatic dispute and review bonuses. */
   bonus: number;
+  manualBonus: number;
   commissions: number;
+  commissionOverride: number | null;
   adjustment: number;
+  amount: number;
 };
 
-export const ROWS: Row[] = [
-  {
-    name: "OrewSegs",
-    initials: "OS",
-    tint: "#a78fb0",
-    role: "Tickets",
-    base: 0,
-    tickets: 386,
-    bonus: 50,
-    commissions: 0,
-    adjustment: 2.5,
-  },
-  {
-    name: "Siren Vampy",
-    initials: "SV",
-    tint: "#8fa7b0",
-    role: "Tickets",
-    base: 0,
-    tickets: 336,
-    bonus: 50,
-    commissions: 3.92,
-    adjustment: 0,
-  },
-  {
-    name: "iiYoyo",
-    initials: "IY",
-    tint: "#8fb0a7",
-    role: "Tickets",
-    base: 0,
-    tickets: 121,
-    bonus: 50,
-    commissions: 0,
-    adjustment: 0,
-  },
-  {
-    name: "Trinity™",
-    initials: "T",
-    tint: "#b08f8f",
-    role: "Tickets",
-    base: 0,
-    tickets: 90,
-    bonus: 50,
-    commissions: 0,
-    adjustment: 1,
-  },
-  {
-    name: "Farah",
-    initials: "FA",
-    tint: "#b0a78f",
-    role: "Tickets",
-    base: 0,
-    tickets: 42,
-    bonus: 0,
-    commissions: 1.22,
-    adjustment: 0,
-  },
-  {
-    name: "Petrino",
-    initials: "PE",
-    tint: "#98b08f",
-    role: "Tickets",
-    base: 0,
-    tickets: 25,
-    bonus: 0,
-    commissions: 0,
-    adjustment: 0,
-  },
-  {
-    name: "Conscience",
-    initials: "CO",
-    tint: "#8fb09e",
-    role: "Backend",
-    base: 400,
-    tickets: 0,
-    bonus: 0,
-    commissions: 0,
-    adjustment: -100,
-  },
-  {
-    name: "FxMoon",
-    initials: "FM",
-    tint: "#afa7af",
-    role: "Disputes",
-    base: 200,
-    tickets: 0,
-    bonus: 0,
-    commissions: 0,
-    adjustment: 0,
-  },
-];
+export function toRow(m: PayableMember): Row {
+  const name = plainName(m.name);
+  return {
+    key: m.userId ?? m.channelId,
+    userId: m.userId,
+    name,
+    initials: initialsOf(name),
+    tint: tintFor(name),
+    role: m.roleName ?? "Unassigned",
+    roleId: m.roleId,
+    paidPerTicket: m.paidPerTicket,
+    base: m.baseCompensation,
+    tickets: effectiveTickets(m),
+    override: m.override,
+    // The frame draws one Bonus column; the sheet pays three kinds, so they are
+    // added up here and the breakdown stays on the live page.
+    bonus: m.bonus + m.disputeBonus + m.reviewBonus,
+    manualBonus: m.bonus,
+    commissions: effectiveCommission(m),
+    commissionOverride: m.commissionOverride,
+    adjustment: m.adjustment,
+    amount: memberTotal({ ...m, commission: effectiveCommission(m) }),
+  };
+}
 
-export const HIDDEN = [
-  { name: "Angeline", initials: "A", tint: "#8fb0a7", role: "Administrator" },
-];
-
-export const money = (n: number) =>
+export const money = (n: number): string =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-export const sum = (rows: Row[], pick: (r: Row) => number) =>
-  rows.reduce((total, r) => total + pick(r), 0);
+export const sum = <T,>(rows: T[], pick: (row: T) => number): number =>
+  rows.reduce((total, row) => total + pick(row), 0);

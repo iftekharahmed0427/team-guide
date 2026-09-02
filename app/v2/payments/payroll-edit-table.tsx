@@ -23,6 +23,8 @@ export type EditValues = Record<EditableKey, number>;
 
 export type EditMember = {
   key: string;
+  /** Roles that are not paid per ticket earn their base only. */
+  paidPerTicket: boolean;
   name: string;
   initials: string;
   /** Avatar fill - the frames give each member their own muted hue. */

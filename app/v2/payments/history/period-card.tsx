@@ -70,6 +70,9 @@ export default function PeriodCard({ title, auto, ticketRate, members }: Props) 
     initials: r.initials,
     tint: r.tint,
     role: r.role,
+    // An archived row carries the pay it was actually given, so the ticket
+    // column is always part of its amount whatever the role was at the time.
+    paidPerTicket: true,
     values: r.values,
   }));
 
