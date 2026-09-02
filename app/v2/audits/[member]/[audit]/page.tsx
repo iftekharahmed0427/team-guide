@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Pencil } from "lucide-react";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { fileUrl } from "@/lib/storage";
 import { AUDIT_CRITERIA } from "@/app/(app)/audits/criteria";
 import { initialsOf, plainName, tintFor } from "../../../member";
+import DeleteAudit from "../../delete-audit";
 import { badgeLabel, badgeTone, pct, splitSummary } from "../../audits-data";
 import AuditScreenshots, { type Shot } from "./screenshots";
 
@@ -19,8 +20,8 @@ import AuditScreenshots, { type Shot } from "./screenshots";
 // so the padding does not jump between the three audits screens; everything
 // inside is the frame's.
 //
-// Edit Audit opens the pre-filled form. Delete Audit is inert - it is a real
-// admin action on the live /audits/[id] page, and v2 is still a canvas.
+// Edit Audit opens the pre-filled form; Delete Audit calls the live action
+// behind a confirmation. Both are admin-only, as the actions are.
 
 const MONTHS = [
   "Jan",
@@ -265,13 +266,12 @@ export default async function V2AuditReviewPage({
           <Pencil size={14} strokeWidth={2} />
           Edit Audit
         </Link>
-        <button
-          type="button"
-          className="flex cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#ef4444]! bg-[#ef4444]/15 px-[20px] py-[10px] text-[14px] font-semibold text-[#ef4444] transition-colors hover:bg-[#ef4444]/25"
-        >
-          <Trash2 size={14} strokeWidth={2} />
-          Delete Audit
-        </button>
+        <DeleteAudit
+          id={auditId}
+          ticketNumber={row.ticketNumber}
+          memberName={name}
+          backHref={`/v2/audits/${encodeURIComponent(memberKey)}`}
+        />
       </div>
     </div>
   );

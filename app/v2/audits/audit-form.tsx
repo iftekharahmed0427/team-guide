@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Check, Link2, MessageSquare } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  Link2,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import V2Select from "../custom-select";
 import {
   AUDIT_CRITERIA,
@@ -12,6 +20,7 @@ import {
   percentage,
   type Criterion,
 } from "@/app/(app)/audits/criteria";
+import { createAudit, updateAudit } from "@/app/(app)/audits/actions";
 
 // The scorecard form from the "new-audit-form" Figma frame (node 159:4): the
 // ticket's details, the six 5-point quality criteria, the six 1-point compliance
@@ -33,6 +42,10 @@ type Entry = { na: boolean; score: number; comment: string };
 
 /** An audit being edited, already split into the shape the form holds. */
 export type InitialAudit = {
+  /** The row being edited. */
+  id: string;
+  /** Screenshot ids already on the audit, kept as they are. */
+  screenshotIds: string[];
   memberId: string;
   ticketNumber: string;
   ticketType: string;
@@ -128,6 +141,70 @@ export default function V2AuditForm({
   const [entries, setEntries] = useState<Record<string, Entry>>(() =>
     buildEntries(initial),
   );
+  const [error, setError] = useState("");
+  const [saving, startSaving] = useTransition();
+  const router = useRouter();
+
+  // The ticket link has no column of its own: it is stored on the end of the
+  // summary as "Ticket URL: ...", which is where audits-data reads it back
+  // from. The live form has no field for it at all and expects an admin to
+  // type that line by hand.
+  function composeSummary() {
+    const body = summary.trim();
+    const link = ticketLink.trim();
+    if (!link) return body;
+    return body ? `${body}\n\nTicket URL: ${link}` : `Ticket URL: ${link}`;
+  }
+
+  function save() {
+    setError("");
+    const member = members.find((m) => m.id === memberId);
+    if (!member) {
+      setError("Pick the member this audit is for.");
+      return;
+    }
+    if (!ticketNumber.trim()) {
+      setError("Enter the ticket number.");
+      return;
+    }
+
+    const scores = AUDIT_CRITERIA.map((c) => ({
+      key: c.key,
+      na: entries[c.key].na,
+      score: entries[c.key].score,
+      comment: entries[c.key].comment,
+    }));
+
+    const fields = {
+      memberId,
+      memberName: member.name,
+      ticketNumber: ticketNumber.trim(),
+      ticketType: ticketType.trim(),
+      ticketDate: ticketDate || null,
+      summary: composeSummary(),
+      scores,
+    };
+
+    startSaving(async () => {
+      // New audits carry a ticket link rather than screenshots, so nothing is
+      // uploaded here; an existing audit keeps the ones it already has.
+      const res = initial
+        ? await updateAudit({
+            ...fields,
+            id: initial.id,
+            keepScreenshotIds: initial.screenshotIds,
+            newScreenshots: [],
+          })
+        : await createAudit({ ...fields, screenshots: [] });
+
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      router.push(backHref);
+      router.refresh();
+    });
+  }
 
   const set = (key: string, patch: Partial<Entry>) =>
     setEntries((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
@@ -456,13 +533,27 @@ export default function V2AuditForm({
             <span className={`font-bold ${pctColour}`}>· {pct}%</span>
           </p>
         </div>
-        <button
-          type="button"
-          className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#10b981] px-[24px] py-[12px] text-[14px] font-bold text-[#0e1217] transition-colors hover:bg-[#34d399]"
-        >
-          <Check size={16} strokeWidth={2.5} />
-          {initial ? "Save changes" : "Save audit"}
-        </button>
+        <div className="flex shrink-0 items-center gap-[16px]">
+          {error ? (
+            <p className="flex items-center gap-[6px] text-[13px] font-medium text-[#ef4444]">
+              <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] bg-[#10b981] px-[24px] py-[12px] text-[14px] font-bold text-[#0e1217] transition-colors hover:bg-[#34d399] disabled:cursor-default disabled:opacity-60"
+          >
+            {saving ? (
+              <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
+            ) : (
+              <Check size={16} strokeWidth={2.5} />
+            )}
+            {initial ? "Save changes" : "Save audit"}
+          </button>
+        </div>
       </div>
     </div>
   );

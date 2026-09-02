@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { audit, auditScore } from "@/db/app-schema";
+import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import { plainName } from "../../../../member";
 import { splitSummary } from "../../../audits-data";
@@ -51,7 +51,19 @@ export default async function V2EditAuditPage({
   // so it goes back into its own field the way the review page reads it.
   const feedback = splitSummary(row.summary);
 
+  // The audit keeps whatever screenshots it already has: new audits carry a
+  // ticket link instead, so the form never adds more, and updateAudit deletes
+  // any id it is not told to keep.
+  const screenshotIds = (
+    await db
+      .select({ id: auditScreenshot.id })
+      .from(auditScreenshot)
+      .where(eq(auditScreenshot.auditId, auditId))
+  ).map((r) => r.id);
+
   const initial: InitialAudit = {
+    id: row.id,
+    screenshotIds,
     memberId: row.memberId ?? "",
     ticketNumber: row.ticketNumber,
     ticketType: row.ticketType,
