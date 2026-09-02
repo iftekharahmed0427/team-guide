@@ -73,6 +73,7 @@ export default async function ReviewsPage() {
       id: user.id,
       name: user.name,
       email: user.email,
+      image: user.image,
       role: user.role,
     })
     .from(user)
@@ -90,6 +91,7 @@ export default async function ReviewsPage() {
     .map((m) => ({
       id: m.id,
       name: plainName(m.name || m.email || "Member"),
+      image: m.image ?? null,
       eligible: eligibleIds.has(m.id),
     }));
 

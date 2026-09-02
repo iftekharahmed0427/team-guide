@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Avatar from "../avatar";
 import { money } from "./payments-data";
 
 // The payroll edit table from the "payments-table-edit-state" Figma frame
@@ -26,9 +27,7 @@ export type EditMember = {
   /** Roles that are not paid per ticket earn their base only. */
   paidPerTicket: boolean;
   name: string;
-  initials: string;
-  /** Avatar fill - the frames give each member their own muted hue. */
-  tint: string;
+  image: string | null;
   role: string;
   values: EditValues;
 };
@@ -156,12 +155,15 @@ export default function PayrollEditTable({
             className="flex h-[52px] items-center gap-[16px] border border-[#1e293b]! px-[16px]"
           >
             <div className={`flex items-center gap-[10px] ${COL.member}`}>
-              <span
-                style={{ backgroundColor: member.tint }}
-                className="flex h-[28px] w-[26px] shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold text-[#0f172a]"
-              >
-                {member.initials}
-              </span>
+              {/* The one square avatar in the app; the frame draws it 26 wide
+                  and 28 tall, squared off here so it stays one component. */}
+              <Avatar
+                name={member.name}
+                image={member.image}
+                size={28}
+                radiusClassName="rounded-[4px]"
+                textClassName="text-[10px]"
+              />
               <p className="truncate text-[13px] font-semibold text-[#f8fafc]">{member.name}</p>
             </div>
             <p className={`truncate text-[13px] font-normal text-[#94a3b8] ${COL.role}`}>

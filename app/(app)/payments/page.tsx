@@ -11,7 +11,7 @@ import {
   ticketPayout,
 } from "@/lib/payment-constants";
 import { formatDate } from "@/lib/datetime";
-import { initialsOf, plainName, tintFor } from "../member";
+import { plainName } from "../member";
 import { PER_TICKET, money, toRow } from "./payments-data";
 import PaymentsTable from "./payments-table";
 import HiddenMembers, { type HiddenMember } from "./hidden-members";
@@ -50,8 +50,7 @@ export default async function PaymentsPage() {
       return {
         userId: m.userId as string,
         name,
-        initials: initialsOf(name),
-        tint: tintFor(name),
+        image: m.image ?? null,
         role: m.roleName ?? "Unassigned",
       };
     });

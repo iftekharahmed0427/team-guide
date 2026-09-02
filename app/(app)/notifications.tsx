@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import type { Notice } from "./notifications-data";
+import Avatar from "./avatar";
 
 // Bell trigger plus the notification dropdown, from the "notification-dropdown"
 // Figma frame (node 15:378). Its own client component so the dashboard around
@@ -186,9 +187,14 @@ export default function Notifications({
                           <span className="size-[6px] rounded-full bg-[#8fb0a7]" />
                         ) : null}
                       </span>
-                      <span className="flex size-[28px] shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-bold text-[#e2e8f0]">
-                        {n.initials}
-                      </span>
+                      <Avatar
+                        name={n.actor}
+                        image={n.image}
+                        size={28}
+                        variant="muted"
+                        textClassName="text-[11px] font-bold"
+                        className="bg-white/[0.06]!"
+                      />
                       <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <span className="text-[13px] leading-[1.4] font-normal text-[#94a3b8]">
                           <span className="font-bold text-[#e2e8f0]">

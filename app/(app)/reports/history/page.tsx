@@ -10,7 +10,9 @@ import {
 } from "@/db/app-schema";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatDateTime } from "@/lib/datetime";
-import { initialsOf, plainName, tintFor } from "../../member";
+import { plainName } from "../../member";
+import Avatar from "../../avatar";
+import { imagesByDiscordId } from "@/lib/member-images";
 import DeletePeriod from "./delete-period";
 
 // /reports/history - the archive from the "report-history-page" Figma frame
@@ -41,6 +43,10 @@ export default async function ReportHistoryPage() {
         .where(inArray(reportPeriodEntry.periodId, ids))
         .orderBy(desc(reportPeriodEntry.count))
     : [];
+
+  // An archived entry stores the member's name and their Discord id, not their
+  // picture, so the picture is read live through the linked account.
+  const images = await imagesByDiscordId(entries.map((e) => e.userId));
 
   // Reviews are archived against the same period, and their source is either a
   // review_source id or a legacy literal like "trustpilot".
@@ -176,12 +182,12 @@ export default async function ReportHistoryPage() {
                       )}
                     </div>
                     <div className="flex min-w-0 flex-1 items-center gap-[12px]">
-                      <span
-                        style={{ backgroundColor: tintFor(entry.name) }}
-                        className="flex size-[24px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#0e1217]"
-                      >
-                        {initialsOf(entry.name)}
-                      </span>
+                      <Avatar
+                        name={entry.name}
+                        image={entry.userId ? images.get(entry.userId) ?? null : null}
+                        size={24}
+                        textClassName="text-[10px]"
+                      />
                       <p className="truncate text-[14px] font-semibold text-[#e2e8f0]">
                         {entry.name}
                       </p>

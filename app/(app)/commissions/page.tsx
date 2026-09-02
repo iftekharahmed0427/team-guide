@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { initialsOf, tintFor } from "../member";
+import Avatar from "../avatar";
 import CommissionsHeader from "./commissions-header";
 import SubmitCommission from "./submit-commission";
 import CommissionCards from "./commission-cards";
@@ -115,12 +115,12 @@ export default async function CommissionsPage() {
                   className={`group flex flex-col gap-[16px] p-[20px] transition-colors hover:border-[#2f3d42]! ${card}`}
                 >
                   <div className="flex items-center gap-[12px]">
-                    <span
-                      style={{ backgroundColor: tintFor(member.name) }}
-                      className="flex size-[36px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-[#0f141a]"
-                    >
-                      {initialsOf(member.name)}
-                    </span>
+                    <Avatar
+                      name={member.name}
+                      image={member.image}
+                      size={36}
+                      textClassName="text-[13px]"
+                    />
                     <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                       <p className="truncate text-[15px] font-semibold text-[#e2e8f0]">
                         {member.name}

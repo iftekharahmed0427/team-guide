@@ -11,7 +11,8 @@ import {
 } from "@/db/app-schema";
 import { user } from "@/db/auth-schema";
 import { formatDate } from "@/lib/datetime";
-import { initialsOf, plainName, tintFor } from "./member";
+import { plainName } from "./member";
+import { imagesByUserId } from "@/lib/member-images";
 
 // Everything the v2 dashboard renders, gathered in one place. The same tables
 // the live dashboard reads, so the two cards agree.
@@ -30,8 +31,7 @@ export type DashboardData = {
   notes: {
     id: string;
     name: string;
-    initials: string;
-    tint: string;
+    image: string | null;
     at: string;
     body: string;
   }[];
@@ -116,6 +116,7 @@ export async function getDashboard(): Promise<DashboardData> {
         id: note.id,
         title: note.title,
         body: note.body,
+        authorId: note.authorId,
         authorName: note.authorName,
         createdAt: note.createdAt,
       })
@@ -143,6 +144,9 @@ export async function getDashboard(): Promise<DashboardData> {
       : null;
 
   const sourceName = new Map(sources.map((s) => [s.id, s.name]));
+
+  // Note rows keep the author's name, not their picture, so it is read live.
+  const noteImages = await imagesByUserId(noteRows.map((n) => n.authorId));
 
   const daysOff: Record<number, string[]> = {};
   for (const row of offRows) {
@@ -186,8 +190,7 @@ export async function getDashboard(): Promise<DashboardData> {
       return {
         id: n.id,
         name,
-        initials: initialsOf(name),
-        tint: tintFor(name),
+        image: n.authorId ? noteImages.get(n.authorId) ?? null : null,
         at: ago(n.createdAt, now),
         // A titled note is a document, and its first line is a poor preview of
         // one, so the name stands in for it here.

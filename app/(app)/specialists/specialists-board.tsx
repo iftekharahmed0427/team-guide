@@ -18,6 +18,7 @@ import {
   removeSpecialty,
 } from "@/lib/actions/specialties";
 import ConfirmDialog from "../confirm-dialog";
+import Avatar from "../avatar";
 
 // The by-game directory from the "specialists-compact" frame (node 61:4), wired
 // to the live specialty actions.
@@ -27,7 +28,11 @@ import ConfirmDialog from "../confirm-dialog";
 // tick, and clicking them takes them off. The live picker only ever adds, which
 // means removing someone is a separate motion somewhere else.
 
-export type Member = { id: string; name: string; initials: string; tint: string };
+export type Member = {
+  id: string;
+  name: string;
+  image: string | null;
+};
 export type Game = { id: string; name: string; memberIds: string[] };
 
 /** The stack shows four faces; the rest collapse into a +N badge. */
@@ -248,20 +253,21 @@ function AvatarStack({ members }: { members: Member[] }) {
   const overflow = members.length - shown.length;
   const last = shown.length + (overflow > 0 ? 1 : 0) - 1;
 
-  const chip =
-    "flex size-[32px] shrink-0 items-center justify-center rounded-full border-2 border-[#171e24]! text-[11px] font-bold";
+  // Avatar draws the circle; this is just the ring that separates overlapping
+  // ones from the card behind them.
+  const chip = "border-2 border-[#171e24]!";
 
   return (
     <div className="flex items-center">
       {shown.map((m, i) => (
-        <span
+        <Avatar
           key={m.id}
-          title={m.name}
-          style={{ backgroundColor: m.tint }}
-          className={`${chip} text-[#11161b] ${i < last ? "-mr-[8px]" : ""}`}
-        >
-          {m.initials}
-        </span>
+          name={m.name}
+          image={m.image}
+          size={32}
+          textClassName="text-[11px]"
+          className={`${chip} ${i < last ? "-mr-[8px]" : ""}`}
+        />
       ))}
       {overflow > 0 ? (
         <span
@@ -458,12 +464,12 @@ function MemberPicker({
                     onClick={() => onToggle(member)}
                     className="flex cursor-pointer items-center gap-[10px] px-[12px] py-[7px] text-left transition-colors hover:bg-white/[0.04] disabled:cursor-default"
                   >
-                    <span
-                      style={{ backgroundColor: member.tint }}
-                      className="flex size-[24px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#11161b]"
-                    >
-                      {member.initials}
-                    </span>
+                    <Avatar
+                      name={member.name}
+                      image={member.image}
+                      size={24}
+                      textClassName="text-[10px]"
+                    />
                     <span
                       className={`min-w-0 flex-1 truncate text-[13px] ${
                         assigned

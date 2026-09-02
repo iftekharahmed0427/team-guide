@@ -7,7 +7,9 @@ import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
 import { fileUrl } from "@/lib/storage";
 import { AUDIT_CRITERIA } from "@/lib/audit-criteria";
-import { initialsOf, plainName, tintFor } from "../../../member";
+import { plainName } from "../../../member";
+import Avatar from "../../../avatar";
+import { imagesByUserId } from "@/lib/member-images";
 import DeleteAudit from "../../delete-audit";
 import { badgeLabel, badgeTone, pct, splitSummary } from "../../audits-data";
 import AuditScreenshots, { type Shot } from "./screenshots";
@@ -96,6 +98,9 @@ export default async function AuditReviewPage({
   ).filter((s): s is Shot => Boolean(s.src));
 
   const name = plainName(row.memberName || "Member");
+  // Read live rather than stored on the audit, so it follows the member's
+  // current Discord picture.
+  const image = (await imagesByUserId([row.memberId])).get(row.memberId ?? "") ?? null;
   const percent = pct(row.totalScore, row.possibleScore);
   const ticketDate = fmtTicketDate(row.ticketDate);
   const meta = [
@@ -141,12 +146,12 @@ export default async function AuditReviewPage({
         className={`flex items-center justify-between gap-[24px] p-[24px] ${card}`}
       >
         <div className="flex min-w-0 items-center gap-[16px]">
-          <span
-            style={{ backgroundColor: tintFor(name) }}
-            className="flex size-[48px] shrink-0 items-center justify-center rounded-full text-[16px] font-bold text-[#0e1217]"
-          >
-            {initialsOf(name)}
-          </span>
+          <Avatar
+            name={name}
+            image={image}
+            size={48}
+            textClassName="text-[16px]"
+          />
           <div className="flex min-w-0 flex-col gap-[4px]">
             <p className="truncate text-[18px] font-bold text-[#e2e8f0]">
               {name}

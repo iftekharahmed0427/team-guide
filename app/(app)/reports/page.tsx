@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getStandings, type Entry, type Trend } from "./reports-data";
+import Avatar from "../avatar";
 
 // /reports - the ticket leaderboard, built from the
 // "reports-leaderboard-page" Figma frame (node 45:4): a hero counter, a
@@ -134,9 +135,14 @@ export default async function ReportsPage() {
                   <span className="text-[11px] font-black text-[#8fb0a7]">CHAMPION</span>
                 </span>
                 <div className="flex flex-col items-center gap-[6px]">
-                  <span className="flex size-[48px] items-center justify-center rounded-full border-[3px] border-[#8fb0a7]! bg-[#243033] text-[16px] font-extrabold text-[#e2e8f0] drop-shadow-[0px_10px_12px_rgba(143,176,167,0.2)]">
-                    {leader.initials}
-                  </span>
+                  <Avatar
+                    name={leader.name}
+                    image={leader.image}
+                    size={48}
+                    variant="muted"
+                    textClassName="text-[16px] font-extrabold"
+                    className="border-[3px] border-[#8fb0a7]! drop-shadow-[0px_10px_12px_rgba(143,176,167,0.2)]"
+                  />
                   <p className="text-[22px] font-extrabold text-[#e2e8f0]">{leader.name}</p>
                 </div>
                 <div className="flex flex-col items-center">
@@ -159,9 +165,14 @@ export default async function ReportsPage() {
                   RANK {place}
                 </span>
                 <div className="flex flex-col items-center gap-[6px]">
-                  <span className="flex size-[40px] items-center justify-center rounded-full border-2 border-[#a3b18a]/40! bg-[#243033] text-[16px] font-bold text-[#e2e8f0]">
-                    {leader.initials}
-                  </span>
+                  <Avatar
+                    name={leader.name}
+                    image={leader.image}
+                    size={40}
+                    variant="muted"
+                    textClassName="text-[16px] font-bold"
+                    className="border-2 border-[#a3b18a]/40!"
+                  />
                   <p className="text-[18px] font-bold text-[#e2e8f0]">{leader.name}</p>
                 </div>
                 <div className="flex flex-col items-center">
@@ -210,13 +221,16 @@ export default async function ReportsPage() {
                 <span className="flex w-[28px] shrink-0 items-center justify-center text-[14px] font-bold text-[#94a3b8]">
                   #{i + 4}
                 </span>
-                <span
-                  className={`flex size-[36px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
-                    entry.isYou ? "bg-[#8fb0a7] text-[#0e1217]" : "bg-[#243033] text-[#e2e8f0]"
-                  }`}
-                >
-                  {entry.initials}
-                </span>
+                <Avatar
+                  name={entry.name}
+                  image={entry.image}
+                  size={36}
+                  variant="muted"
+                  textClassName="text-[13px] font-bold"
+                  // Marked important so the "you" fill wins over the muted
+                  // variant's own background rather than racing it.
+                  className={entry.isYou ? "bg-[#8fb0a7]! text-[#0e1217]!" : ""}
+                />
                 <span className="flex min-w-0 flex-col gap-[2px]">
                   <span className="flex items-center gap-[8px]">
                     <span className="truncate text-[15px] font-semibold text-[#e2e8f0]">

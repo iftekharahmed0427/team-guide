@@ -26,12 +26,18 @@ export default function Avatar({
   /** "tint" colours the fallback by name; "muted" is the sidebar's flat chip. */
   variant = "tint",
   className = "",
+  /** The initials' type size, where a caller wants the one its frame drew. */
+  textClassName,
+  /** The payroll edit table draws a rounded square rather than a circle. */
+  radiusClassName = "rounded-full",
 }: {
   name: string;
   image: string | null;
   size: number;
   variant?: "tint" | "muted";
   className?: string;
+  textClassName?: string;
+  radiusClassName?: string;
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
@@ -42,7 +48,7 @@ export default function Avatar({
   }, []);
 
   const broken = !image || failedSrc === image;
-  const box = `shrink-0 rounded-full ${className}`;
+  const box = `shrink-0 ${radiusClassName} ${className}`;
   const style = { width: size, height: size };
 
   if (broken) {
@@ -59,9 +65,12 @@ export default function Avatar({
             : "bg-[#243033] font-semibold text-[#e2e8f0]"
         }`}
       >
-        {/* Scaled off the box so one component serves the 32px sidebar chip and
-            the 34px note card without either caller passing a type size. */}
-        <span style={{ fontSize: Math.round(size * 0.36) }}>
+        {/* Scaled off the box, so a caller that has no opinion still gets
+            initials in proportion to the circle it asked for. */}
+        <span
+          className={textClassName}
+          style={textClassName ? undefined : { fontSize: Math.round(size * 0.36) }}
+        >
           {initialsOf(name)}
         </span>
       </span>

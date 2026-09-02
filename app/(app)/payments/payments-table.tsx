@@ -39,8 +39,7 @@ export default function PaymentsTable({ rows }: { rows: Row[] }) {
   const display: PayrollRow[] = rows.map((r) => ({
     key: r.key,
     name: r.name,
-    initials: r.initials,
-    tint: r.tint,
+    image: r.image,
     role: r.role,
     base: r.base,
     tickets: r.tickets,
@@ -53,8 +52,7 @@ export default function PaymentsTable({ rows }: { rows: Row[] }) {
   const editable: EditMember[] = rows.map((r) => ({
     key: r.key,
     name: r.name,
-    initials: r.initials,
-    tint: r.tint,
+    image: r.image,
     role: r.role,
     paidPerTicket: r.paidPerTicket,
     values: {

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { commission } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
 import { plainName } from "../member";
+import { imagesByUserId } from "@/lib/member-images";
 import type { CommissionMember, CommissionRow } from "./commissions-shape";
 
 // The commission query, shared by the grid and the member detail behind it.
@@ -81,6 +82,7 @@ export async function commissionMembers(): Promise<{
       ({
         key,
         name,
+        image: null,
         pending: 0,
         approved: 0,
         denied: 0,
@@ -102,6 +104,11 @@ export async function commissionMembers(): Promise<{
     member.rows.push(shaped);
     acc.set(key, member);
   }
+
+  // The key is the submitter's user id wherever the row had one, so it doubles
+  // as the lookup for their picture.
+  const images = await imagesByUserId([...acc.keys()]);
+  for (const [key, member] of acc) member.image = images.get(key) ?? null;
 
   // Anyone with work awaiting review first, then alphabetical - the order the
   // live tool uses, so the queue stays at the front.

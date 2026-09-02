@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { gameCategory, memberGame } from "@/db/app-schema";
-import { initialsOf, plainName, tintFor } from "../member";
+import { plainName } from "../member";
 import SpecialistsBoard, { type Game, type Member } from "./specialists-board";
 
 // /specialists - the by-game directory from the "specialists-compact" Figma
@@ -32,6 +32,7 @@ export default async function SpecialistsPage() {
         id: userTable.id,
         name: userTable.name,
         email: userTable.email,
+        image: userTable.image,
       })
       .from(userTable)
       .orderBy(userTable.name),
@@ -52,15 +53,15 @@ export default async function SpecialistsPage() {
     }));
 
   // Names come through plainName because one member's Discord name is stored in
-  // the mathematical alphanumeric block; the avatar hue is derived from the name
-  // rather than stored, so it stays stable as the roster changes.
+  // the mathematical alphanumeric block. Avatar draws the picture where there is
+  // one and derives the fallback hue from the name, so it stays stable as the
+  // roster changes.
   const members: Member[] = memberRows.map((m) => {
     const name = plainName(m.name || m.email || "Member");
     return {
       id: m.id,
       name,
-      initials: initialsOf(name),
-      tint: tintFor(name),
+      image: m.image ?? null,
     };
   });
 

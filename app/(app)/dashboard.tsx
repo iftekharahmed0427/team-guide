@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Notifications from "./notifications";
+import Avatar from "./avatar";
 import AvailabilityCard from "./availability-card";
 import ShiftCard from "./shift-card";
 import type { DashboardData } from "./dashboard-data";
@@ -288,12 +289,12 @@ export default function Dashboard({
               {data.notes.map((note, i) => (
                 <div key={note.id} className="flex flex-col gap-[12px]">
                   <div className="flex items-start gap-[12px]">
-                    <span
-                      className="flex size-[32px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#0f141a]"
-                      style={{ background: note.tint }}
-                    >
-                      {note.initials}
-                    </span>
+                    <Avatar
+                      name={note.name}
+                      image={note.image}
+                      size={32}
+                      textClassName="text-[12px]"
+                    />
                     <span className="flex min-w-0 flex-1 flex-col gap-[6px]">
                       <span className="flex items-center justify-between gap-[8px]">
                         <span className="truncate text-[13px] font-semibold text-[#e2e8f0]">

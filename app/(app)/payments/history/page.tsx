@@ -3,7 +3,8 @@ import { asc, desc, inArray } from "drizzle-orm";
 import { ArrowLeft, Plus } from "lucide-react";
 import { db } from "@/db";
 import { paymentPeriod, paymentPeriodRow } from "@/db/app-schema";
-import { initialsOf, plainName, tintFor } from "../../member";
+import { plainName } from "../../member";
+import { imagesByUserId } from "@/lib/member-images";
 import PeriodCard, { type PeriodMember } from "./period-card";
 
 // /payments/history - the archive from the "payment-history-page" Figma frame
@@ -53,6 +54,10 @@ export default async function PaymentHistoryPage() {
         .where(inArray(paymentPeriodRow.periodId, ids))
         .orderBy(asc(paymentPeriodRow.position))
     : [];
+
+  // An archived row stores the member's name, not their picture: the picture
+  // changes, so it is read live and the row keeps only the id.
+  const images = await imagesByUserId(rows.map((r) => r.memberId));
 
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which
   // wins over Tailwind's layered border utilities, so borders are marked
@@ -111,8 +116,9 @@ export default async function PaymentHistoryPage() {
               return {
                 id: r.id,
                 name,
-                initials: initialsOf(name),
-                tint: tintFor(name),
+                // Read live from the user table by lib/payment-history, so an
+                // archived period shows the member's picture as it is today.
+                image: r.memberId ? images.get(r.memberId) ?? null : null,
                 role: r.roleName,
                 paidPerTicket: r.paidPerTicket,
                 amountOverride: r.amountOverride,

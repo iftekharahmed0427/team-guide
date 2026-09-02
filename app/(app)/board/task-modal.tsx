@@ -20,7 +20,8 @@ import {
   unassignMember,
 } from "@/lib/actions/board";
 import type { Comment, Member, Task } from "@/lib/board-columns";
-import { initialsOf, plainName, tintFor } from "../member";
+import { plainName } from "../member";
+import Avatar from "../avatar";
 
 // The task detail modal, built from the "question-detail-modal" Figma frame
 // (node 136:4): a 520px dialog with the assignees row, the comments list and a
@@ -247,12 +248,12 @@ export default function TaskModal({
                     key={m.id}
                     className="flex items-center gap-[8px] rounded-full border border-[#243033]! bg-[#0f141a] py-[4px] pr-[10px] pl-[4px]"
                   >
-                    <span
-                      style={{ backgroundColor: tintFor(plainName(m.name)) }}
-                      className="flex size-[22px] items-center justify-center rounded-full text-[10px] font-bold text-[#0e1217]"
-                    >
-                      {initialsOf(plainName(m.name))}
-                    </span>
+                    <Avatar
+                      name={plainName(m.name)}
+                      image={m.image}
+                      size={22}
+                      textClassName="text-[10px]"
+                    />
                     <span className="text-[13px] font-medium text-[#e2e8f0]">
                       {plainName(m.name)}
                     </span>
@@ -276,12 +277,12 @@ export default function TaskModal({
                       onClick={() => toggleAssignee(m)}
                       className="flex cursor-pointer items-center gap-[10px] px-[12px] py-[8px] text-left transition-colors hover:bg-white/[0.04] disabled:cursor-default"
                     >
-                      <span
-                        style={{ backgroundColor: tintFor(name) }}
-                        className="flex size-[22px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#0e1217]"
-                      >
-                        {initialsOf(name)}
-                      </span>
+                      <Avatar
+                        name={name}
+                        image={m.image}
+                        size={22}
+                        textClassName="text-[10px]"
+                      />
                       <span
                         className={`min-w-0 flex-1 truncate text-[13px] ${on ? "font-semibold text-[#e2e8f0]" : "font-normal text-[#94a3b8]"}`}
                       >
@@ -329,12 +330,12 @@ export default function TaskModal({
                   const mine = c.authorId === currentUserId;
                   return (
                     <div key={c.id} className="flex items-start gap-[10px]">
-                      <span
-                        style={{ backgroundColor: tintFor(name) }}
-                        className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#0e1217]"
-                      >
-                        {initialsOf(name)}
-                      </span>
+                      <Avatar
+                        name={name}
+                        image={c.authorImage}
+                        size={26}
+                        textClassName="text-[10px]"
+                      />
                       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <div className="flex items-center gap-[8px]">
                           <p className="truncate text-[13px] font-semibold text-[#e2e8f0]">

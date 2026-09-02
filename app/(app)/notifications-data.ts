@@ -2,7 +2,8 @@ import { desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { activityLog } from "@/db/app-schema";
 import { describeAction } from "@/lib/activity-labels";
-import { initialsOf, plainName } from "./member";
+import { plainName } from "./member";
+import { imagesByUserId } from "@/lib/member-images";
 
 // What the bell shows. There is no notifications table and nothing in the app
 // produces one, so this is the activity log filtered down to the events a
@@ -16,7 +17,8 @@ import { initialsOf, plainName } from "./member";
 export type Notice = {
   id: string;
   actor: string;
-  initials: string;
+  /** Read live, so a notice shows the actor as they look today. */
+  image: string | null;
   /** The phrase after the actor's name. */
   action: string;
   target: string | null;
@@ -80,12 +82,14 @@ export async function getNotices(): Promise<Notice[]> {
     .orderBy(desc(activityLog.createdAt))
     .limit(LIMIT);
 
+  const images = await imagesByUserId(rows.map((r) => r.actorId));
+
   return rows.map((r) => {
     const actor = plainName(r.actorName || "Someone");
     return {
       id: r.id,
       actor,
-      initials: initialsOf(actor),
+      image: r.actorId ? images.get(r.actorId) ?? null : null,
       action: describeAction(r.action),
       target: r.targetLabel || null,
       tag: WORTH_TELLING[r.action] ?? "Activity",

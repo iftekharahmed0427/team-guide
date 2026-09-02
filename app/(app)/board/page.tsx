@@ -21,7 +21,12 @@ export default async function BoardPage() {
   const [tasks, memberRows] = await Promise.all([
     listTasks(),
     db
-      .select({ id: userTable.id, name: userTable.name, email: userTable.email })
+      .select({
+        id: userTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        image: userTable.image,
+      })
       .from(userTable)
       .orderBy(asc(userTable.name)),
   ]);
@@ -29,7 +34,7 @@ export default async function BoardPage() {
   const members: Member[] = memberRows.map((m) => ({
     id: m.id,
     name: displayName(m.name, m.email),
-    image: null,
+    image: m.image ?? null,
   }));
 
   return (

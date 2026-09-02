@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
 import { invite as inviteTable } from "@/db/app-schema";
 import { formatDate } from "@/lib/datetime";
-import { initialsOf, plainName, tintFor } from "../member";
+import { plainName } from "../member";
+import Avatar from "../avatar";
 import { InviteMember, MemberRow, RevokeInvite } from "./team-controls";
 
 // /team - the member roster, built from the "team-members-page" Figma frame
@@ -32,6 +33,7 @@ export default async function TeamPage() {
       id: userTable.id,
       name: userTable.name,
       email: userTable.email,
+      image: userTable.image,
       role: userTable.role,
       createdAt: userTable.createdAt,
     })
@@ -111,12 +113,12 @@ export default async function TeamPage() {
               className="flex items-center border-b border-[#243033]! px-[24px] py-[16px] last:border-0"
             >
               <div className="flex min-w-0 flex-1 items-center gap-[12px]">
-                <span
-                  style={{ backgroundColor: tintFor(name) }}
-                  className="flex size-[32px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-[#0f141a]"
-                >
-                  {initialsOf(name)}
-                </span>
+                <Avatar
+                  name={name}
+                  image={raw.image}
+                  size={32}
+                  textClassName="text-[11px]"
+                />
                 <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                   <div className="flex items-center gap-[8px]">
                     <p className="truncate text-[14px] font-semibold text-[#e2e8f0]">

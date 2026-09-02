@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Avatar from "../avatar";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
 import { setMemberHidden } from "@/lib/actions/payments";
@@ -11,8 +12,7 @@ import { setMemberHidden } from "@/lib/actions/payments";
 export type HiddenMember = {
   userId: string;
   name: string;
-  initials: string;
-  tint: string;
+  image: string | null;
   role: string;
 };
 
@@ -62,12 +62,12 @@ export default function HiddenMembers({
           className="flex items-center justify-between gap-[16px]"
         >
           <div className="flex min-w-0 items-center gap-[12px]">
-            <span
-              style={{ backgroundColor: member.tint }}
-              className="flex size-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-[#0e1217]"
-            >
-              {member.initials}
-            </span>
+            <Avatar
+              name={member.name}
+              image={member.image}
+              size={28}
+              textClassName="text-[11px]"
+            />
             <div className="flex min-w-0 flex-col gap-[2px]">
               <p className="truncate text-[14px] font-semibold text-[#94a3b8]">
                 {member.name}

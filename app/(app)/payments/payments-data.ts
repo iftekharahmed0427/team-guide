@@ -5,7 +5,7 @@ import {
   memberTotal,
   type PayableMember,
 } from "@/lib/payment-constants";
-import { initialsOf, plainName, tintFor } from "../member";
+import { plainName } from "../member";
 
 // The shape the v2 payroll table renders, derived from the live PayableMember so
 // both sheets agree on what a member is owed. The arithmetic itself is the live
@@ -18,9 +18,8 @@ export type Row = {
   key: string;
   userId: string | null;
   name: string;
-  initials: string;
-  /** Avatar fill - the frames give each member their own muted hue. */
-  tint: string;
+  /** Read live from the user table; Avatar derives the fallback hue. */
+  image: string | null;
   role: string;
   roleId: string | null;
   paidPerTicket: boolean;
@@ -43,8 +42,7 @@ export function toRow(m: PayableMember): Row {
     key: m.userId ?? m.channelId,
     userId: m.userId,
     name,
-    initials: initialsOf(name),
-    tint: tintFor(name),
+    image: m.image ?? null,
     role: m.roleName ?? "Unassigned",
     roleId: m.roleId,
     paidPerTicket: m.paidPerTicket,

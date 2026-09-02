@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { setReviewEligibility } from "@/lib/actions/reviews";
-import { initialsOf, tintFor } from "../member";
+import Avatar from "../avatar";
 
 // The eligible-members panel from the "reviews-page" frame (node 163:110). A
 // tick marks a member as earning the bonus when the period hits its threshold.
@@ -13,7 +13,12 @@ import { initialsOf, tintFor } from "../member";
 // review_bonus_member row and is admin-gated. The tick moves straight away and
 // is put back if the write fails, so a mis-click is visible rather than silent.
 
-export type StaffMember = { id: string; name: string; eligible: boolean };
+export type StaffMember = {
+  id: string;
+  name: string;
+  image: string | null;
+  eligible: boolean;
+};
 
 export default function EligibleMembers({
   members,
@@ -84,12 +89,12 @@ export default function EligibleMembers({
               className="flex w-full cursor-pointer items-center justify-between gap-[12px] border-b border-[#243033]! px-[14px] py-[10px] text-left transition-colors hover:bg-[#0e1217]/40 disabled:cursor-default"
             >
               <span className="flex min-w-0 items-center gap-[12px]">
-                <span
-                  style={{ backgroundColor: tintFor(member.name) }}
-                  className="flex size-[32px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#0e1217]"
-                >
-                  {initialsOf(member.name)}
-                </span>
+                <Avatar
+                  name={member.name}
+                  image={member.image}
+                  size={32}
+                  textClassName="text-[12px]"
+                />
                 <span className="truncate text-[14px] font-medium text-[#e2e8f0]">
                   {member.name}
                 </span>

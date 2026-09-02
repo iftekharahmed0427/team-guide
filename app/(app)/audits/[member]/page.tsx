@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { initialsOf, tintFor } from "../../member";
+import Avatar from "../../avatar";
 import AuditsHeader from "../audits-header";
 import { auditMembers, scoreColour } from "../audits-data";
 
@@ -41,12 +41,12 @@ export default async function AuditMemberPage({
         </Link>
 
         <div className="flex min-w-0 shrink items-center gap-[12px] rounded-[100px] border border-[#243033]! bg-[#0f141a] px-[12px] py-[6px]">
-          <span
-            style={{ backgroundColor: tintFor(member.name) }}
-            className="flex size-[32px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-[#0e1217]"
-          >
-            {initialsOf(member.name)}
-          </span>
+          <Avatar
+            name={member.name}
+            image={member.image}
+            size={32}
+            textClassName="text-[13px]"
+          />
           <div className="flex min-w-0 flex-col gap-[2px]">
             <p className="truncate text-[14px] font-bold text-[#e2e8f0]">
               {member.name}

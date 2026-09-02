@@ -22,6 +22,8 @@ export type CommissionMember = {
   /** Route segment, and the grid's React key. */
   key: string;
   name: string;
+  /** Read live from the user table, never stored on the commission. */
+  image: string | null;
   pending: number;
   approved: number;
   denied: number;

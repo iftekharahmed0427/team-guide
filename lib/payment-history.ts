@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { asc, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentPeriod, paymentPeriodRow } from "@/db/app-schema";
-import { user as userTable } from "@/db/auth-schema";
 import { getPayableMembers } from "@/lib/payments";
 import {
   effectiveTickets,
   effectiveCommission,
   TICKET_RATE,
 } from "@/lib/payment-constants";
+import { imagesByUserId } from "@/lib/member-images";
 
 export type PaymentHistoryRow = {
   id: string;
@@ -52,15 +52,7 @@ export async function getPaymentHistory(): Promise<PaymentHistoryPeriod[]> {
     .where(inArray(paymentPeriodRow.periodId, ids))
     .orderBy(asc(paymentPeriodRow.position), asc(paymentPeriodRow.createdAt));
 
-  const memberIds = [...new Set(rows.map((r) => r.memberId).filter((x): x is string => !!x))];
-  const images = new Map<string, string | null>();
-  if (memberIds.length) {
-    const users = await db
-      .select({ id: userTable.id, image: userTable.image })
-      .from(userTable)
-      .where(inArray(userTable.id, memberIds));
-    for (const u of users) images.set(u.id, u.image ?? null);
-  }
+  const images = await imagesByUserId(rows.map((r) => r.memberId));
 
   const byPeriod = new Map<string, PaymentHistoryRow[]>();
   for (const r of rows) {

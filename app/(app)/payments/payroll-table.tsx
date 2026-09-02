@@ -1,3 +1,4 @@
+import Avatar from "../avatar";
 import { money } from "./payments-data";
 
 // The payroll table, drawn once and used twice: the live sheet on /payments
@@ -12,9 +13,7 @@ import { money } from "./payments-data";
 export type PayrollRow = {
   key: string;
   name: string;
-  initials: string;
-  /** Avatar fill - the frames give each member their own muted hue. */
-  tint: string;
+  image: string | null;
   role: string;
   base: number;
   tickets: number;
@@ -79,12 +78,12 @@ export default function PayrollTable({ rows }: { rows: PayrollRow[] }) {
           className="flex items-center border-b border-[#243033]! px-[16px] py-[14px]"
         >
           <div className={`flex items-center gap-[12px] ${COL.member}`}>
-            <span
-              style={{ backgroundColor: row.tint }}
-              className="flex size-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-[#0e1217]"
-            >
-              {row.initials}
-            </span>
+            <Avatar
+              name={row.name}
+              image={row.image}
+              size={28}
+              textClassName="text-[11px]"
+            />
             <p className="truncate text-[14px] font-semibold text-[#e2e8f0]">{row.name}</p>
           </div>
           <p className={`truncate text-[13px] font-normal text-[#94a3b8] ${COL.role}`}>

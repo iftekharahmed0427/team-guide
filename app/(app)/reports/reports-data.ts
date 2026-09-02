@@ -19,7 +19,8 @@ export type Trend = "up" | "down" | "flat";
 export type Entry = {
   id: string;
   name: string;
-  initials: string;
+  /** Read live from the linked account's user row. */
+  image: string | null;
   count: number;
   /** Tickets per day over the window the count covers. */
   avgPerDay: number;
@@ -35,13 +36,6 @@ export type Standings = {
 };
 
 const DAY_MS = 1000 * 60 * 60 * 24;
-
-const initialsOf = (name: string) => {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "?";
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return words[0].slice(0, 2).toUpperCase();
-};
 
 export async function getStandings(
   currentUserId: string,
@@ -74,6 +68,7 @@ export async function getStandings(
         resetAt: reportChannel.countResetAt,
         userId: userTable.id,
         userName: userTable.name,
+        userImage: userTable.image,
       })
       .from(reportChannel)
       .leftJoin(
@@ -113,7 +108,7 @@ export async function getStandings(
     return {
       id: r.id,
       name,
-      initials: initialsOf(name),
+      image: r.userImage ?? null,
       count,
       avgPerDay: Math.round((count / daysTracked) * 10) / 10,
       trend,

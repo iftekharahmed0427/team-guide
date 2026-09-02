@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { audit } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
 import { plainName } from "../member";
+import { imagesByUserId } from "@/lib/member-images";
 
 // Shared by the audits grid and the member detail behind it: both frames show
 // the same total in the subtitle, and the detail page needs the same per-member
@@ -22,6 +23,8 @@ export type AuditMember = {
   /** Route segment, and the grid's React key. */
   key: string;
   name: string;
+  /** Read live from the user table, never stored on the audit. */
+  image: string | null;
   count: number;
   /** Over the summed scores, not the mean of each audit's own percentage. */
   avgPct: number;
@@ -82,10 +85,15 @@ export async function auditMembers(): Promise<{
     acc.set(key, member);
   }
 
+  // The key is the member's user id wherever the audit had one, so it doubles
+  // as the lookup for their picture.
+  const images = await imagesByUserId([...acc.keys()]);
+
   const members = [...acc.entries()]
     .map(([key, m]) => ({
       key,
       name: m.name,
+      image: images.get(key) ?? null,
       count: m.audits.length,
       avgPct: pct(m.total, m.possible),
       audits: m.audits,

@@ -19,8 +19,7 @@ import PayrollEditTable, { type EditMember, type EditValues } from "../payroll-e
 export type PeriodMember = {
   id: string;
   name: string;
-  initials: string;
-  tint: string;
+  image: string | null;
   role: string;
   paidPerTicket: boolean;
   amountOverride: number | null;
@@ -53,8 +52,7 @@ export default function PeriodCard({ title, auto, ticketRate, members }: Props) 
   const display: PayrollRow[] = rows.map((r) => ({
     key: r.id,
     name: r.name,
-    initials: r.initials,
-    tint: r.tint,
+    image: r.image,
     role: r.role,
     base: r.values.base,
     tickets: r.values.tickets,
@@ -67,8 +65,7 @@ export default function PeriodCard({ title, auto, ticketRate, members }: Props) 
   const editable: EditMember[] = rows.map((r) => ({
     key: r.id,
     name: r.name,
-    initials: r.initials,
-    tint: r.tint,
+    image: r.image,
     role: r.role,
     // An archived row carries the pay it was actually given, so the ticket
     // column is always part of its amount whatever the role was at the time.
