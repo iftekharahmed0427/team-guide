@@ -270,12 +270,13 @@ function AvatarStack({ members }: { members: Member[] }) {
         />
       ))}
       {overflow > 0 ? (
+        // Not an Avatar, so it carries the same box the others get from theirs.
         <span
           title={members
             .slice(SHOWN)
             .map((m) => m.name)
             .join(", ")}
-          className={`${chip} bg-[#2c3a42] text-white`}
+          className={`${chip} flex size-[32px] shrink-0 items-center justify-center rounded-full bg-[#2c3a42] text-[11px] font-bold text-white`}
         >
           +{overflow}
         </span>
