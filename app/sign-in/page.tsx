@@ -11,7 +11,7 @@ import SignInButton from "./sign-in-button";
 // the card.
 //
 // It sits outside the (app) group and outside /v2, so it does not inherit
-// either shell. Figtree is scoped here the way app/v2/layout.tsx scopes it,
+// either shell. Figtree is scoped here the way app/layout.tsx scopes it,
 // since globals.css sets Geist on <body>.
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });

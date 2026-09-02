@@ -6,9 +6,12 @@ import { SSE_PATH } from "@/lib/realtime-shared";
 
 // Pages that don't need realtime - skip the subscription there entirely so an
 // idle tab doesn't hold a connection open for no benefit. News and Guides rarely
-// change; Settings self-polls where it needs to (bot status); the Board runs its
-// OWN subscription (kanban-board.tsx), so the layout one is redundant there.
-const NO_LIVE_PREFIXES = ["/news", "/guides", "/settings", "/board"];
+// change, and Settings self-polls where it needs to (bot status).
+//
+// The Board is NOT on this list: it used to run its own subscription, and the
+// board that replaced it does not. It adopts fresh server props by comparing a
+// signature, so a refresh from here reconciles into it rather than fighting it.
+const NO_LIVE_PREFIXES = ["/news", "/guides", "/settings"];
 
 // Mounted once in the app layout. On pages that benefit from realtime, and while
 // the tab is VISIBLE, it opens an SSE connection to /api/events and re-renders

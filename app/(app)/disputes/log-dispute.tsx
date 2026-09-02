@@ -1,0 +1,248 @@
+"use client";
+
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, Check, Info, Loader2, Plus, UploadCloud, X } from "lucide-react";
+import { imageFilesFrom, imageToDataUrl } from "@/app/components/editor-images";
+import { createDispute } from "@/lib/actions/disputes";
+import CustomSelect from "../custom-select";
+import { OUTCOMES, outcomeLabel } from "./disputes-shape";
+
+// The log form, built from the reviews "Log a review" card: same surface, the
+// same 12px field captions, the same dashed upload zone, and the same footer
+// with a hint on the left and the accent button on the right. Four fields
+// instead of two, so they sit two by two like the audit form's meta card.
+//
+// The screenshot is downsized to 1400px and sent as a data URL, which is what
+// the live form does and what the action stores.
+
+export default function LogDispute({ categories }: { categories: string[] }) {
+  const router = useRouter();
+  const [reference, setReference] = useState("");
+  const [category, setCategory] = useState(categories[0] ?? "");
+  const [outcome, setOutcome] = useState<string>("won");
+  const [amount, setAmount] = useState("");
+  const [image, setImage] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function takeFiles(files: File[]) {
+    const file = files[0];
+    if (!file) return;
+    setError("");
+    try {
+      setImage(await imageToDataUrl(file, 1400));
+    } catch {
+      setError("Could not read that image.");
+    }
+  }
+
+  function submit() {
+    setError("");
+    setDone(false);
+    const amt = Number(amount);
+    if (!reference.trim()) return setError("Enter the dispute reference.");
+    if (!category) return setError("Pick a category.");
+    if (!Number.isFinite(amt) || amt <= 0) return setError("Enter the amount.");
+    if (!image) return setError("Attach a screenshot of the dispute.");
+
+    startTransition(async () => {
+      const res = await createDispute({
+        dispute: reference,
+        category,
+        outcome,
+        amount: amt,
+        imageUrl: image,
+      });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setReference("");
+      setAmount("");
+      setImage(null);
+      setDone(true);
+      router.refresh();
+    });
+  }
+
+  const field = "flex min-w-0 flex-1 flex-col gap-[8px]";
+  const label = "text-[12px] font-semibold text-[#94a3b8]";
+  const input =
+    "w-full rounded-[8px] border border-[#243033]! bg-[#0e1217] px-[14px] py-[11px] text-[14px] font-normal text-[#e2e8f0] outline-none transition-colors placeholder:text-[#64748b] focus:border-[#8fb0a7]! disabled:opacity-60";
+
+  // globals.css sets an unlayered `* { border-color: var(--border) }`, which
+  // wins over Tailwind's layered border utilities, so borders are marked
+  // important to opt out of the app-wide default.
+  return (
+    <div
+      className="flex flex-col gap-[20px] rounded-[12px] border border-[#243033]! bg-[#171e24] p-[24px]"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        takeFiles(imageFilesFrom(e.dataTransfer));
+      }}
+      onPaste={(e) => {
+        const files = imageFilesFrom(e.clipboardData);
+        if (files.length) {
+          e.preventDefault();
+          takeFiles(files);
+        }
+      }}
+    >
+      <div className="flex items-center justify-between gap-[16px]">
+        <p className="text-[16px] font-bold text-[#e2e8f0]">Log a dispute</p>
+        <Info size={14} strokeWidth={2} className="shrink-0 text-[#64748b]" />
+      </div>
+
+      <div className="flex items-start gap-[16px]">
+        <div className={field}>
+          <label htmlFor="dispute-ref" className={label}>
+            Dispute
+          </label>
+          <input
+            id="dispute-ref"
+            value={reference}
+            disabled={pending}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="e.g. dp_1QxAbC · customer@example.com"
+            className={input}
+          />
+        </div>
+        <div className={field}>
+          {/* The trigger is a button carrying its own aria-label, so this is a
+              caption rather than a <label>. */}
+          <p className={label}>Category</p>
+          <CustomSelect
+            id="dispute-category"
+            ariaLabel="Category"
+            value={category}
+            placeholder="Select a category..."
+            options={categories.map((c) => ({ value: c, label: c }))}
+            onChange={setCategory}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-start gap-[16px]">
+        <div className={field}>
+          <p className={label}>Outcome</p>
+          <CustomSelect
+            id="dispute-outcome"
+            ariaLabel="Outcome"
+            value={outcome}
+            options={OUTCOMES.map((o) => ({
+              value: o,
+              label: outcomeLabel(o),
+            }))}
+            onChange={setOutcome}
+          />
+        </div>
+        <div className={field}>
+          <label htmlFor="dispute-amount" className={label}>
+            Amount
+          </label>
+          <div className="flex w-full items-center gap-[6px] rounded-[8px] border border-[#243033]! bg-[#0e1217] px-[14px] py-[11px] transition-colors focus-within:border-[#8fb0a7]!">
+            <span className="shrink-0 text-[14px] font-normal text-[#64748b]">
+              $
+            </span>
+            <input
+              id="dispute-amount"
+              value={amount}
+              disabled={pending}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              inputMode="decimal"
+              placeholder="0.00"
+              className="min-w-0 flex-1 bg-transparent text-[14px] font-normal text-[#e2e8f0] outline-none placeholder:text-[#64748b]"
+            />
+          </div>
+        </div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          takeFiles(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
+
+      {image ? (
+        <div className="relative overflow-hidden rounded-[8px] border border-[#243033]!">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt="Dispute screenshot"
+            className="max-h-[260px] w-full object-cover object-top"
+          />
+          <button
+            type="button"
+            onClick={() => setImage(null)}
+            aria-label="Remove screenshot"
+            className="absolute top-[8px] right-[8px] cursor-pointer rounded-full bg-[#0e1217]/80 p-[6px] text-[#e2e8f0] transition-colors hover:text-[#ef4444]"
+          >
+            <X size={14} strokeWidth={2} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex cursor-pointer flex-col items-center justify-center gap-[12px] rounded-[8px] border border-dashed border-[#243033]! bg-[#0e1217] p-[32px] transition-colors hover:border-[#8fb0a7]!"
+        >
+          <span className="rounded-full border border-[#243033]! bg-[#171e24] p-[12px]">
+            <UploadCloud size={18} strokeWidth={2} className="text-[#94a3b8]" />
+          </span>
+          <span className="flex flex-col items-center gap-[4px] text-center">
+            <span className="text-[14px] font-medium text-[#e2e8f0]">
+              Choose a screenshot, or paste one
+            </span>
+            <span className="text-[12px] font-normal text-[#64748b]">
+              PNG, JPG up to 10MB
+            </span>
+          </span>
+        </button>
+      )}
+
+      <div className="h-px w-full bg-[#243033]" />
+
+      <div className="flex items-center justify-between gap-[16px]">
+        <div className="min-w-0 flex-1">
+          {error ? (
+            <p className="flex items-center gap-[6px] text-[13px] font-medium text-[#ef4444]">
+              <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
+              {error}
+            </p>
+          ) : done ? (
+            <p className="flex items-center gap-[6px] text-[13px] font-semibold text-[#10b981]">
+              <Check size={14} strokeWidth={2} className="shrink-0" />
+              Logged.
+            </p>
+          ) : (
+            <p className="text-[13px] font-normal text-[#64748b]">
+              Only won disputes count toward the recovered total and the bonus.
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={pending}
+          className="flex shrink-0 cursor-pointer items-center gap-[8px] rounded-[6px] bg-[#8fb0a7] px-[18px] py-[10px] text-[13px] font-semibold text-[#0e1217] transition-colors hover:bg-[#a3c0b8] disabled:cursor-default disabled:opacity-60"
+        >
+          {pending ? (
+            <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+          ) : (
+            <Plus size={14} strokeWidth={2} />
+          )}
+          Add dispute
+        </button>
+      </div>
+    </div>
+  );
+}

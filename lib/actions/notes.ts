@@ -39,11 +39,8 @@ async function requireCanEdit(id: string) {
   return session;
 }
 
-// Every write touches both the v2 page and the v1 one it replaces, plus the
-// dashboard, which counts notes.
+// Every write touches the notes page and the dashboard, which lists the newest.
 function revalidateNotes() {
-  revalidatePath("/v2/notes");
-  revalidatePath("/v2");
   revalidatePath("/notes");
   revalidatePath("/");
 }

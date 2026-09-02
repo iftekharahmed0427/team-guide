@@ -1,0 +1,318 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  Newspaper,
+  BookOpen,
+  StickyNote,
+  SquareKanban,
+  Ticket,
+  Star,
+  HandCoins,
+  Gavel,
+  Wallet,
+  ClipboardCheck,
+  Gamepad2,
+  Users,
+  Server,
+  CircleUser,
+  Cpu,
+  Settings,
+  Eye,
+  EyeOff,
+  Loader2,
+  LogOut,
+} from "lucide-react";
+import { signOut } from "@/lib/auth-client";
+import { setViewAsMember } from "@/app/components/view-as-actions";
+
+// v2 side navigation. Same items and grouping as the live sidebar; the surface,
+// type and spacing are lifted from the "team-dashboard-components" Figma frame
+// (node 3:5) - dark #0e1217 panel, hairline #243033 edges, sage #8fb0a7 accent
+// on the active row, and Figtree throughout.
+//
+// Only the nav scrolls - the brand lockup and the account pill are both pinned.
+// The rail is the frame's scrollbar-track/thumb (narrowed to 2px) rather than
+// the platform default, so it is always shown (overflow-y-scroll) as drawn.
+//
+// Every row is a real link and takes its active state from the path.
+//
+// Rows a member cannot reach are not rendered for them: Payments and Settings
+// are admin-only, and Disputes needs the Disputes payment role. The pages
+// themselves redirect either way; this only keeps the menu from offering a
+// door that bounces you back.
+//
+// An admin previewing as a member sees exactly what a member sees, because
+// getSession downgrades the role behind the cookie and every gate reads that.
+// The toggle out of the preview is the one control that reads the real role.
+
+type NavItem = {
+  label: string;
+  /** Hidden from members: the page itself redirects them anyway. */
+  adminOnly?: boolean;
+  /** Admins plus members on the Disputes payment role. */
+  disputesOnly?: boolean;
+  icon: React.ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+    className?: string;
+  }>;
+  href?: string;
+};
+
+type NavGroup = { label: string; items: NavItem[] };
+
+const GROUPS: NavGroup[] = [
+  {
+    label: "Main",
+    items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/" }],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { label: "News", icon: Newspaper, href: "/news" },
+      { label: "Guides", icon: BookOpen, href: "/guides" },
+      { label: "Notes", icon: StickyNote, href: "/notes" },
+      { label: "Board", icon: SquareKanban, href: "/board" },
+      { label: "Reports", icon: Ticket, href: "/reports" },
+      { label: "Reviews", icon: Star, href: "/reviews" },
+      { label: "Commissions", icon: HandCoins, href: "/commissions" },
+      { label: "Disputes", icon: Gavel, href: "/disputes", disputesOnly: true },
+      { label: "Payments", icon: Wallet, href: "/payments", adminOnly: true },
+      { label: "Audits", icon: ClipboardCheck, href: "/audits" },
+      { label: "Specialists", icon: Gamepad2, href: "/specialists" },
+      { label: "Team", icon: Users, href: "/team" },
+    ],
+  },
+  {
+    label: "Panel tools",
+    items: [
+      { label: "Server lookup", icon: Server, href: "/tools/server" },
+      { label: "User lookup", icon: CircleUser, href: "/tools/user" },
+      { label: "Node lookup", icon: Cpu, href: "/tools/node" },
+    ],
+  },
+  {
+    label: "General",
+    items: [
+      {
+        label: "Settings",
+        icon: Settings,
+        href: "/settings",
+        adminOnly: true,
+      },
+    ],
+  },
+];
+
+function initialsOf(source?: string | null): string {
+  const s = (source ?? "").trim();
+  if (!s) return "?";
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+export default function Sidebar({
+  user,
+  isAdmin,
+  canSeeDisputes,
+  realAdmin,
+  viewingAsMember,
+}: {
+  user: { name: string; email: string; image: string | null };
+  /** The effective role: already downgraded while previewing. */
+  isAdmin: boolean;
+  /** Admins, plus members assigned the Disputes payment role. */
+  canSeeDisputes: boolean;
+  /** The role on the account, which the preview does not change. */
+  realAdmin: boolean;
+  viewingAsMember: boolean;
+}) {
+  // A row an admin can reach and a member cannot is not shown to the member:
+  // every gated page redirects them, so offering it would only bounce them
+  // back. The pages stay the authority; this is only the menu agreeing.
+  const visible = (item: NavItem) =>
+    (!item.adminOnly || isAdmin) && (!item.disputesOnly || canSeeDisputes);
+
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(visible),
+  })).filter((group) => group.items.length > 0);
+
+  // A routed row wins unless an unrouted one was picked since the last
+  // navigation, so the highlight never sits on two rows at once.
+  const [picked, setPicked] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [switching, startSwitching] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const routed = groups
+    .flatMap((g) => g.items)
+    .filter(
+      (i) =>
+        i.href && (pathname === i.href || pathname.startsWith(`${i.href}/`)),
+    )
+    .sort((a, b) => b.href!.length - a.href!.length)[0];
+  const active = picked ?? routed?.label;
+
+  function toggleViewAs() {
+    startSwitching(async () => {
+      await setViewAsMember(!viewingAsMember);
+      // The whole tree depends on the role, so this re-renders the server
+      // components rather than trying to patch state here.
+      router.refresh();
+    });
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    await signOut();
+    router.push("/sign-in");
+    router.refresh();
+  }
+
+  // globals.css sets an unlayered `* { border-color: var(--border) }`, which wins
+  // over Tailwind's layered border utilities, so every border here is marked
+  // important to opt out of the app-wide default.
+  return (
+    <aside className="flex w-[260px] shrink-0 flex-col justify-between border-r border-[#243033]! bg-[#0e1217]">
+      <div className="flex items-center gap-[12px] px-[24px] pt-[24px]">
+        <span className="size-[36px] shrink-0 overflow-hidden rounded-[4px]">
+          <Image
+            src="/logo.png"
+            alt="Gravel Host"
+            width={2018}
+            height={819}
+            priority
+            className="size-full object-contain"
+          />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[18px] font-bold text-[#e2e8f0]">
+            GRAVEL HOST
+          </span>
+          <span className="block truncate text-[11px] font-semibold text-[#ff7a59]">
+            TEAM PORTAL
+          </span>
+        </span>
+      </div>
+
+      {/* Right padding is 19px so that nav rows clear the 2px rail and its 3px
+          gutter at exactly the frame's 24px inset. */}
+      <nav className="v2-rail mt-[20px] mr-[3px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-scroll pr-[19px] pb-[24px] pl-[24px]">
+        {groups.map((group) => (
+          <div key={group.label} className="flex flex-col gap-[8px]">
+            <p className="text-[11px] font-bold tracking-[0.88px] text-[#94a3b8] uppercase">
+              {group.label}
+            </p>
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const isActive = active === item.label;
+              const className = `flex w-full cursor-pointer items-center gap-[12px] rounded-[8px] border px-[12px] py-[10px] text-[14px] transition-colors ${
+                isActive
+                  ? "border-[#243033]! bg-[#171e24] font-semibold text-[#e2e8f0]"
+                  : "border-transparent! font-medium text-[#94a3b8] hover:bg-[#171e24]/60 hover:text-[#e2e8f0]"
+              }`;
+              const inner = (
+                <>
+                  <Icon
+                    size={18}
+                    strokeWidth={2}
+                    className={`shrink-0 ${isActive ? "text-[#8fb0a7]" : "text-[#94a3b8]"}`}
+                  />
+                  <span className="truncate">{item.label}</span>
+                </>
+              );
+
+              return item.href ? (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => setPicked(null)}
+                  className={className}
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => setPicked(item.label)}
+                  className={className}
+                >
+                  {inner}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      <div className="flex flex-col gap-[10px] px-[24px] pt-[12px] pb-[24px]">
+        {viewingAsMember ? (
+          <p className="flex items-center gap-[8px] rounded-[8px] border border-[#f59e0b]/40! bg-[#f59e0b]/[0.08] px-[12px] py-[8px] text-[11px] font-semibold text-[#f59e0b]">
+            <EyeOff size={13} strokeWidth={2} className="shrink-0" />
+            Viewing as a member
+          </p>
+        ) : null}
+
+        {realAdmin ? (
+          <button
+            type="button"
+            onClick={toggleViewAs}
+            disabled={switching}
+            className="flex w-full cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[12px] py-[8px] text-[12px] font-semibold text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0] disabled:cursor-default disabled:opacity-60"
+          >
+            {switching ? (
+              <Loader2 size={13} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Eye size={13} strokeWidth={2} />
+            )}
+            {viewingAsMember ? "Exit member view" : "View as member"}
+          </button>
+        ) : null}
+
+        <div className="flex items-center gap-[12px] rounded-[8px] bg-[#171e24] p-[12px]">
+          {user.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.image}
+              alt={user.name}
+              className="size-[32px] shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-[#243033] text-[11px] font-semibold text-[#e2e8f0]">
+              {initialsOf(user.name)}
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-[#e2e8f0]">
+              {user.name}
+            </span>
+            <span className="block truncate text-[11px] font-normal text-[#94a3b8]">
+              {user.email}
+            </span>
+          </span>
+          {/* Negative margin keeps the 14px glyph on the frame's grid while
+              giving the control a 26px hit target. */}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            aria-label="Log out"
+            title="Log out"
+            className="-m-[6px] shrink-0 cursor-pointer p-[6px] text-[#94a3b8] transition-colors hover:text-[#8fb0a7] disabled:cursor-default disabled:opacity-50"
+          >
+            <LogOut size={14} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}

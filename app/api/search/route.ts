@@ -35,19 +35,13 @@ function noteLabel(title: string, body: string): string {
   return first.length > 80 ? `${first.slice(0, 80).trim()}...` : first.trim();
 }
 
-// The full news + guides index for the client-side search palette (Fuse.js does
-// the realtime matching). Lightweight: title/excerpt/tags/game + a body snippet,
-// not the full HTML. Signed-in members only (the whole app is gated anyway).
-//
-// Notes join the index only for a caller that asks (`?include=notes`). The v1
-// palette routes anything that is not news to /guides, so it must keep seeing
-// the two types it knows about; the v2 palette opts in.
-export async function GET(request: Request) {
+// The full news + guides + notes index for the client-side search palette
+// (Fuse.js does the realtime matching). Lightweight: title/excerpt/tags/game
+// plus a body snippet, not the full HTML. Signed-in members only (the whole app
+// is gated anyway).
+export async function GET() {
   const session = await getSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
-
-  const wantNotes =
-    new URL(request.url).searchParams.get("include") === "notes";
 
   const [news, guides, notes] = await Promise.all([
     db
@@ -71,18 +65,16 @@ export async function GET(request: Request) {
       })
       .from(guide)
       .orderBy(desc(guide.createdAt)),
-    wantNotes
-      ? db
-          .select({
-            id: note.id,
-            title: note.title,
-            body: note.body,
-            authorName: note.authorName,
-            pinned: note.pinned,
-          })
-          .from(note)
-          .orderBy(desc(note.pinned), desc(note.createdAt))
-      : [],
+    db
+      .select({
+        id: note.id,
+        title: note.title,
+        body: note.body,
+        authorName: note.authorName,
+        pinned: note.pinned,
+      })
+      .from(note)
+      .orderBy(desc(note.pinned), desc(note.createdAt)),
   ]);
 
   const items: SearchItem[] = [
