@@ -34,12 +34,19 @@ import { signOut } from "@/lib/auth-client";
 // The rail is the frame's scrollbar-track/thumb (narrowed to 2px) rather than
 // the platform default, so it is always shown (overflow-y-scroll) as drawn.
 //
-// Rows with an href are real links and take their active state from the path.
-// The rest are still buttons while v2 is a canvas - clicking one only moves the
-// highlight so the styling can be seen. They get an href as each route lands.
+// Every row is a real link and takes its active state from the path.
+//
+// Rows a member cannot reach are not rendered for them: Payments and Settings
+// are admin-only, and Disputes needs the Disputes payment role. The pages
+// themselves redirect either way; this only keeps the menu from offering a
+// door that bounces you back.
 
 type NavItem = {
   label: string;
+  /** Hidden from members: the page itself redirects them anyway. */
+  adminOnly?: boolean;
+  /** Admins plus members on the Disputes payment role. */
+  disputesOnly?: boolean;
   icon: React.ComponentType<{
     size?: number;
     strokeWidth?: number;
@@ -64,8 +71,8 @@ const GROUPS: NavGroup[] = [
       { label: "Reports", icon: Ticket, href: "/v2/reports" },
       { label: "Reviews", icon: Star, href: "/v2/reviews" },
       { label: "Commissions", icon: HandCoins, href: "/v2/commissions" },
-      { label: "Disputes", icon: Gavel, href: "/v2/disputes" },
-      { label: "Payments", icon: Wallet, href: "/v2/payments" },
+      { label: "Disputes", icon: Gavel, href: "/v2/disputes", disputesOnly: true },
+      { label: "Payments", icon: Wallet, href: "/v2/payments", adminOnly: true },
       { label: "Audits", icon: ClipboardCheck, href: "/v2/audits" },
       { label: "Specialists", icon: Gamepad2, href: "/v2/specialists" },
       { label: "Team", icon: Users, href: "/v2/team" },
@@ -81,7 +88,14 @@ const GROUPS: NavGroup[] = [
   },
   {
     label: "General",
-    items: [{ label: "Settings", icon: Settings, href: "/v2/settings" }],
+    items: [
+      {
+        label: "Settings",
+        icon: Settings,
+        href: "/v2/settings",
+        adminOnly: true,
+      },
+    ],
   },
 ];
 
@@ -95,9 +109,25 @@ function initialsOf(source?: string | null): string {
 
 export default function V2Sidebar({
   user,
+  isAdmin,
+  canSeeDisputes,
 }: {
   user: { name: string; email: string; image: string | null };
+  isAdmin: boolean;
+  /** Admins, plus members assigned the Disputes payment role. */
+  canSeeDisputes: boolean;
 }) {
+  // A row an admin can reach and a member cannot is not shown to the member:
+  // every gated page redirects them, so offering it would only bounce them
+  // back. The pages stay the authority; this is only the menu agreeing.
+  const visible = (item: NavItem) =>
+    (!item.adminOnly || isAdmin) && (!item.disputesOnly || canSeeDisputes);
+
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(visible),
+  })).filter((group) => group.items.length > 0);
+
   // A routed row wins unless an unrouted one was picked since the last
   // navigation, so the highlight never sits on two rows at once.
   const [picked, setPicked] = useState<string | null>(null);
@@ -105,7 +135,8 @@ export default function V2Sidebar({
   const router = useRouter();
   const pathname = usePathname();
 
-  const routed = GROUPS.flatMap((g) => g.items)
+  const routed = groups
+    .flatMap((g) => g.items)
     .filter(
       (i) =>
         i.href && (pathname === i.href || pathname.startsWith(`${i.href}/`)),
@@ -149,7 +180,7 @@ export default function V2Sidebar({
       {/* Right padding is 19px so that nav rows clear the 2px rail and its 3px
           gutter at exactly the frame's 24px inset. */}
       <nav className="v2-rail mt-[20px] mr-[3px] flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-scroll pr-[19px] pb-[24px] pl-[24px]">
-        {GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label} className="flex flex-col gap-[8px]">
             <p className="text-[11px] font-bold tracking-[0.88px] text-[#94a3b8] uppercase">
               {group.label}

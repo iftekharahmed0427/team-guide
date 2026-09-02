@@ -1,6 +1,7 @@
 import { Figtree } from "next/font/google";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { canAccessDisputes } from "@/lib/disputes";
 import V2Sidebar from "./v2-sidebar";
 import V2SearchPalette from "./search-palette";
 
@@ -25,11 +26,18 @@ export default async function V2Layout({ children }: { children: React.ReactNode
     redirect("/sign-in");
   }
 
+  // Which rows the sidebar offers. Disputes is open to admins and to members on
+  // the Disputes payment role, the same rule /v2/disputes enforces.
+  const isAdmin = session.user.role === "admin";
+  const canSeeDisputes = await canAccessDisputes(session);
+
   return (
     <div
       className={`${figtree.className} flex h-screen w-full overflow-hidden bg-[#0e1217] leading-[normal]`}
     >
       <V2Sidebar
+        isAdmin={isAdmin}
+        canSeeDisputes={canSeeDisputes}
         user={{
           name: session?.user.name || "Member",
           email: session?.user.email || "",
