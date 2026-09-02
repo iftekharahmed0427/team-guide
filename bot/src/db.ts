@@ -277,3 +277,46 @@ export async function closeDb(): Promise<void> {
     pool = null;
   }
 }
+
+// ── Member profiles ──────────────────────────────────────────────────────────
+
+export type LinkedMember = {
+  userId: string;
+  discordId: string;
+  name: string;
+  image: string | null;
+};
+
+/**
+ * Every member with a linked Discord account, so their name and avatar can be
+ * refreshed from Discord. The website only writes these at sign-in, and a
+ * Discord avatar URL is pinned to the avatar hash, so one stored months ago
+ * points at a picture that no longer exists.
+ */
+export async function getLinkedMembers(): Promise<LinkedMember[]> {
+  const { rows } = await getPool().query(
+    `select u.id, u.name, u.image, a.account_id
+       from "user" u
+       join account a
+         on a.user_id = u.id
+        and a.provider_id = 'discord'`,
+  );
+  return rows.map((r) => ({
+    userId: String(r.id),
+    discordId: String(r.account_id),
+    name: r.name == null ? "" : String(r.name),
+    image: r.image == null ? null : String(r.image),
+  }));
+}
+
+/** Only ever touches name and image: email is what the invite list matches on. */
+export async function updateMemberProfile(
+  userId: string,
+  name: string,
+  image: string | null,
+): Promise<void> {
+  await getPool().query(
+    `update "user" set name = $2, image = $3, updated_at = now() where id = $1`,
+    [userId, name, image],
+  );
+}

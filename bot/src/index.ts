@@ -25,6 +25,7 @@ import {
 } from "./db.ts";
 import { runReport, postArchivedReport } from "./report.ts";
 import { countWindow } from "./count.ts";
+import { syncProfiles, PROFILE_SYNC_MS } from "./profiles.ts";
 
 const args = new Set(process.argv.slice(2));
 const RUN_NOW = args.has("--now"); // one-shot report, then exit
@@ -48,6 +49,7 @@ const TICK_REACTION = "✅";
 
 let client: Client | null = null;
 let loggedInToken: string | null = null;
+let syncingProfiles = false;
 let appliedPresence = "";
 let reporting = false;
 let counting = false;
@@ -203,6 +205,29 @@ async function refreshTopic(
 
 // Keep the dashboard "Tickets solved" total fresh. Runs only while connected;
 // re-counts every channel's window above its last manual reset.
+// Refreshes every member's name and avatar from Discord. Hourly, because a
+// stored avatar URL goes stale the moment that member changes their picture and
+// nobody should have to sign in for the rest of the team to see them correctly.
+async function profileTick(): Promise<void> {
+  if (shuttingDown || syncingProfiles) return;
+  if (!client || !client.isReady()) return;
+
+  syncingProfiles = true;
+  try {
+    const updated = await syncProfiles(client);
+    if (updated > 0) {
+      console.log(`[bot] refreshed ${updated} member profile(s)`);
+      // The sidebar, notes and every avatar on the site read these, so tell the
+      // app to re-render rather than waiting for the next navigation.
+      await notifyAppEvent().catch(() => {});
+    }
+  } catch (e) {
+    console.error("[bot] profile sync failed:", msg(e));
+  } finally {
+    syncingProfiles = false;
+  }
+}
+
 async function countTick(): Promise<void> {
   if (shuttingDown || counting || reporting) return;
   if (!client || !client.isReady()) return;
@@ -351,16 +376,21 @@ async function main() {
   }
 
   console.log(
-    `[bot] starting; config every ${TICK_MS / 1000}s, live count every ${COUNT_TICK_MS / 1000}s`,
+    `[bot] starting; config every ${TICK_MS / 1000}s, live count every ${COUNT_TICK_MS / 1000}s, profiles every ${PROFILE_SYNC_MS / 60000}m`,
   );
   await tick();
   const interval = setInterval(() => void tick(), TICK_MS);
   const countInterval = setInterval(() => void countTick(), COUNT_TICK_MS);
+  // Once at startup so a restart picks up anything that changed while the bot
+  // was down, then hourly.
+  void profileTick();
+  const profileInterval = setInterval(() => void profileTick(), PROFILE_SYNC_MS);
 
   const shutdown = async (sig: string) => {
     shuttingDown = true;
     clearInterval(interval);
     clearInterval(countInterval);
+    clearInterval(profileInterval);
     console.log(`[bot] ${sig}: shutting down`);
     if (client) {
       try {

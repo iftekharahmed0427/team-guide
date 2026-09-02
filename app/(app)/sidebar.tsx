@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { setViewAsMember } from "@/app/components/view-as-actions";
+import Avatar from "./avatar";
 
 // v2 side navigation. Same items and grouping as the live sidebar; the surface,
 // type and spacing are lifted from the "team-dashboard-components" Figma frame
@@ -108,14 +109,6 @@ const GROUPS: NavGroup[] = [
     ],
   },
 ];
-
-function initialsOf(source?: string | null): string {
-  const s = (source ?? "").trim();
-  if (!s) return "?";
-  const parts = s.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return s.slice(0, 2).toUpperCase();
-}
 
 export default function Sidebar({
   user,
@@ -279,18 +272,12 @@ export default function Sidebar({
         ) : null}
 
         <div className="flex items-center gap-[12px] rounded-[8px] bg-[#171e24] p-[12px]">
-          {user.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.image}
-              alt={user.name}
-              className="size-[32px] shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-[#243033] text-[11px] font-semibold text-[#e2e8f0]">
-              {initialsOf(user.name)}
-            </span>
-          )}
+          <Avatar
+            name={user.name}
+            image={user.image}
+            size={32}
+            variant="muted"
+          />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold text-[#e2e8f0]">
               {user.name}

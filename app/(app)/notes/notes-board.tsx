@@ -18,7 +18,7 @@ import {
 import { removeNote, setNotePinned, updateNote } from "@/lib/actions/notes";
 import { MAX_NOTE_BODY, MAX_NOTE_TITLE } from "@/lib/note-constants";
 import ConfirmDialog from "../confirm-dialog";
-import { initialsOf, tintFor } from "../member";
+import Avatar from "../avatar";
 import {
   countLabel,
   focusBody,
@@ -162,21 +162,11 @@ function NoteCard({
     >
       <div className="flex items-start justify-between gap-[16px]">
         <div className="flex min-w-0 items-center gap-[12px]">
-          {note.authorImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={note.authorImage}
-              alt={note.authorName}
-              className="size-[34px] shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span
-              style={{ backgroundColor: tintFor(note.authorName) }}
-              className="flex size-[34px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#0e1217]"
-            >
-              {initialsOf(note.authorName)}
-            </span>
-          )}
+          <Avatar
+            name={note.authorName}
+            image={note.authorImage}
+            size={34}
+          />
           <div className="flex min-w-0 flex-col gap-[3px]">
             <p className="truncate text-[14px] font-semibold text-[#e2e8f0]">
               <Marked text={note.authorName} tokens={tokens} />
