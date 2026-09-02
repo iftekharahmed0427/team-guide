@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,9 +21,13 @@ import {
   CircleUser,
   Cpu,
   Settings,
+  Eye,
+  EyeOff,
+  Loader2,
   LogOut,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
+import { setViewAsMember } from "@/app/components/view-as-actions";
 
 // v2 side navigation. Same items and grouping as the live sidebar; the surface,
 // type and spacing are lifted from the "team-dashboard-components" Figma frame
@@ -40,6 +44,10 @@ import { signOut } from "@/lib/auth-client";
 // are admin-only, and Disputes needs the Disputes payment role. The pages
 // themselves redirect either way; this only keeps the menu from offering a
 // door that bounces you back.
+//
+// An admin previewing as a member sees exactly what a member sees, because
+// getSession downgrades the role behind the cookie and every gate reads that.
+// The toggle out of the preview is the one control that reads the real role.
 
 type NavItem = {
   label: string;
@@ -111,11 +119,17 @@ export default function V2Sidebar({
   user,
   isAdmin,
   canSeeDisputes,
+  realAdmin,
+  viewingAsMember,
 }: {
   user: { name: string; email: string; image: string | null };
+  /** The effective role: already downgraded while previewing. */
   isAdmin: boolean;
   /** Admins, plus members assigned the Disputes payment role. */
   canSeeDisputes: boolean;
+  /** The role on the account, which the preview does not change. */
+  realAdmin: boolean;
+  viewingAsMember: boolean;
 }) {
   // A row an admin can reach and a member cannot is not shown to the member:
   // every gated page redirects them, so offering it would only bounce them
@@ -132,6 +146,7 @@ export default function V2Sidebar({
   // navigation, so the highlight never sits on two rows at once.
   const [picked, setPicked] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [switching, startSwitching] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -143,6 +158,15 @@ export default function V2Sidebar({
     )
     .sort((a, b) => b.href!.length - a.href!.length)[0];
   const active = picked ?? routed?.label;
+
+  function toggleViewAs() {
+    startSwitching(async () => {
+      await setViewAsMember(!viewingAsMember);
+      // The whole tree depends on the role, so this re-renders the server
+      // components rather than trying to patch state here.
+      router.refresh();
+    });
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -228,7 +252,30 @@ export default function V2Sidebar({
         ))}
       </nav>
 
-      <div className="px-[24px] pt-[12px] pb-[24px]">
+      <div className="flex flex-col gap-[10px] px-[24px] pt-[12px] pb-[24px]">
+        {viewingAsMember ? (
+          <p className="flex items-center gap-[8px] rounded-[8px] border border-[#f59e0b]/40! bg-[#f59e0b]/[0.08] px-[12px] py-[8px] text-[11px] font-semibold text-[#f59e0b]">
+            <EyeOff size={13} strokeWidth={2} className="shrink-0" />
+            Viewing as a member
+          </p>
+        ) : null}
+
+        {realAdmin ? (
+          <button
+            type="button"
+            onClick={toggleViewAs}
+            disabled={switching}
+            className="flex w-full cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[12px] py-[8px] text-[12px] font-semibold text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0] disabled:cursor-default disabled:opacity-60"
+          >
+            {switching ? (
+              <Loader2 size={13} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Eye size={13} strokeWidth={2} />
+            )}
+            {viewingAsMember ? "Exit member view" : "View as member"}
+          </button>
+        ) : null}
+
         <div className="flex items-center gap-[12px] rounded-[8px] bg-[#171e24] p-[12px]">
           {user.image ? (
             // eslint-disable-next-line @next/next/no-img-element

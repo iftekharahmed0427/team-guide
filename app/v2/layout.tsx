@@ -1,6 +1,6 @@
 import { Figtree } from "next/font/google";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getRealSession, getSession, isViewingAsMember } from "@/lib/auth";
 import { canAccessDisputes } from "@/lib/disputes";
 import V2Sidebar from "./v2-sidebar";
 import V2SearchPalette from "./search-palette";
@@ -31,6 +31,13 @@ export default async function V2Layout({ children }: { children: React.ReactNode
   const isAdmin = session.user.role === "admin";
   const canSeeDisputes = await canAccessDisputes(session);
 
+  // The real role, which the preview does not touch, so an admin who has
+  // downgraded their own view can still find the way back out.
+  const [real, viewingAsMember] = await Promise.all([
+    getRealSession(),
+    isViewingAsMember(),
+  ]);
+
   return (
     <div
       className={`${figtree.className} flex h-screen w-full overflow-hidden bg-[#0e1217] leading-[normal]`}
@@ -38,6 +45,8 @@ export default async function V2Layout({ children }: { children: React.ReactNode
       <V2Sidebar
         isAdmin={isAdmin}
         canSeeDisputes={canSeeDisputes}
+        realAdmin={real?.user.role === "admin"}
+        viewingAsMember={viewingAsMember}
         user={{
           name: session?.user.name || "Member",
           email: session?.user.email || "",
