@@ -5,7 +5,7 @@ import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import {
   resetAllReportChannels,
   updatePeriodLength,
-} from "@/app/(app)/settings/discord-bot/actions";
+} from "@/lib/actions/bot";
 import {
   ErrorLine,
   INPUT,

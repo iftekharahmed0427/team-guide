@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateReviewBonus } from "@/app/(app)/reviews/actions";
+import { updateReviewBonus } from "@/lib/actions/reviews";
 import { Field, SaveBar, useAction } from "../settings-controls";
 
 // The review bonus rule, which until now was editable only inline on /reviews.

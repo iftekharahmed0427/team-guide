@@ -19,8 +19,8 @@ import {
   computeTotals,
   percentage,
   type Criterion,
-} from "@/app/(app)/audits/criteria";
-import { createAudit, updateAudit } from "@/app/(app)/audits/actions";
+} from "@/lib/audit-criteria";
+import { createAudit, updateAudit } from "@/lib/actions/audits";
 
 // The scorecard form from the "new-audit-form" Figma frame (node 159:4): the
 // ticket's details, the six 5-point quality criteria, the six 1-point compliance

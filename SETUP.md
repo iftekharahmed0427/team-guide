@@ -121,7 +121,7 @@ only need `--build-arg` wiring if those URLs ever change.
 - `lib/auth-client.ts` - client SDK (`signIn`, `signOut`, `useSession`).
 - `app/api/auth/[...all]/route.ts` - mounts the Better Auth handler.
 - `proxy.ts` - optimistic redirect to `/sign-in` when the session cookie is absent (Next 16 renamed middleware to proxy).
-- `app/(app)/layout.tsx` - server-side session guard for everything in the `(app)` route group; the real enforcement.
+- `app/(v1)/layout.tsx` - server-side session guard for everything in the `(v1)` route group; the real enforcement.
 - `app/sign-in/` - public sign-in page with the Discord button.
 - `db/index.ts` - connects to Postgres (TLS unless `DATABASE_SSL=disable`); `db/auth-schema.ts` is generated; migrations live in `drizzle/`.
 

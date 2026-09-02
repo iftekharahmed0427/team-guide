@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateAnnouncement } from "@/app/(app)/settings/discord-bot/actions";
+import { updateAnnouncement } from "@/lib/actions/bot";
 import { Field, SaveBar, Toggle, useAction } from "../../settings-controls";
 
 // The announcement embed. The ranking itself is generated, so everything here is

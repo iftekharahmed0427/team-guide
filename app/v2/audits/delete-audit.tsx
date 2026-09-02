@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
-import { deleteAudit } from "@/app/(app)/audits/actions";
+import { deleteAudit } from "@/lib/actions/audits";
 import V2ConfirmDialog from "../confirm-dialog";
 
 // Delete on an audit's review page. Admin-only, matching the action, and it

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Info, Loader2, Plus } from "lucide-react";
-import { submitCommission } from "@/app/(app)/commissions/actions";
+import { submitCommission } from "@/lib/actions/commissions";
 
 // The submit card. Built from the reviews "Log a review" card, which is the
 // closest thing the design system has to a short inline form: same surface,

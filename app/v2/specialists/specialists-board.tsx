@@ -16,7 +16,7 @@ import {
   addSpecialty,
   deleteGame,
   removeSpecialty,
-} from "@/app/(app)/specialties/actions";
+} from "@/lib/actions/specialties";
 import V2ConfirmDialog from "../confirm-dialog";
 
 // The by-game directory from the "specialists-compact" frame (node 61:4), wired

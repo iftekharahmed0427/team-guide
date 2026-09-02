@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Server } from "lucide-react";
-import { lookupServer } from "@/app/(app)/tools/actions";
+import { lookupServer } from "@/lib/actions/tools";
 import {
   formatCpu,
   formatMB,
@@ -10,7 +10,7 @@ import {
   panelServerUrl,
   whmcsServiceUrl,
   type LookupServer,
-} from "@/app/(app)/tools/constants";
+} from "@/lib/tools-constants";
 import {
   CARD,
   EmptyState,

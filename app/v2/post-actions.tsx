@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { AlertCircle, Loader2, Pencil, Trash2 } from "lucide-react";
-import { deletePost } from "@/app/(app)/news/actions";
-import { deleteGuide } from "@/app/(app)/guides/actions";
+import { deletePost } from "@/lib/actions/news";
+import { deleteGuide } from "@/lib/actions/guides";
 import V2ConfirmDialog from "./confirm-dialog";
 import type { PostKind } from "./post-editor";
 

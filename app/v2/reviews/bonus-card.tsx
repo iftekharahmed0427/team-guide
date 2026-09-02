@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Gift, Loader2 } from "lucide-react";
-import { updateReviewBonus } from "@/app/(app)/reviews/actions";
+import { updateReviewBonus } from "@/lib/actions/reviews";
 
 // The review bonus card from the "reviews-page" frame (node 163:82): the rule,
 // its two settings, and the team's progress toward the threshold.

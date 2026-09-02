@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Info, Loader2, Plus, UploadCloud, X } from "lucide-react";
 import { imageFilesFrom, imageToDataUrl } from "@/app/components/editor-images";
-import { createDispute } from "@/app/(app)/disputes/actions";
+import { createDispute } from "@/lib/actions/disputes";
 import V2Select from "../custom-select";
 import { OUTCOMES, outcomeLabel } from "./disputes-shape";
 

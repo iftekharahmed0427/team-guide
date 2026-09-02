@@ -35,7 +35,7 @@ export async function imageToDataUrl(file: Blob, maxDim = MAX_DIM): Promise<stri
 // React sends a File as its own multipart part, while a data URL travels as a
 // string in the action's argument payload, where React caps the total decoded
 // string length at 1,000,000 characters. Audits send several screenshots at
-// once, so they must go as Files (see app/(app)/audits/actions.ts).
+// once, so they must go as Files (see app/(v1)/audits/actions.ts).
 export async function imageToJpegFile(file: Blob, maxDim = MAX_DIM): Promise<File> {
   const canvas = await downscale(file, maxDim);
   const blob = await new Promise<Blob | null>((resolve) =>

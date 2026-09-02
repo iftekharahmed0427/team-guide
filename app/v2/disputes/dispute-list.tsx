@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Gavel, Loader2, Trash2 } from "lucide-react";
-import { deleteDispute } from "@/app/(app)/disputes/actions";
+import { deleteDispute } from "@/lib/actions/disputes";
 import V2ConfirmDialog from "../confirm-dialog";
 import V2Lightbox from "../lightbox";
 import {

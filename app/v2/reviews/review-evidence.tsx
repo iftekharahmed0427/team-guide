@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
-import { deleteReview } from "@/app/(app)/reviews/actions";
+import { deleteReview } from "@/lib/actions/reviews";
 import V2ConfirmDialog from "../confirm-dialog";
 import V2Lightbox from "../lightbox";
 import { sourceDot } from "./reviews-data";

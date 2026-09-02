@@ -2,8 +2,8 @@ import { asc } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
 import { db } from "@/db";
 import { user as userTable } from "@/db/auth-schema";
-import { listTasks } from "@/app/(app)/board/actions";
-import { displayName, type Member } from "@/app/(app)/board/columns";
+import { listTasks } from "@/lib/actions/board";
+import { displayName, type Member } from "@/lib/board-columns";
 import BoardClient from "./board-client";
 
 // /v2/board - the kanban board from the "kanban-board-page" Figma frame

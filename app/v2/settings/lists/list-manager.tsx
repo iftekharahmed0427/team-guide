@@ -14,7 +14,7 @@ import {
 // review sources) are the same interaction, so they are the same component with
 // different actions passed in; payment roles add two flags per entry.
 //
-// The actions are the live ones from app/(app)/settings, so a change made here
+// The actions are the live ones from app/(v1)/settings, so a change made here
 // is the same write, the same activity log entry and the same notifyChange as
 // the old page. Renaming commits on blur, which is what the live managers do.
 

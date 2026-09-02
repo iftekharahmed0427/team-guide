@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { Cpu } from "lucide-react";
-import { lookupNode } from "@/app/(app)/tools/actions";
+import { lookupNode } from "@/lib/actions/tools";
 import {
   formatMB,
   panelNodeUrl,
   type LookupNode,
-} from "@/app/(app)/tools/constants";
+} from "@/lib/tools-constants";
 import {
   CARD,
   EmptyState,

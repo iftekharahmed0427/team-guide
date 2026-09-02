@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updatePresence } from "@/app/(app)/settings/discord-bot/actions";
+import { updatePresence } from "@/lib/actions/bot";
 import V2Select from "../../../custom-select";
 import { Field, SaveBar, useAction } from "../../settings-controls";
 

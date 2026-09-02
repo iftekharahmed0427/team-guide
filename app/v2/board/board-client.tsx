@@ -24,8 +24,8 @@ import {
   createTask,
   deleteTask,
   moveTask,
-} from "@/app/(app)/board/actions";
-import { COLUMNS, type Member, type Task } from "@/app/(app)/board/columns";
+} from "@/lib/actions/board";
+import { COLUMNS, type Member, type Task } from "@/lib/board-columns";
 import V2TaskModal from "./task-modal";
 
 // The kanban board from the "kanban-board-page" frame (node 43:4), on the real

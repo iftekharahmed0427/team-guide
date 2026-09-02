@@ -2,13 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { CircleUser } from "lucide-react";
-import { lookupUser } from "@/app/(app)/tools/actions";
+import { lookupUser } from "@/lib/actions/tools";
 import {
   formatPanelDate,
   panelUserUrl,
   whmcsClientUrl,
   type LookupUser,
-} from "@/app/(app)/tools/constants";
+} from "@/lib/tools-constants";
 import {
   CARD,
   EmptyState,

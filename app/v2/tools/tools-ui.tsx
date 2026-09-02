@@ -6,7 +6,7 @@ import {
   panelServerUrl,
   whmcsServiceUrl,
   type LookupServer,
-} from "@/app/(app)/tools/constants";
+} from "@/lib/tools-constants";
 
 // Shared chrome for the three v2 panel lookups. No Figma frame draws these, so
 // they are composed from the v2 design system - the disputes log card for the

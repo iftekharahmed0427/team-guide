@@ -4,7 +4,7 @@ import {
   effectiveTickets,
   memberTotal,
   type PayableMember,
-} from "@/app/(app)/payments/constants";
+} from "@/lib/payment-constants";
 import { initialsOf, plainName, tintFor } from "../member";
 
 // The shape the v2 payroll table renders, derived from the live PayableMember so

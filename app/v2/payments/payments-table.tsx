@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2, Pencil } from "lucide-react";
-import { savePayments } from "@/app/(app)/payments/actions";
+import { savePayments } from "@/lib/actions/payments";
 import { PER_TICKET, type Row } from "./payments-data";
 import PayrollTable, { type PayrollRow } from "./payroll-table";
 import PayrollEditTable, {

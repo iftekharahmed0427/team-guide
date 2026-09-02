@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { audit, auditScore, auditScreenshot } from "@/db/app-schema";
 import { formatDateTime } from "@/lib/datetime";
 import { fileUrl } from "@/lib/storage";
-import { AUDIT_CRITERIA } from "@/app/(app)/audits/criteria";
+import { AUDIT_CRITERIA } from "@/lib/audit-criteria";
 import { initialsOf, plainName, tintFor } from "../../../member";
 import DeleteAudit from "../../delete-audit";
 import { badgeLabel, badgeTone, pct, splitSummary } from "../../audits-data";

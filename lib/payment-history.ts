@@ -8,7 +8,7 @@ import {
   effectiveTickets,
   effectiveCommission,
   TICKET_RATE,
-} from "@/app/(app)/payments/constants";
+} from "@/lib/payment-constants";
 
 export type PaymentHistoryRow = {
   id: string;

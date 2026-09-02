@@ -8,7 +8,7 @@ import {
   removeMember,
   revokeInvite,
   setMemberRole,
-} from "@/app/(app)/team/actions";
+} from "@/lib/actions/team";
 import V2ConfirmDialog from "../confirm-dialog";
 import V2Select from "../custom-select";
 

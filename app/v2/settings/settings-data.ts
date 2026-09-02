@@ -15,7 +15,7 @@ import {
   reviewSource,
 } from "@/db/app-schema";
 import { user as userTable } from "@/db/auth-schema";
-import { TICKET_RATE } from "@/app/(app)/payments/constants";
+import { TICKET_RATE } from "@/lib/payment-constants";
 import { DISPUTE_BONUS_RATE } from "@/lib/disputes";
 import { REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
 import { formatDate } from "@/lib/datetime";

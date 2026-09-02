@@ -18,8 +18,8 @@ import {
   deleteComment,
   listComments,
   unassignMember,
-} from "@/app/(app)/board/actions";
-import type { Comment, Member, Task } from "@/app/(app)/board/columns";
+} from "@/lib/actions/board";
+import type { Comment, Member, Task } from "@/lib/board-columns";
 import { initialsOf, plainName, tintFor } from "../member";
 
 // The task detail modal, built from the "question-detail-modal" Figma frame

@@ -9,7 +9,7 @@ import {
 import {
   effectiveTickets,
   ticketPayout,
-} from "@/app/(app)/payments/constants";
+} from "@/lib/payment-constants";
 import { formatDate } from "@/lib/datetime";
 import { initialsOf, plainName, tintFor } from "../member";
 import { PER_TICKET, money, toRow } from "./payments-data";

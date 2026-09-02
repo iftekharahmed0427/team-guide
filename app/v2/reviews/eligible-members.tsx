@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
-import { setReviewEligibility } from "@/app/(app)/reviews/actions";
+import { setReviewEligibility } from "@/lib/actions/reviews";
 import { initialsOf, tintFor } from "../member";
 
 // The eligible-members panel from the "reviews-page" frame (node 163:110). A

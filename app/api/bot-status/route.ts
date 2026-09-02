@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth";
-import { getBotStatusPayload } from "@/app/(app)/settings/discord-bot/status";
+import { getBotStatusPayload } from "@/lib/bot-status";
 
 export const dynamic = "force-dynamic";
 

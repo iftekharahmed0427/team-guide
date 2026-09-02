@@ -6,7 +6,7 @@ import {
   addReportChannel,
   deleteReportChannel,
   resetReportChannel,
-} from "@/app/(app)/settings/discord-bot/actions";
+} from "@/lib/actions/bot";
 import V2Select from "../../../custom-select";
 import {
   ConfirmButton,

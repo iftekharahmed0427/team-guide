@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
-import { setMemberHidden } from "@/app/(app)/payments/actions";
+import { setMemberHidden } from "@/lib/actions/payments";
 
 // Members an admin has taken off the payroll sheet. They still count in
 // Reports; this only excludes them from payments and its totals.

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { reportChannel, reportPeriod, ticketCount, botSetting, paymentOverride, paymentRole } from "@/db/app-schema";
 import { user as userTable, account } from "@/db/auth-schema";
-import { effectiveTickets, type PayableMember, type PaymentRole } from "@/app/(app)/payments/constants";
+import { effectiveTickets, type PayableMember, type PaymentRole } from "@/lib/payment-constants";
 import { getDisputeTotalsByUser } from "@/lib/disputes";
 import { getReviewBonusByUser } from "@/lib/reviews";
 import { getCommissionTotalsByUser } from "@/lib/commissions";

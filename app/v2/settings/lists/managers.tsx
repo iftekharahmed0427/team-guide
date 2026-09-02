@@ -6,17 +6,17 @@ import {
   renameRole,
   setRoleBonusEligible,
   setRolePayType,
-} from "@/app/(app)/settings/payment-roles/actions";
+} from "@/lib/actions/payment-roles";
 import {
   createCategory,
   deleteCategory,
   renameCategory,
-} from "@/app/(app)/settings/dispute-categories/actions";
+} from "@/lib/actions/dispute-categories";
 import {
   createSource,
   deleteSource,
   renameSource,
-} from "@/app/(app)/settings/review-sources/actions";
+} from "@/lib/actions/review-sources";
 import ListManager, { type ListEntry } from "./list-manager";
 
 // The three catalogues, each binding the live actions to the shared list. Thin

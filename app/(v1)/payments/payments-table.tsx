@@ -1,0 +1,579 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Save, AlertCircle, Pencil, X, EyeOff, RotateCcw } from "lucide-react";
+import Avatar from "@/app/components/avatar";
+import CustomSelect from "@/app/components/custom-select";
+import {
+  formatUSD,
+  formatAdjustment,
+  memberTotal,
+  type PayableMember,
+  type PaymentRole,
+} from "@/lib/payment-constants";
+import { savePayments, setMemberHidden, type PaymentChange } from "@/lib/actions/payments";
+
+type Draft = {
+  roleId: string | null;
+  overrideText: string;
+  baseText: string;
+  bonusText: string;
+  commissionText: string;
+  adjustmentText: string;
+};
+
+const moneyText = (n: number) => (n ? String(n) : "");
+const seedRow = (m: PayableMember): Draft => ({
+  roleId: m.roleId,
+  overrideText: m.override === null ? "" : String(m.override),
+  baseText: moneyText(m.baseCompensation),
+  bonusText: moneyText(m.bonus),
+  commissionText: m.commissionOverride === null ? "" : String(m.commissionOverride),
+  adjustmentText: m.adjustment ? String(m.adjustment) : "",
+});
+
+const EMPTY_DRAFT: Draft = {
+  roleId: null,
+  overrideText: "",
+  baseText: "",
+  bonusText: "",
+  commissionText: "",
+  adjustmentText: "",
+};
+
+const parseOverride = (t: string): number | null => {
+  const s = t.trim();
+  if (s === "") return null;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+const parseBase = (t: string): number => {
+  const n = Math.round((Number(t.trim()) || 0) * 100) / 100;
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+// Money override: blank = track the computed value (null); a number = a fixed amount.
+const parseMoneyOverride = (t: string): number | null => {
+  const s = t.trim();
+  if (s === "") return null;
+  const n = Math.round((Number(s) || 0) * 100) / 100;
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+// Signed money: may be negative (a deduction); blank = 0.
+const parseSigned = (t: string): number => {
+  const n = Math.round((Number(t.trim()) || 0) * 100) / 100;
+  return Number.isFinite(n) ? n : 0;
+};
+// Keep only digits, one dot, and a leading minus while typing.
+const sanitizeSigned = (v: string) => {
+  const neg = v.trim().startsWith("-");
+  return (neg ? "-" : "") + v.replace(/[^\d.]/g, "");
+};
+
+export default function PaymentsTable({
+  members,
+  hiddenMembers = [],
+  roles,
+  editable,
+}: {
+  members: PayableMember[];
+  hiddenMembers?: PayableMember[];
+  roles: PaymentRole[];
+  editable: boolean;
+}) {
+  const router = useRouter();
+
+  const seed = (): Record<string, Draft> =>
+    Object.fromEntries(
+      members.filter((m) => m.userId).map((m) => [m.userId as string, seedRow(m)]),
+    );
+
+  const [draft, setDraft] = useState<Record<string, Draft>>(seed);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+  // Admins start in read-only view and opt into editing; everyone else is always
+  // read-only. Inputs render only while editing.
+  const [editing, setEditing] = useState(false);
+  // Hiding/restoring a member is an immediate action (not staged like the field
+  // edits); `busyId` tracks the row in flight so only its button shows pending.
+  const [hidePending, startHide] = useTransition();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function toggleHidden(userId: string, hidden: boolean) {
+    setError("");
+    setBusyId(userId);
+    startHide(async () => {
+      const res = await setMemberHidden(userId, hidden);
+      setBusyId(null);
+      if ("error" in res) setError(res.error);
+      else router.refresh();
+    });
+  }
+
+  const payByRole = useMemo(() => new Map(roles.map((r) => [r.id, r.paidPerTicket])), [roles]);
+  const roleOptions = useMemo(
+    () => [
+      { value: "", label: "Unassigned" },
+      ...roles.map((r) => ({ value: r.id, label: r.name })),
+    ],
+    [roles],
+  );
+
+  // Resolve a row's effective values: the staged draft while editing, else saved.
+  function resolved(m: PayableMember) {
+    const d = (editing && m.userId && draft[m.userId]) || seedRow(m);
+    const override = parseOverride(d.overrideText);
+    const base = parseBase(d.baseText);
+    const bonus = parseBase(d.bonusText);
+    const roleId = d.roleId;
+    const paidPerTicket = roleId ? payByRole.get(roleId) ?? false : true;
+    // The disputes amount + its 5% bonus and the review bonus are server-computed
+    // (from /disputes and /reviews) and not editable here. Commissions default to
+    // the computed approved-commission total but an admin can override it (blank =
+    // track the computed value); each adds to Amount on top of the manual bonus.
+    const disputeAmount = m.disputeAmount || 0;
+    const disputeBonus = m.disputeBonus || 0;
+    const reviewBonus = m.reviewBonus || 0;
+    const commissionOverride = parseMoneyOverride(d.commissionText);
+    const commission = commissionOverride ?? m.commission;
+    // Adjustment is a signed +/- correction (may be negative); folds into Amount.
+    const adjustment = parseSigned(d.adjustmentText);
+    const eff = override ?? m.tickets;
+    const amount = memberTotal({
+      tickets: m.tickets,
+      override,
+      paidPerTicket,
+      baseCompensation: base,
+      bonus,
+      disputeBonus,
+      reviewBonus,
+      commission,
+      adjustment,
+    });
+    return {
+      override,
+      base,
+      bonus,
+      roleId,
+      paidPerTicket,
+      eff,
+      amount,
+      disputeAmount,
+      disputeBonus,
+      reviewBonus,
+      commission,
+      commissionOverride,
+      adjustment,
+    };
+  }
+
+  function isChanged(m: PayableMember) {
+    if (!m.userId) return false;
+    const r = resolved(m);
+    return (
+      r.roleId !== m.roleId ||
+      r.override !== m.override ||
+      r.base !== m.baseCompensation ||
+      r.bonus !== m.bonus ||
+      r.commissionOverride !== m.commissionOverride ||
+      r.adjustment !== m.adjustment
+    );
+  }
+
+  const changedMembers = editing ? members.filter(isChanged) : [];
+  const dirty = changedMembers.length > 0;
+
+  // Re-seed from the server only when there are no unsaved edits, so a live
+  // refresh (or a just-completed save) syncs without clobbering work in progress.
+  // The ref holds the latest `dirty` so the effect can read it without re-running
+  // on every edit; it is written inside the effect to avoid a render-time ref write.
+  const dirtyRef = useRef(dirty);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+    if (!dirtyRef.current) setDraft(seed());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
+
+  function patch(userId: string, p: Partial<Draft>) {
+    setError("");
+    setDraft((cur) => ({ ...cur, [userId]: { ...seedRowFallback(cur, userId), ...p } }));
+  }
+  function seedRowFallback(cur: Record<string, Draft>, userId: string): Draft {
+    return cur[userId] ?? EMPTY_DRAFT;
+  }
+
+  function cancel() {
+    setDraft(seed()); // discard unsaved edits
+    setError("");
+    setEditing(false);
+  }
+
+  function save() {
+    const changes: PaymentChange[] = changedMembers.map((m) => {
+      const r = resolved(m);
+      return {
+        userId: m.userId as string,
+        ticketOverride: r.override,
+        roleId: r.roleId,
+        baseCompensation: r.base,
+        bonus: r.bonus,
+        commissionOverride: r.commissionOverride,
+        adjustment: r.adjustment,
+      };
+    });
+    startTransition(async () => {
+      const res = await savePayments(changes);
+      if ("error" in res) setError(res.error);
+      else {
+        setEditing(false);
+        router.refresh();
+      }
+    });
+  }
+
+  const totals = members.reduce(
+    (acc, m) => {
+      const r = resolved(m);
+      acc.tickets += r.eff;
+      acc.base += r.base;
+      acc.bonus += r.bonus + r.disputeBonus + r.reviewBonus;
+      acc.commission += r.commission;
+      acc.adjustment += r.adjustment;
+      acc.amount += r.amount;
+      return acc;
+    },
+    { tickets: 0, base: 0, bonus: 0, commission: 0, adjustment: 0, amount: 0 },
+  );
+
+  const cell = "h-8 w-20 border border-border bg-surface-2 px-2 text-right text-sm tabular-nums text-foreground outline-none focus:border-foreground/40 disabled:opacity-60";
+
+  return (
+    <div className="flex flex-col gap-3">
+      {editable ? (
+        <div className="flex items-center justify-between gap-3">
+          {editing ? (
+            <>
+              <p className="text-xs text-muted">
+                {dirty
+                  ? `${changedMembers.length} unsaved change${changedMembers.length === 1 ? "" : "s"}`
+                  : "All changes saved"}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={cancel}
+                  disabled={pending}
+                  className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  <X size={15} strokeWidth={1.75} />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={!dirty || pending}
+                  className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors disabled:cursor-not-allowed disabled:text-muted disabled:opacity-50"
+                >
+                  <Save size={15} strokeWidth={1.75} />
+                  Save changes
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted">View only</p>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="btn-wipe flex h-9 shrink-0 items-center gap-2 border border-border px-3 text-sm text-foreground transition-colors"
+              >
+                <Pencil size={15} strokeWidth={1.75} />
+                Edit
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="flex items-center gap-2 border border-border bg-surface px-4 py-2.5 text-xs text-red-400">
+          <AlertCircle size={13} strokeWidth={2} />
+          {error}
+        </div>
+      ) : null}
+
+      <div className="w-full border border-border bg-surface">
+        {members.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted">
+            No ticket activity yet. Members appear here once they handle tickets in Reports.
+          </p>
+        ) : (
+          <table className="w-full caption-bottom text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted">
+                <th className="h-11 px-4 text-left align-middle font-medium">Member</th>
+                <th className="h-11 px-4 text-left align-middle font-medium">Role</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Base comp</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Tickets</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Bonus</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Commissions</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Adjustment</th>
+                <th className="h-11 px-4 text-right align-middle font-medium">Amount</th>
+                {editable ? <th className="h-11 w-10 px-2" /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m) => {
+                const r = resolved(m);
+                const linked = editing && !!m.userId;
+                const changed = editing && isChanged(m);
+                const d = (m.userId && draft[m.userId]) || seedRow(m);
+                return (
+                  <tr
+                    key={m.userId ?? m.channelId}
+                    className="border-b border-border transition-colors hover:bg-surface-2"
+                  >
+                    <td className={`h-12 px-4 align-middle border-l-2 ${changed ? "border-foreground" : "border-transparent"}`}>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={m.name} image={m.image} size={26} />
+                        <span className="font-medium">{m.name}</span>
+                      </div>
+                    </td>
+                    <td className="h-12 px-4 align-middle">
+                      {linked ? (
+                        <CustomSelect
+                          key={`${m.userId}:${m.roleId ?? "none"}`}
+                          name={`role-${m.userId}`}
+                          options={roleOptions}
+                          defaultValue={d.roleId ?? ""}
+                          className="w-44"
+                          onChange={(v) => patch(m.userId as string, { roleId: v || null })}
+                        />
+                      ) : (
+                        <span className={m.roleName ? "text-foreground" : "text-muted"}>
+                          {m.roleName ?? "Unassigned"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-muted">$</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={d.baseText}
+                            disabled={pending}
+                            placeholder="0"
+                            onChange={(e) =>
+                              patch(m.userId as string, { baseText: e.target.value.replace(/[^\d.]/g, "") })
+                            }
+                            className={cell}
+                          />
+                        </div>
+                      ) : (
+                        formatUSD(m.baseCompensation)
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={d.overrideText}
+                          disabled={pending}
+                          placeholder={String(m.tickets)}
+                          title={`Live: ${m.tickets}. Leave blank to track Reports.`}
+                          onChange={(e) =>
+                            patch(m.userId as string, { overrideText: e.target.value.replace(/[^\d]/g, "") })
+                          }
+                          className={`${cell} ml-auto`}
+                        />
+                      ) : (
+                        r.eff
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-muted">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={d.bonusText}
+                              disabled={pending}
+                              placeholder="0"
+                              title="Bonus (adds to pay)"
+                              onChange={(e) =>
+                                patch(m.userId as string, { bonusText: e.target.value.replace(/[^\d.]/g, "") })
+                              }
+                              className={cell}
+                            />
+                          </div>
+                          {r.disputeAmount > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="5% of this period's disputes, added to the bonus"
+                            >
+                              Disputes {formatUSD(r.disputeAmount)} &rarr; +{formatUSD(r.disputeBonus)}
+                            </span>
+                          ) : null}
+                          {r.reviewBonus > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="Eligible for the review bonus this period"
+                            >
+                              Review bonus &rarr; +{formatUSD(r.reviewBonus)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span
+                          title={
+                            r.disputeBonus > 0 || r.reviewBonus > 0
+                              ? `Manual ${formatUSD(r.bonus)}${
+                                  r.reviewBonus > 0 ? ` · review +${formatUSD(r.reviewBonus)}` : ""
+                                }${r.disputeBonus > 0 ? ` · disputes +${formatUSD(r.disputeBonus)}` : ""}`
+                              : undefined
+                          }
+                        >
+                          {formatUSD(r.bonus + r.disputeBonus + r.reviewBonus)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-muted">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={d.commissionText}
+                              disabled={pending}
+                              placeholder={moneyText(m.commission) || "0"}
+                              title={`Approved commissions: ${formatUSD(m.commission)}. Leave blank to track them.`}
+                              onChange={(e) =>
+                                patch(m.userId as string, { commissionText: e.target.value.replace(/[^\d.]/g, "") })
+                              }
+                              className={cell}
+                            />
+                          </div>
+                          {r.commissionOverride !== null && m.commission > 0 ? (
+                            <span
+                              className="text-[10px] text-muted"
+                              title="Overriding the computed approved-commission total"
+                            >
+                              Computed {formatUSD(m.commission)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className={r.commission > 0 ? "text-foreground" : "text-muted"}>
+                          {formatUSD(r.commission)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle tabular-nums">
+                      {linked ? (
+                        <input
+                          type="text"
+                          inputMode="text"
+                          value={d.adjustmentText}
+                          disabled={pending}
+                          placeholder="0"
+                          title="Adjustment: use a minus for a deduction, e.g. -50"
+                          onChange={(e) =>
+                            patch(m.userId as string, { adjustmentText: sanitizeSigned(e.target.value) })
+                          }
+                          className={`${cell} ml-auto`}
+                        />
+                      ) : (
+                        <span
+                          className={
+                            r.adjustment === 0
+                              ? "text-muted"
+                              : r.adjustment < 0
+                                ? "text-red-400"
+                                : "text-foreground"
+                          }
+                        >
+                          {formatAdjustment(r.adjustment)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="h-12 px-4 text-right align-middle font-medium tabular-nums">
+                      {formatUSD(r.amount)}
+                    </td>
+                    {editable ? (
+                      <td className="h-12 w-10 px-2 align-middle">
+                        {editing && m.userId ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleHidden(m.userId as string, true)}
+                            disabled={hidePending}
+                            aria-label={`Hide ${m.name} from payments`}
+                            title="Hide from payments"
+                            className="flex h-7 w-7 items-center justify-center border border-transparent text-muted transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
+                          >
+                            <EyeOff size={14} strokeWidth={1.75} />
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border font-semibold">
+                <td className="h-12 px-4 align-middle border-l-2 border-transparent">Total</td>
+                <td className="h-12 px-4 align-middle" />
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.base)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{totals.tickets}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.bonus)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.commission)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatAdjustment(totals.adjustment)}</td>
+                <td className="h-12 px-4 text-right align-middle tabular-nums">{formatUSD(totals.amount)}</td>
+                {editable ? <td className="h-12 w-10 px-2" /> : null}
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+
+      {editable && hiddenMembers.length > 0 ? (
+        <div className="border border-border bg-surface">
+          <p className="border-b border-border px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted">
+            Hidden from payments ({hiddenMembers.length})
+          </p>
+          <ul>
+            {hiddenMembers.map((m) => (
+              <li
+                key={m.userId ?? m.channelId}
+                className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 last:border-b-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Avatar name={m.name} image={m.image} size={24} />
+                  <span className="text-sm text-muted">{m.name}</span>
+                </div>
+                {m.userId ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleHidden(m.userId as string, false)}
+                    disabled={hidePending && busyId === m.userId}
+                    className="btn-wipe flex h-8 shrink-0 items-center gap-1.5 border border-border px-2.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                  >
+                    <RotateCcw size={13} strokeWidth={1.75} />
+                    Restore
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}

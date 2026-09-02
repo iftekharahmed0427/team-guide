@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { imageFilesFrom, imageToDataUrl } from "@/app/components/editor-images";
-import { addReview } from "@/app/(app)/reviews/actions";
+import { addReview } from "@/lib/actions/reviews";
 import V2Select from "../custom-select";
 import { sourceDot } from "./reviews-data";
 

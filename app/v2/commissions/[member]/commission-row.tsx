@@ -10,7 +10,7 @@ import {
   Pencil,
   X,
 } from "lucide-react";
-import { reviewCommission } from "@/app/(app)/commissions/actions";
+import { reviewCommission } from "@/lib/actions/commissions";
 import { money, type CommissionRow as Row } from "../commissions-shape";
 
 // One commission, three to a row. At that width the stats sit two by two rather

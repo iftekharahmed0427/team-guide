@@ -32,8 +32,8 @@ import {
   imageEditorProps,
   imageToDataUrl,
 } from "@/app/components/editor-images";
-import { createPost, updatePost } from "@/app/(app)/news/actions";
-import { addGame, createGuide, updateGuide } from "@/app/(app)/guides/actions";
+import { createPost, updatePost } from "@/lib/actions/news";
+import { addGame, createGuide, updateGuide } from "@/lib/actions/guides";
 import V2ConfirmDialog from "./confirm-dialog";
 import { PALETTE_COLOURS, pillFor, swatchFor } from "./post-shape";
 

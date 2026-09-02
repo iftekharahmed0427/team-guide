@@ -6,7 +6,7 @@ import {
   clearBotToken,
   requestRunNow,
   setBotToken,
-} from "@/app/(app)/settings/discord-bot/actions";
+} from "@/lib/actions/bot";
 import {
   ConfirmButton,
   ErrorLine,

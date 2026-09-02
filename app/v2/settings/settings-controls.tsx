@@ -8,7 +8,7 @@ import { AlertCircle, Check, Loader2 } from "lucide-react";
 // styling, the pending state, the error line and the "saved" flash, so eight
 // panels behave identically.
 //
-// Every action these drive is the live one from app/(app)/settings, which
+// Every action these drive is the live one from app/(v1)/settings, which
 // re-checks the admin role, writes the activity log and calls notifyChange.
 // Nothing new writes to the database from v2.
 

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { dispute, disputeCategory, paymentOverride, paymentRole, reportPeriod } from "@/db/app-schema";
-import { BONUS_OUTCOME } from "@/app/(app)/disputes/constants";
+import { BONUS_OUTCOME } from "@/lib/dispute-constants";
 
 // 5% of each member's current-period dispute amounts is added to their /payments
 // bonus, on top of the manual bonus (see lib/payments + the payments table).

@@ -39,7 +39,7 @@ export const newsPost = pgTable("news_post", {
 
 // Guides: long-form how-tos authored like news (TipTap HTML), admin only, but
 // organized by game so the listing reads like a per-game blog. `game` holds the
-// category label (one of the curated values in app/(app)/guides/games.ts).
+// category label (one of the curated values in app/(v1)/guides/games.ts).
 export const guide = pgTable("guide", {
   id: text("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -601,7 +601,7 @@ export const botStatus = pgTable("bot_status", {
 // ── Support ticket QA audits ──────────────────────────────────────────────────
 
 // One QA review of a support ticket against the scorecard rubric (the criteria
-// live in app/(app)/audits/criteria.ts). An admin fills it out for a team
+// live in app/(v1)/audits/criteria.ts). An admin fills it out for a team
 // member's ticket; that member can see their own. `memberId`/`reviewerId` are
 // denormalized user ids (no FK, like the content tables' authorId).
 // `totalScore`/`possibleScore` are computed + stored; `possibleScore` excludes

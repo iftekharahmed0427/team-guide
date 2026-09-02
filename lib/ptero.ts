@@ -1,4 +1,4 @@
-import type { LookupNode, LookupServer, LookupUser } from "@/app/(app)/tools/constants";
+import type { LookupNode, LookupServer, LookupUser } from "@/lib/tools-constants";
 
 // Pterodactyl application API client behind the /tools lookups. Server-side
 // only: it reads the panel key from the environment and is imported by the tools

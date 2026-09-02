@@ -1,7 +1,7 @@
 import { count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { review, reviewSetting } from "@/db/app-schema";
-import { TICKET_RATE } from "@/app/(app)/payments/constants";
+import { TICKET_RATE } from "@/lib/payment-constants";
 import { DISPUTE_BONUS_RATE } from "@/lib/disputes";
 import { REVIEW_BONUS_DEFAULTS } from "@/lib/reviews";
 import { Row, SettingsHeader, Section } from "../settings-ui";
