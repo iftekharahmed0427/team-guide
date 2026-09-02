@@ -1,5 +1,8 @@
+import Link from "next/link";
 import V2Notifications from "./v2-notifications";
+import type { DashboardData } from "./dashboard-data";
 import {
+  ArrowDown,
   ArrowRight,
   ArrowUp,
   ChevronLeft,
@@ -15,170 +18,146 @@ import {
 // (node 15:4): a top bar, four stat cards, then a two-column body - news and
 // notes on the left, availability and shift check-in on the right.
 //
-// Content is the frame's placeholder copy - this is still the redesign canvas,
-// so nothing here reads from the database yet.
+// Reads the real tables the live dashboard reads, so the two agree. The
+// calendar follows the current month rather than the frame's fixed August,
+// and marks the days someone has said they are unavailable.
 
 type Stat = {
   label: string;
   value: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  icon: React.ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+    className?: string;
+  }>;
   delta?: string;
   note?: string;
   /** Per-source counts, shown as pills instead of a note line. */
   sources?: { count: string; label: string }[];
 };
 
-const STATS: Stat[] = [
-  { label: "Tickets solved", value: "990", icon: CircleCheck, delta: "+3%", note: "vs last period" },
-  { label: "On shift now", value: "4 / 11", icon: Users, note: "Active operators checked in" },
-  {
-    label: "Reviews",
-    value: "63",
-    icon: Star,
-    sources: [
-      { count: "16", label: "TP" },
-      { count: "46", label: "HA" },
-      { count: "1", label: "GH" },
-    ],
-  },
-  {
-    label: "Earnings this period",
-    value: "$12,480",
-    icon: CircleCheck,
-    delta: "+8%",
-    note: "vs last period",
-  },
-];
-
-const NEWS = [
-  { title: "Gravel Host Review Links", meta: "Aug 12 · By Angeline", tag: "Processes" },
-  { title: "Security Verification Requirements", meta: "Aug 12 · By Angeline", tag: "Guidelines" },
-  { title: "Services Terminated for Abuse Email.", meta: "Aug 12 · By Angeline", tag: "Guidelines" },
-  { title: "DDoss Response", meta: "Aug 11 · By Angeline", tag: "Scripts" },
-  {
-    title: "Copyright infringement claims Team Response",
-    meta: "Jul 18 · By Angeline",
-    tag: "Copyright",
-  },
-];
-
-const ON_SHIFT = [
-  { name: "Angeline", at: "9:38 PM" },
-  { name: "OrewSegs", at: "8:01 PM" },
-  { name: "Trinity™", at: "11:37 PM" },
-  { name: "Siren Vampy", at: "2:44 AM" },
-];
-
-const NOTES = [
-  {
-    initials: "A",
-    tint: "#8fb0a7",
-    name: "Angeline",
-    at: "2h ago",
-    body: "Hey gemini, Blast off Nahashi's lights",
-  },
-  {
-    initials: "OS",
-    tint: "#a78fb0",
-    name: "OrewSegs",
-    at: "5h ago",
-    body: "Server migration scheduled for Friday 3AM UTC, please confirm availability",
-  },
-  {
-    initials: "T",
-    tint: "#b08f8f",
-    name: "Trinity™",
-    at: "Yesterday",
-    body: "Updated the abuse response template, check the new version",
-  },
-  {
-    initials: "SV",
-    tint: "#8fa7b0",
-    name: "Siren Vampy",
-    at: "2d ago",
-    body: "Backup verification complete, all systems green 🟢",
-  },
-  {
-    initials: "A",
-    tint: "#8fb0a7",
-    name: "Angeline",
-    at: "3d ago",
-    body: "Q3 review meeting moved to Thursday",
-  },
-];
-
-// Fixed so the canvas keeps matching the frame; becomes the real month once the
-// calendar reads availability data.
-const MONTH = { year: 2026, month: 7 }; // August 2026
-const SELECTED_DAY = 13;
-// The frame marks the viewer's days off and the team's identically, even though
-// the legend distinguishes them, so they share one style here.
-const DAYS_OFF = [7, 21];
-
 type DayCell = { day: number; inMonth: boolean };
 
 // The frame's grid is drawn by hand and does not line up with real weekdays
 // (it puts Aug 13 2026 on a Tuesday; it is a Thursday), so the cells are
 // generated instead. A month can need six rows, which the frame's five do not.
-function monthGrid({ year, month }: { year: number; month: number }): DayCell[][] {
+function monthGrid({
+  year,
+  month,
+}: {
+  year: number;
+  month: number;
+}): DayCell[][] {
   const first = new Date(Date.UTC(year, month, 1));
   const lead = first.getUTCDay();
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const daysInPrev = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
   const cells: DayCell[] = [];
-  for (let i = lead - 1; i >= 0; i--) cells.push({ day: daysInPrev - i, inMonth: false });
+  for (let i = lead - 1; i >= 0; i--)
+    cells.push({ day: daysInPrev - i, inMonth: false });
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, inMonth: true });
-  for (let d = 1; cells.length % 7 !== 0; d++) cells.push({ day: d, inMonth: false });
+  for (let d = 1; cells.length % 7 !== 0; d++)
+    cells.push({ day: d, inMonth: false });
 
   const rows: DayCell[][] = [];
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
   return rows;
 }
 
-const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
+const MONTH_FORMAT = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
   timeZone: "UTC",
-}).format(new Date(Date.UTC(MONTH.year, MONTH.month, 1)));
+});
 
-const SELECTED_LABEL = new Intl.DateTimeFormat("en-US", {
+const SELECTED_FORMAT = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
   year: "numeric",
   timeZone: "UTC",
-}).format(new Date(Date.UTC(MONTH.year, MONTH.month, SELECTED_DAY)));
+});
 
 const CARD = "rounded-[12px] border border-[#243033]! bg-[#171e24] p-[20px]";
 const ICON_BADGE = "rounded-[8px] bg-white/[0.03] p-[6px]";
 
 // The frame writes these as a literal ">" glyph; lucide keeps it consistent
 // with the rest of the iconography.
-function ViewAll({ className = "" }: { className?: string }) {
+function ViewAll({
+  href,
+  className = "",
+}: {
+  href: string;
+  className?: string;
+}) {
   return (
-    <button
-      type="button"
+    <Link
+      href={href}
       className={`flex shrink-0 cursor-pointer items-center gap-[2px] font-semibold text-[#8fb0a7] transition-opacity hover:opacity-80 ${className}`}
     >
       View all
       <ChevronRight size={14} strokeWidth={2} />
-    </button>
+    </Link>
   );
 }
 
-export default function V2Dashboard() {
-  const weeks = monthGrid(MONTH);
+export default function V2Dashboard({ data }: { data: DashboardData }) {
+  const weeks = monthGrid(data.month);
+  const monthLabel = MONTH_FORMAT.format(
+    new Date(Date.UTC(data.month.year, data.month.month, 1)),
+  );
+  const todayLabel = SELECTED_FORMAT.format(
+    new Date(Date.UTC(data.month.year, data.month.month, data.today)),
+  );
+
+  const stats: Stat[] = [
+    {
+      label: "Tickets solved",
+      value: data.ticketsSolved.toLocaleString("en-US"),
+      icon: CircleCheck,
+      // Only shown when there is a previous period to compare against.
+      delta: data.ticketDelta ?? undefined,
+      note: data.ticketDelta ? "vs last period" : "this period",
+    },
+    {
+      label: "On shift now",
+      value: `${data.onShift.length} / ${data.memberCount}`,
+      icon: Users,
+      note: "Active operators checked in",
+    },
+    {
+      label: "Reviews",
+      value: String(data.reviewTotal),
+      icon: Star,
+      sources: data.reviewsBySource.map((s) => ({
+        count: String(s.count),
+        label: s.label,
+      })),
+    },
+    {
+      label: "Team members",
+      value: String(data.memberCount),
+      icon: Users,
+      note: "With workspace access",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-[24px] p-[32px]">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-[4px]">
           <h1 className="text-[28px] font-bold text-[#e2e8f0]">Dashboard</h1>
-          <p className="text-[14px] font-normal text-[#94a3b8]">Overview of your team workspace</p>
+          <p className="text-[14px] font-normal text-[#94a3b8]">
+            Overview of your team workspace
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-[16px]">
           <div className="flex w-[280px] items-center gap-[10px] rounded-[8px] border border-[#243033]! bg-[#171e24] px-[14px] py-[10px]">
-            <Search size={14} strokeWidth={2} className="shrink-0 text-[#94a3b8]" />
+            <Search
+              size={14}
+              strokeWidth={2}
+              className="shrink-0 text-[#94a3b8]"
+            />
             <span className="min-w-0 flex-1 truncate text-[14px] font-normal text-[#94a3b8]">
               Search news and guides
             </span>
@@ -188,7 +167,7 @@ export default function V2Dashboard() {
       </div>
 
       <div className="flex items-start gap-[16px]">
-        {STATS.map((stat) => {
+        {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
@@ -200,18 +179,48 @@ export default function V2Dashboard() {
                   {stat.label}
                 </p>
                 <span className={ICON_BADGE}>
-                  <Icon size={14} strokeWidth={2} className="block text-[#e2e8f0]" />
+                  <Icon
+                    size={14}
+                    strokeWidth={2}
+                    className="block text-[#e2e8f0]"
+                  />
                 </span>
               </div>
               <div className="flex flex-col gap-[6px]">
-                <p className="text-[28px] font-bold text-[#e2e8f0]">{stat.value}</p>
+                <p className="text-[28px] font-bold text-[#e2e8f0]">
+                  {stat.value}
+                </p>
                 {stat.delta ? (
                   <div className="flex items-center gap-[6px]">
-                    <span className="flex items-center gap-[4px] rounded-[4px] bg-[#10b981]/[0.11] px-[6px] py-[2px]">
-                      <ArrowUp size={10} strokeWidth={2} className="text-[#10b981]" />
-                      <span className="text-[11px] font-bold text-[#10b981]">{stat.delta}</span>
+                    {/* The frame only draws the rising case; a real delta can
+                        fall, and showing that in green under an up arrow would
+                        read as good news. */}
+                    {(() => {
+                      const down = stat.delta.startsWith("-");
+                      const Arrow = down ? ArrowDown : ArrowUp;
+                      const tone = down ? "#ef4444" : "#10b981";
+                      return (
+                        <span
+                          className="flex items-center gap-[4px] rounded-[4px] px-[6px] py-[2px]"
+                          style={{ backgroundColor: `${tone}1c` }}
+                        >
+                          <Arrow
+                            size={10}
+                            strokeWidth={2}
+                            style={{ color: tone }}
+                          />
+                          <span
+                            className="text-[11px] font-bold"
+                            style={{ color: tone }}
+                          >
+                            {stat.delta}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                    <span className="text-[12px] font-normal text-[#94a3b8]">
+                      {stat.note}
                     </span>
-                    <span className="text-[12px] font-normal text-[#94a3b8]">{stat.note}</span>
                   </div>
                 ) : stat.sources ? (
                   <div className="flex items-center gap-[8px] text-[11px]">
@@ -220,13 +229,19 @@ export default function V2Dashboard() {
                         key={s.label}
                         className="flex items-center gap-[6px] rounded-[4px] bg-white/[0.03] px-[6px] py-[2px]"
                       >
-                        <span className="font-bold text-[#e2e8f0]">{s.count}</span>
-                        <span className="font-medium text-[#94a3b8]">{s.label}</span>
+                        <span className="font-bold text-[#e2e8f0]">
+                          {s.count}
+                        </span>
+                        <span className="font-medium text-[#94a3b8]">
+                          {s.label}
+                        </span>
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[12px] font-normal text-[#94a3b8]">{stat.note}</p>
+                  <p className="text-[12px] font-normal text-[#94a3b8]">
+                    {stat.note}
+                  </p>
                 )}
               </div>
             </div>
@@ -240,39 +255,60 @@ export default function V2Dashboard() {
           <div className={`flex flex-col gap-[12px] ${CARD}`}>
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-[4px]">
-                <p className="text-[16px] font-bold text-[#e2e8f0]">Latest news</p>
+                <p className="text-[16px] font-bold text-[#e2e8f0]">
+                  Latest news
+                </p>
                 <p className="text-[13px] font-normal text-[#94a3b8]">
                   Announcements and updates from the team
                 </p>
               </div>
-              <ViewAll className="text-[13px]" />
+              <ViewAll href="/v2/news" className="text-[13px]" />
             </div>
             <div className="flex flex-col">
-              {NEWS.map((item, i) => (
-                <div key={item.title} className="flex flex-col">
-                  <button
-                    type="button"
+              {data.news.length === 0 ? (
+                <p className="py-[10px] text-[13px] font-normal text-[#64748b]">
+                  No posts yet.
+                </p>
+              ) : null}
+              {data.news.map((item, i) => (
+                <div key={item.slug} className="flex flex-col">
+                  <Link
+                    href={`/v2/news/${item.slug}`}
                     className="flex w-full cursor-pointer items-center gap-[12px] py-[10px] text-left"
                   >
                     <span className="flex min-w-0 flex-1 items-center gap-[10px]">
                       <span className="shrink-0 rounded-[6px] bg-white/[0.03] p-[6px]">
-                        <FileText size={16} strokeWidth={2} className="block text-[#8fb0a7]" />
+                        <FileText
+                          size={16}
+                          strokeWidth={2}
+                          className="block text-[#8fb0a7]"
+                        />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
                         <span className="truncate text-[13px] font-semibold text-[#e2e8f0]">
                           {item.title}
                         </span>
-                        <span className="text-[12px] font-normal text-[#64748b]">{item.meta}</span>
+                        <span className="text-[12px] font-normal text-[#64748b]">
+                          {item.meta}
+                        </span>
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-[10px]">
-                      <span className="rounded-full bg-[#8fb0a7]/[0.12] px-[8px] py-[3px] text-[10px] font-bold text-[#8fb0a7]">
-                        {item.tag}
-                      </span>
-                      <ChevronRight size={14} strokeWidth={2} className="text-[#64748b]" />
+                      {item.tag ? (
+                        <span className="rounded-full bg-[#8fb0a7]/[0.12] px-[8px] py-[3px] text-[10px] font-bold text-[#8fb0a7]">
+                          {item.tag}
+                        </span>
+                      ) : null}
+                      <ChevronRight
+                        size={14}
+                        strokeWidth={2}
+                        className="text-[#64748b]"
+                      />
                     </span>
-                  </button>
-                  {i < NEWS.length - 1 ? <div className="h-px w-full bg-[#243033]" /> : null}
+                  </Link>
+                  {i < data.news.length - 1 ? (
+                    <div className="h-px w-full bg-[#243033]" />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -280,17 +316,26 @@ export default function V2Dashboard() {
 
           {/* The frame fixes this card to the news card's height and clips the
               thread rather than letting it grow. */}
-          <div className={`flex h-[351px] flex-col gap-[12px] overflow-hidden ${CARD}`}>
+          <div
+            className={`flex h-[351px] flex-col gap-[12px] overflow-hidden ${CARD}`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-[4px]">
                 <p className="text-[15px] font-bold text-[#e2e8f0]">Notes</p>
-                <p className="text-[12px] font-normal text-[#94a3b8]">Shared notes from the team</p>
+                <p className="text-[12px] font-normal text-[#94a3b8]">
+                  Shared notes from the team
+                </p>
               </div>
-              <ViewAll className="text-[12px]" />
+              <ViewAll href="/v2/notes" className="text-[12px]" />
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-[12px] overflow-hidden">
-              {NOTES.map((note, i) => (
-                <div key={`${note.name}-${i}`} className="flex flex-col gap-[12px]">
+              {data.notes.length === 0 ? (
+                <p className="text-[13px] font-normal text-[#64748b]">
+                  No notes yet.
+                </p>
+              ) : null}
+              {data.notes.map((note, i) => (
+                <div key={note.id} className="flex flex-col gap-[12px]">
                   <div className="flex items-start gap-[12px]">
                     <span
                       className="flex size-[32px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-[#0f141a]"
@@ -312,7 +357,9 @@ export default function V2Dashboard() {
                       </span>
                     </span>
                   </div>
-                  {i < NOTES.length - 1 ? <div className="h-px w-full bg-[#243033]" /> : null}
+                  {i < data.notes.length - 1 ? (
+                    <div className="h-px w-full bg-[#243033]" />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -323,7 +370,9 @@ export default function V2Dashboard() {
         <div className="flex w-[332px] shrink-0 flex-col gap-[16px]">
           <div className={`flex flex-col gap-[12px] ${CARD}`}>
             <div className="flex flex-col gap-[4px] pl-[12px]">
-              <p className="text-[15px] font-bold text-[#e2e8f0]">Team availability</p>
+              <p className="text-[15px] font-bold text-[#e2e8f0]">
+                Team availability
+              </p>
               <p className="text-[12px] font-normal text-[#94a3b8]">
                 Select a day to set your unavailability
               </p>
@@ -331,13 +380,29 @@ export default function V2Dashboard() {
 
             <div className="flex flex-col gap-[10px]">
               <div className="flex items-center justify-between">
-                <p className="text-[14px] font-bold text-[#e2e8f0]">{MONTH_LABEL}</p>
+                <p className="text-[14px] font-bold text-[#e2e8f0]">
+                  {monthLabel}
+                </p>
                 <div className="flex items-start gap-[8px]">
-                  <button type="button" className={`cursor-pointer ${ICON_BADGE}`}>
-                    <ChevronLeft size={12} strokeWidth={2} className="block text-[#e2e8f0]" />
+                  <button
+                    type="button"
+                    className={`cursor-pointer ${ICON_BADGE}`}
+                  >
+                    <ChevronLeft
+                      size={12}
+                      strokeWidth={2}
+                      className="block text-[#e2e8f0]"
+                    />
                   </button>
-                  <button type="button" className={`cursor-pointer ${ICON_BADGE}`}>
-                    <ChevronRight size={12} strokeWidth={2} className="block text-[#e2e8f0]" />
+                  <button
+                    type="button"
+                    className={`cursor-pointer ${ICON_BADGE}`}
+                  >
+                    <ChevronRight
+                      size={12}
+                      strokeWidth={2}
+                      className="block text-[#e2e8f0]"
+                    />
                   </button>
                 </div>
               </div>
@@ -354,8 +419,9 @@ export default function V2Dashboard() {
                 {weeks.map((week, wi) => (
                   <div key={wi} className="flex items-start justify-between">
                     {week.map((cell, ci) => {
-                      const isSelected = cell.inMonth && cell.day === SELECTED_DAY;
-                      const isOff = cell.inMonth && DAYS_OFF.includes(cell.day);
+                      const isSelected =
+                        cell.inMonth && cell.day === data.today;
+                      const isOff = cell.inMonth && !!data.daysOff[cell.day];
                       return (
                         <button
                           key={`${wi}-${ci}`}
@@ -383,8 +449,12 @@ export default function V2Dashboard() {
               <div className="h-px w-full bg-[#243033]" />
               <div className="flex items-center justify-between gap-[12px]">
                 <div className="flex flex-col gap-[2px]">
-                  <p className="text-[13px] font-semibold text-[#e2e8f0]">{SELECTED_LABEL}</p>
-                  <p className="text-[11px] font-normal text-[#10b981]">Everyone available</p>
+                  <p className="text-[13px] font-semibold text-[#e2e8f0]">
+                    {todayLabel}
+                  </p>
+                  <p className="text-[11px] font-normal text-[#10b981]">
+                    Everyone available
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -409,23 +479,33 @@ export default function V2Dashboard() {
           <div className={`flex flex-col gap-[12px] overflow-hidden ${CARD}`}>
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-[4px]">
-                <p className="text-[15px] font-bold text-[#e2e8f0]">Shift check-in</p>
-                <p className="text-[12px] font-normal text-[#94a3b8]">Who is on shift right now</p>
+                <p className="text-[15px] font-bold text-[#e2e8f0]">
+                  Shift check-in
+                </p>
+                <p className="text-[12px] font-normal text-[#94a3b8]">
+                  Who is on shift right now
+                </p>
               </div>
               <span className="flex shrink-0 items-center gap-[6px] rounded-full bg-[#10b981]/[0.11] px-[10px] py-[4px]">
                 <span className="size-[6px] rounded-full bg-[#10b981]" />
-                <span className="text-[11px] font-bold text-[#10b981]">LIVE</span>
+                <span className="text-[11px] font-bold text-[#10b981]">
+                  LIVE
+                </span>
               </span>
             </div>
 
             <div className="flex h-[120px] flex-col gap-[10px] overflow-hidden">
-              {ON_SHIFT.map((m) => (
+              {data.onShift.map((m) => (
                 <div key={m.name} className="flex items-center justify-between">
                   <span className="flex items-center gap-[8px]">
                     <span className="size-[6px] rounded-full bg-[#10b981]" />
-                    <span className="text-[13px] font-semibold text-[#e2e8f0]">{m.name}</span>
+                    <span className="text-[13px] font-semibold text-[#e2e8f0]">
+                      {m.name}
+                    </span>
                   </span>
-                  <span className="text-[12px] font-normal text-[#64748b]">{m.at}</span>
+                  <span className="text-[12px] font-normal text-[#64748b]">
+                    {m.at}
+                  </span>
                 </div>
               ))}
             </div>
