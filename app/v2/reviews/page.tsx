@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { asc, desc, isNull } from "drizzle-orm";
 import { Clock, Star } from "lucide-react";
@@ -13,9 +14,9 @@ import { user } from "@/db/auth-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import { fileUrl } from "@/lib/storage";
 import { plainName } from "../member";
-import { sourceDot } from "./reviews-data";
 import LogReview, { type Source } from "./log-review";
 import BonusCard from "./bonus-card";
+import ReviewEvidence from "./review-evidence";
 import EligibleMembers, { type StaffMember } from "./eligible-members";
 
 // /v2/reviews - the manual review counter from the "reviews-page" Figma frame
@@ -38,6 +39,9 @@ async function displayUrl(imageUrl: string): Promise<string | null> {
 }
 
 export default async function V2ReviewsPage() {
+  const session = await getSession();
+  const isAdmin = session?.user.role === "admin";
+
   // Selected directly rather than through lib/reviews' getReviewSources, which
   // seeds the catalog on read.
   const sources = await db
@@ -187,45 +191,17 @@ export default async function V2ReviewsPage() {
               // The frame only draws the empty state - the dev database has no
               // reviews in the current period - so the populated list reuses the
               // screenshot tiles from the audit review.
-              <div className="grid grid-cols-3 gap-[16px]">
-                {items.map((item) => {
-                  const name =
-                    sources.find((s) => s.id === item.source)?.name ??
-                    item.source;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`flex flex-col overflow-hidden ${card}`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.src ?? ""}
-                        alt=""
-                        className="aspect-video w-full border-b border-[#243033]! object-cover object-top"
-                      />
-                      <div className="flex flex-col gap-[6px] p-[14px]">
-                        <div className="flex items-center gap-[8px]">
-                          <span
-                            style={{ backgroundColor: sourceDot(name) }}
-                            className="size-[8px] shrink-0 rounded-full"
-                          />
-                          <p className="truncate text-[13px] font-semibold text-[#e2e8f0]">
-                            {name}
-                          </p>
-                        </div>
-                        {item.note ? (
-                          <p className="truncate text-[12px] font-normal text-[#94a3b8]">
-                            {item.note}
-                          </p>
-                        ) : null}
-                        <p className="text-[11px] font-normal text-[#64748b]">
-                          {formatDateTime(item.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <ReviewEvidence
+                isAdmin={isAdmin}
+                items={items.map((item) => ({
+                  id: item.id,
+                  src: item.src,
+                  sourceName:
+                    sources.find((s) => s.id === item.source)?.name ?? item.source,
+                  note: item.note,
+                  when: formatDateTime(item.createdAt),
+                }))}
+              />
             )}
           </div>
         </div>

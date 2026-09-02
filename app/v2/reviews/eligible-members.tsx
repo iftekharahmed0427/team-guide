@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Loader2 } from "lucide-react";
+import { setReviewEligibility } from "@/app/(app)/reviews/actions";
 import { initialsOf, tintFor } from "../member";
 
 // The eligible-members panel from the "reviews-page" frame (node 163:110). A
 // tick marks a member as earning the bonus when the period hits its threshold.
 //
-// Toggling is local: the live /reviews page owns toggleBonusMember, which
-// inserts or deletes the review_bonus_member row and is admin-gated.
+// Toggling calls the live setReviewEligibility, which inserts or deletes the
+// review_bonus_member row and is admin-gated. The tick moves straight away and
+// is put back if the write fails, so a mis-click is visible rather than silent.
 
 export type StaffMember = { id: string; name: string; eligible: boolean };
 
@@ -17,17 +20,38 @@ export default function EligibleMembers({
 }: {
   members: StaffMember[];
 }) {
+  const router = useRouter();
   const [ticked, setTicked] = useState(
     () => new Set(members.filter((m) => m.eligible).map((m) => m.id)),
   );
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [, startTransition] = useTransition();
 
-  const toggle = (id: string) =>
+  const flip = (id: string) =>
     setTicked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+
+  function toggle(id: string) {
+    const next = !ticked.has(id);
+    setError("");
+    setBusy(id);
+    flip(id);
+    startTransition(async () => {
+      const res = await setReviewEligibility(id, next);
+      setBusy(null);
+      if ("error" in res) {
+        flip(id);
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   // globals.css sets an unlayered `* { border-color: var(--border) }`, which
   // wins over Tailwind's layered border utilities, so borders are marked
@@ -55,8 +79,9 @@ export default function EligibleMembers({
               type="button"
               role="checkbox"
               aria-checked={on}
+              disabled={busy === member.id}
               onClick={() => toggle(member.id)}
-              className="flex w-full cursor-pointer items-center justify-between gap-[12px] border-b border-[#243033]! px-[14px] py-[10px] text-left transition-colors hover:bg-[#0e1217]/40"
+              className="flex w-full cursor-pointer items-center justify-between gap-[12px] border-b border-[#243033]! px-[14px] py-[10px] text-left transition-colors hover:bg-[#0e1217]/40 disabled:cursor-default"
             >
               <span className="flex min-w-0 items-center gap-[12px]">
                 <span
@@ -77,7 +102,15 @@ export default function EligibleMembers({
                     : "border-[1.5px] border-[#64748b]! bg-transparent"
                 }`}
               >
-                {on ? <Check size={10} strokeWidth={3} /> : null}
+                {busy === member.id ? (
+                  <Loader2
+                    size={11}
+                    strokeWidth={2.5}
+                    className="animate-spin text-[#8fb0a7]"
+                  />
+                ) : on ? (
+                  <Check size={10} strokeWidth={3} />
+                ) : null}
               </span>
             </button>
           );
@@ -89,6 +122,12 @@ export default function EligibleMembers({
           </p>
         ) : null}
       </div>
+
+      {error ? (
+        <p className="px-[14px] pb-[12px] text-[12px] font-medium text-[#ef4444]">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

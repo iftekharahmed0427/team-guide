@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Gift } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, Check, Gift, Loader2 } from "lucide-react";
+import { updateReviewBonus } from "@/app/(app)/reviews/actions";
 
 // The review bonus card from the "reviews-page" frame (node 163:82): the rule,
 // its two settings, and the team's progress toward the threshold.
 //
-// The threshold and amount are editable so the copy and the bar can be
-// exercised, but Update settings is inert - the live /reviews page owns
-// saveReviewSettings, and it is admin-gated.
+// Wired to the live updateReviewBonus, which is admin-gated. The same rule is
+// shown on /v2/settings/pay-rules; this is the copy of it that sits where the
+// reviews are actually logged.
 
 export default function BonusCard({
   threshold: savedThreshold,
@@ -20,8 +22,26 @@ export default function BonusCard({
   /** Reviews logged in the current period, across every source. */
   total: number;
 }) {
+  const router = useRouter();
   const [threshold, setThreshold] = useState(String(savedThreshold));
   const [amount, setAmount] = useState(String(savedAmount));
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function save() {
+    setError("");
+    setSaved(false);
+    startTransition(async () => {
+      const res = await updateReviewBonus({ threshold: goal, amount: perMember });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setSaved(true);
+      router.refresh();
+    });
+  }
 
   const goal = Math.max(0, Number(threshold.replace(/[^0-9.]/g, "")) || 0);
   const perMember = Number(amount.replace(/[^0-9.]/g, "")) || 0;
@@ -91,10 +111,27 @@ export default function BonusCard({
 
         <button
           type="button"
-          className="flex w-full cursor-pointer items-center justify-center rounded-[6px] border border-[#243033]! bg-[#0e1217] py-[10px] text-[13px] font-semibold text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0]"
+          onClick={save}
+          disabled={pending}
+          className="flex w-full cursor-pointer items-center justify-center gap-[8px] rounded-[6px] border border-[#243033]! bg-[#0e1217] py-[10px] text-[13px] font-semibold text-[#94a3b8] transition-colors hover:border-[#2f3d42]! hover:text-[#e2e8f0] disabled:cursor-default disabled:opacity-60"
         >
+          {pending ? (
+            <Loader2 size={13} strokeWidth={2} className="animate-spin" />
+          ) : null}
           Update settings
         </button>
+
+        {error ? (
+          <p className="flex items-center gap-[6px] text-[12px] font-medium text-[#ef4444]">
+            <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
+            {error}
+          </p>
+        ) : saved ? (
+          <p className="flex items-center gap-[6px] text-[12px] font-semibold text-[#10b981]">
+            <Check size={12} strokeWidth={2} className="shrink-0" />
+            Saved.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-[8px]">
