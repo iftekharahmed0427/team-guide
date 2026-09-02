@@ -100,7 +100,10 @@ export default function BoardClient({
   function onDragEnd(event: DragEndEvent) {
     setDragging(null);
     const { active, over } = event;
-    if (!over) return;
+    // Dropped on nothing, or back on itself: a short drag that ends where it
+    // started is not a move, and treating it as one would send the card to the
+    // end of its column and write a move nobody asked for.
+    if (!over || over.id === active.id) return;
 
     const task = tasks.find((t) => t.id === active.id);
     if (!task) return;
