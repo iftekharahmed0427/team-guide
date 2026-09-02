@@ -326,7 +326,9 @@ export default function V2Dashboard({
                   Shared notes from the team
                 </p>
               </div>
-              <ViewAll href="/v2/notes" className="text-[12px]" />
+              {/* Notes has no v2 page yet - it is due a revamp - so this
+                  points at the one v1 still serves. */}
+              <ViewAll href="/notes" className="text-[12px]" />
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-[12px] overflow-hidden">
               {data.notes.length === 0 ? (
