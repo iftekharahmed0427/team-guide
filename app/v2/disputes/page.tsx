@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { asc, desc, isNull } from "drizzle-orm";
 import { Clock, Gavel } from "lucide-react";
+import { getSession } from "@/lib/auth";
+import { canAccessDisputes } from "@/lib/disputes";
 import { db } from "@/db";
 import { dispute, disputeCategory, reportPeriod } from "@/db/app-schema";
 import { formatDate, formatDateTime } from "@/lib/datetime";
@@ -22,8 +25,10 @@ import {
 //
 // Reads the real dispute table. The current period is everything not yet
 // archived (periodId null), the rule the live page uses; the subtitle dates it
-// from the last "Reset all". Access is role-gated on the live page, not here -
-// v2 pages do not gate, the shell does.
+// from the last "Reset all".
+//
+// Role-gated the way the live page is: admins, plus members on the Disputes
+// payment role. Everyone else is sent back to the dashboard.
 
 async function displayUrl(imageUrl: string): Promise<string | null> {
   if (imageUrl.startsWith("data:")) return imageUrl;
@@ -31,6 +36,11 @@ async function displayUrl(imageUrl: string): Promise<string | null> {
 }
 
 export default async function V2DisputesPage() {
+  const session = await getSession();
+  if (!(await canAccessDisputes(session))) redirect("/v2");
+  const isAdmin = session?.user.role === "admin";
+  const currentUserId = session?.user.id ?? "";
+
   const categories = await db
     .select({ name: disputeCategory.name })
     .from(disputeCategory)
@@ -61,6 +71,7 @@ export default async function V2DisputesPage() {
       outcome: r.outcome,
       amount: r.amount,
       src: await displayUrl(r.imageUrl),
+      submittedById: r.submittedById,
       submittedByName: plainName(r.submittedByName || "Member"),
       when: formatDateTime(r.createdAt),
     })),
@@ -175,7 +186,11 @@ export default async function V2DisputesPage() {
             </div>
           </div>
         ) : (
-          <DisputeList items={items} />
+          <DisputeList
+            items={items}
+            isAdmin={isAdmin}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
     </div>

@@ -11,6 +11,7 @@ export type Dispute = {
   amount: number;
   /** Null when the screenshot cannot be resolved (storage off locally). */
   src: string | null;
+  submittedById: string | null;
   submittedByName: string;
   when: string;
 };

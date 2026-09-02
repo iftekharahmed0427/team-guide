@@ -36,6 +36,7 @@ export default async function V2DisputeHistoryPage() {
       outcome: dispute.outcome,
       amount: dispute.amount,
       imageUrl: dispute.imageUrl,
+      submittedById: dispute.submittedById,
       submittedByName: dispute.submittedByName,
       createdAt: dispute.createdAt,
       periodId: dispute.periodId,
@@ -77,6 +78,7 @@ export default async function V2DisputeHistoryPage() {
       outcome: row.outcome,
       amount: row.amount,
       src: await displayUrl(row.imageUrl),
+      submittedById: row.submittedById,
       submittedByName: plainName(row.submittedByName || "Member"),
       when: formatDateTime(row.createdAt),
     });
